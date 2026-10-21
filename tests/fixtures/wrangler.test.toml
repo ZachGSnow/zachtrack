@@ -1,0 +1,8 @@
+# Local-only config for tests/sync.test.ts: a throwaway in-memory D1.
+name = "zachtrack-test"
+compatibility_date = "2026-10-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "zachtrack-test-db"
+database_id = "00000000-0000-0000-0000-000000000000"

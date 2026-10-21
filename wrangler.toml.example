@@ -1,0 +1,19 @@
+# Copy to wrangler.toml (git-ignored) and fill in your own values.
+# See README.md "Deploy your own" for where each value comes from.
+name = "zachtrack"
+pages_build_output_dir = "dist"
+compatibility_date = "2026-10-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "zachtrack-db"
+database_id = "00000000-0000-0000-0000-000000000000"
+
+[vars]
+# The only email the sync endpoint accepts. Must match your Access policy.
+OWNER_EMAIL = "you@example.com"
+# Your Zero Trust team domain (Zero Trust > Settings > Custom Pages).
+ACCESS_TEAM_DOMAIN = "your-team.cloudflareaccess.com"
+# Optional but recommended: the Access application's AUD tag
+# (Zero Trust > Access > Applications > your app > Overview).
+# ACCESS_AUD = "<your-access-aud-tag>"

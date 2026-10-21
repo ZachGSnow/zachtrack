@@ -1,0 +1,47 @@
+import { defineConfig } from 'vite'
+import { svelte } from '@sveltejs/vite-plugin-svelte'
+import tailwindcss from '@tailwindcss/vite'
+import { VitePWA } from 'vite-plugin-pwa'
+
+// https://vite.dev/config/
+export default defineConfig({
+  server: {
+    host: true,
+    port: 5173,
+  },
+  plugins: [
+    svelte(),
+    tailwindcss(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      devOptions: {
+        enabled: true,
+      },
+      includeAssets: ['favicon.svg'],
+      manifest: {
+        name: 'ZachTrack',
+        short_name: 'ZachTrack',
+        description: 'A personal fasting timer and everything tracker with cross-metric charting.',
+        theme_color: '#0b0f0e',
+        background_color: '#0b0f0e',
+        display: 'standalone',
+        orientation: 'portrait',
+        start_url: '/',
+        scope: '/',
+        icons: [
+          { src: '/pwa-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: '/pwa-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: '/maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+        ],
+      },
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest}'],
+        // Never answer these navigations with the cached app shell -- they must
+        // reach the network so Cloudflare Access can run its login/callback
+        // flow (see ARCHITECTURE.md 4.9). `?reauth=` is the marker the sync
+        // store's `reauthenticate()` uses to force a real network navigation.
+        navigateFallbackDenylist: [/^\/api\//, /^\/cdn-cgi\//, /[?&]reauth=/],
+      },
+    }),
+  ],
+})
