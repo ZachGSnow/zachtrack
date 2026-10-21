@@ -6,7 +6,8 @@ import type {
   SettingsRecord,
   SyncRecordType,
 } from '../../src/lib/db';
-import { verifyAccessJwt, type AccessDeps } from '../../server/access';
+import { UNAVAILABLE_REASONS, verifyAccessJwt, type AccessDeps } from '../../server/access';
+import { invalidReason, recordKey, type RecordKind } from '../../server/validate';
 
 export interface Env {
   DB: D1Database;
@@ -36,8 +37,8 @@ interface SyncRequestBody {
   tombstones: Tombstone[];
 }
 
-interface RejectedFast {
-  recordType: 'fasts';
+interface RejectedRecord {
+  recordType: RecordKind;
   uuid: string;
   reason: string;
 }
@@ -53,14 +54,24 @@ interface SyncResponseBody {
     trackableEntries: WireRow<TrackableEntry>[];
     settings: WireRow<SettingsRecord> | null;
   };
-  rejected: RejectedFast[];
+  rejected: RejectedRecord[];
 }
 
-const TOMBSTONE_TABLES: Record<SyncRecordType, { table: string; keyColumn: string }> = {
-  fasts: { table: 'fasts', keyColumn: 'uuid' },
+/**
+ * Where each record type lives, and which columns a delete clears. Field and
+ * trackable definitions keep their names so the sync history can still say
+ * what was deleted; fasts and entries lose their notes, tags and values.
+ * d1/scrub-deleted.sql applies the same clearing to rows deleted earlier.
+ */
+const TOMBSTONE_TABLES: Record<SyncRecordType, { table: string; keyColumn: string; scrub?: string }> = {
+  fasts: {
+    table: 'fasts',
+    keyColumn: 'uuid',
+    scrub: 'note = NULL, tags = NULL, moodRating = NULL, energyRating = NULL, hungerRating = NULL',
+  },
   fieldDefinitions: { table: 'fieldDefinitions', keyColumn: 'id' },
   trackableDefinitions: { table: 'trackableDefinitions', keyColumn: 'id' },
-  trackableEntries: { table: 'trackableEntries', keyColumn: 'id' },
+  trackableEntries: { table: 'trackableEntries', keyColumn: 'id', scrub: 'note = NULL, tags = NULL, fieldValues = NULL' },
 };
 
 export const onRequestPost: PagesFunction<Env> = (context) => handleSync(context.request, context.env);
@@ -81,6 +92,10 @@ export async function handleSync(request: Request, env: Env, deps: AccessDeps = 
     deps,
   );
   if (!access.ok) {
+    if (UNAVAILABLE_REASONS.has(access.reason)) {
+      console.error(`sync: could not check the Access token (${access.reason})`);
+      return jsonResponse({ error: 'Sync is temporarily unavailable' }, 503);
+    }
     console.warn(`sync: rejected request (${access.reason})`);
     return jsonResponse({ error: 'Forbidden' }, 403);
   }
@@ -91,7 +106,7 @@ export async function handleSync(request: Request, env: Env, deps: AccessDeps = 
   } catch {
     return jsonResponse({ error: 'Invalid JSON body' }, 400);
   }
-  if (typeof body?.cursor !== 'number' || !body.changes) {
+  if (typeof body?.cursor !== 'number' || !Number.isFinite(body.cursor) || typeof body.changes !== 'object' || body.changes === null) {
     return jsonResponse({ error: 'Malformed sync request' }, 400);
   }
 
@@ -115,7 +130,8 @@ export async function handleSync(request: Request, env: Env, deps: AccessDeps = 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    // Health data: never cached by the browser or anything in between.
+    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' },
   });
 }
 
@@ -136,15 +152,30 @@ async function currentSeq(db: D1Database): Promise<number> {
 //   4. up to 1 batched tombstone application (all deletes together)
 // ---------------------------------------------------------------------------
 
-async function applyIncomingChanges(db: D1Database, body: SyncRequestBody): Promise<RejectedFast[]> {
-  const fasts = body.changes.fasts ?? [];
-  const fields = body.changes.fieldDefinitions ?? [];
-  const trackables = body.changes.trackableDefinitions ?? [];
-  const entries = body.changes.trackableEntries ?? [];
-  const settings = body.changes.settings;
-  const tombstones = body.tombstones ?? [];
+async function applyIncomingChanges(db: D1Database, body: SyncRequestBody): Promise<RejectedRecord[]> {
+  const rejected: RejectedRecord[] = [];
 
-  const rejected: RejectedFast[] = [];
+  // Drop (and report) anything that doesn't match the schema before any SQL
+  // runs, so one bad record can't fail a whole batch (see server/validate.ts).
+  function valid<T>(kind: RecordKind, list: unknown): T[] {
+    if (list == null) return [];
+    if (!Array.isArray(list)) {
+      rejected.push({ recordType: kind, uuid: '', reason: `${kind} must be a list` });
+      return [];
+    }
+    return list.filter((record): record is T => {
+      const reason = invalidReason(kind, record);
+      if (reason) rejected.push({ recordType: kind, uuid: recordKey(record), reason: `Invalid record: ${reason}` });
+      return reason === null;
+    });
+  }
+
+  const fasts = valid<FastRecord>('fasts', body.changes.fasts);
+  const fields = valid<FieldDefinition>('fieldDefinitions', body.changes.fieldDefinitions);
+  const trackables = valid<TrackableDefinition>('trackableDefinitions', body.changes.trackableDefinitions);
+  const entries = valid<TrackableEntry>('trackableEntries', body.changes.trackableEntries);
+  const settings = body.changes.settings == null ? null : (valid<SettingsRecord>('settings', [body.changes.settings])[0] ?? null);
+  const tombstones = valid<Tombstone>('tombstones', body.tombstones);
 
   const totalSeqNeeded = fasts.length + fields.length + trackables.length + entries.length + (settings ? 1 : 0) + tombstones.length;
   let nextSeqValue = 0;
@@ -343,13 +374,15 @@ function buildSettingsUpsert(db: D1Database, settings: SettingsRecord, serverSeq
 }
 
 function buildTombstoneUpdate(db: D1Database, tombstone: Tombstone, serverSeq: number): D1PreparedStatement | null {
+  if (!Object.hasOwn(TOMBSTONE_TABLES, tombstone.recordType) || !tombstone.uuid) return null;
   const target = TOMBSTONE_TABLES[tombstone.recordType];
-  if (!target || !tombstone.uuid) return null;
   // Only apply if the current row's updatedAt doesn't postdate this delete
   // (i.e. no newer concurrent edit from another device has superseded it).
+  // The row itself stays (other devices learn about the delete from it), but
+  // its health content is cleared so a deleted entry doesn't keep its values.
   return db
     .prepare(
-      `UPDATE ${target.table} SET deletedAt = ?, updatedAt = ?, serverSeq = ? WHERE ${target.keyColumn} = ? AND updatedAt <= ?`,
+      `UPDATE ${target.table} SET ${target.scrub ? `${target.scrub}, ` : ''}deletedAt = ?, updatedAt = ?, serverSeq = ? WHERE ${target.keyColumn} = ? AND updatedAt <= ?`,
     )
     .bind(tombstone.deletedAt, tombstone.deletedAt, serverSeq, tombstone.uuid, tombstone.deletedAt);
 }

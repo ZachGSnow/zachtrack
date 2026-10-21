@@ -105,6 +105,12 @@ every request instead of running unchecked.
   Access JWT (RS256 signature against the team's published keys, issuer,
   expiry, audience, email), because `*.pages.dev` hostnames can reach it
   without Access (`server/access.ts`).
+- **Input checks:** every incoming record is validated against the schema
+  (`server/validate.ts`); a bad one is skipped and reported back, and the
+  rest of the sync goes through.
+- **Headers:** `public/_headers` sets a strict Content-Security-Policy
+  (same-origin only, no framing), HSTS and related headers; sync responses
+  are never cached.
 
 Stack: Vite, Svelte 5 (runes), TypeScript, Tailwind CSS 4, Dexie,
 vite-plugin-pwa, ECharts, Cloudflare Pages + Functions + D1 + Access.
@@ -122,9 +128,12 @@ protocol, the real bugs hit along the way and how they were fixed.
 - **In what form:** plain JSON in IndexedDB and plain rows in D1. D1 is
   encrypted at rest by Cloudflare; the app adds no encryption of its own.
 - **Deleting:** deleting a record removes it locally and marks it deleted in
-  D1 (`deletedAt`), so other devices delete it too. The row stays in D1 as a
-  soft delete. Clearing site data removes the local copy; dropping the D1
-  database removes the server copy. Neither is a secure erase.
+  D1 (`deletedAt`), so other devices delete it too. The server also clears a
+  deleted fast's or entry's notes, tags, ratings and values; a small row with
+  the id, dates and `deletedAt` stays. For rows deleted before v1.0.1, run
+  `d1/scrub-deleted.sql` once. Clearing site data removes the local copy;
+  dropping the D1 database removes the server copy. Neither is a secure erase,
+  and D1 Time Travel keeps earlier versions for 7 days.
 - **Per-device only:** sync history and view preferences stay in that
   browser's `localStorage`.
 
@@ -146,15 +155,22 @@ CI runs all three on Linux and Windows with Node 22 and 24.
   rolling averages and TSV copy.
 - Access JWT verification: valid tokens pass; forged, foreign-key, `alg: none`,
   expired, not-yet-valid, wrong-issuer, wrong-audience and wrong-email tokens
-  fail; key caching and rotation.
+  fail; key caching, rotation, and at most one forced refetch per 5 minutes.
 - The sync endpoint end to end against a local D1 built from `d1/schema.sql`:
   fail-closed config, round trip of every record type, last-write-wins,
-  one-fast-per-day rejection, deletes vs newer edits, and a 240-record push in
-  one request.
+  one-fast-per-day rejection, deletes vs newer edits, a 240-record push in
+  one request, malformed records rejected one by one without failing the
+  batch, unknown delete types skipped, content cleared on delete, and
+  `d1/scrub-deleted.sql`.
 
-**Verified by hand:** the Access certs format against a live team's
-`/cdn-cgi/access/certs` endpoint (RS256 keys that import with the same
-WebCrypto call the Function uses).
+**Verified by hand:**
+- The Access certs format against a live team's `/cdn-cgi/access/certs`
+  endpoint (RS256 keys that import with the same WebCrypto call the Function
+  uses).
+- Record validation against a copy of a real database: every live record
+  passes.
+- The CSP under `wrangler pages dev`: every tab and the charts render with no
+  violations.
 
 **Not verified by automated tests:** the Svelte UI, the service worker's
 re-login flow (ARCHITECTURE.md 4.9) and Access's own redirects. Those are

@@ -75,15 +75,51 @@ describe('verifyAccessJwt', () => {
     expect((await verifyAccessJwt(token, { ...config, aud: undefined }, deps())).ok).toBe(true);
   });
 
-  it('caches keys, and refetches once for an unknown kid (key rotation)', async () => {
+  it('caches keys for repeat requests', async () => {
     const token = await signer.sign(ownerClaims(NOW));
     await verifyAccessJwt(token, config, deps());
     await verifyAccessJwt(token, config, deps());
     expect(fetches).toHaveLength(1);
+  });
 
-    const rotated = await signer.sign(ownerClaims(NOW), { kid: 'key-2' });
-    expect(await verifyAccessJwt(rotated, config, deps())).toEqual({ ok: false, reason: 'unknown kid' });
+  it('refetches for an unknown kid at most once per 5 minutes', async () => {
+    let now = NOW;
+    let jwks = signer.jwks;
+    const timed = {
+      now: () => now,
+      fetchKeys: async (domain: string) => {
+        fetches.push(domain);
+        return jwks;
+      },
+    };
+    await verifyAccessJwt(await signer.sign(ownerClaims(NOW)), config, timed);
+    expect(fetches).toHaveLength(1);
+
+    // A flood of made-up kids right after a fetch causes no extra fetches.
+    for (let i = 0; i < 20; i++) {
+      const fake = await signer.sign(ownerClaims(NOW), { kid: `made-up-${i}` });
+      expect(await verifyAccessJwt(fake, config, timed)).toEqual({ ok: false, reason: 'unknown kid' });
+    }
+    expect(fetches).toHaveLength(1);
+
+    // Key rotation: once 5 minutes have passed, an unknown kid triggers one refetch and the new key works.
+    const rotatedSigner = await createSigner('key-2');
+    jwks = { keys: [...signer.jwks.keys, ...rotatedSigner.jwks.keys] };
+    now = NOW + 5 * 60 * 1000 + 1;
+    const rotated = await rotatedSigner.sign(ownerClaims(now));
+    expect((await verifyAccessJwt(rotated, config, timed)).ok).toBe(true);
     expect(fetches).toHaveLength(2);
+  });
+
+  it('reports keys unavailable when the certs fetch fails, instead of throwing', async () => {
+    const token = await signer.sign(ownerClaims(NOW));
+    const failing = {
+      now: () => NOW,
+      fetchKeys: async () => {
+        throw new Error('network down');
+      },
+    };
+    expect(await verifyAccessJwt(token, config, failing)).toEqual({ ok: false, reason: 'keys unavailable' });
   });
 
   it('accepts a team domain written as a URL', async () => {

@@ -196,3 +196,92 @@ describe('sync', () => {
     expect(res.body.changes.trackableEntries).toHaveLength(200);
   });
 });
+
+describe('hardening', () => {
+  it('rejects a malformed record by itself and still stores the rest of the batch', async () => {
+    const res = await sync(
+      syncBody(0, {
+        fasts: [fast('good', day(20), 10), { uuid: 'no-start', startDay: day(21), method: 'preset', createdAt: 1, updatedAt: 1 }],
+        trackableEntries: [entry('e-good', 5, 12), { ...entry('e-bad', 5, 1), values: { 'f-water': 'twelve' } }],
+        fieldDefinitions: [{ ...field, kind: 'text' }],
+      }),
+    );
+    expect(res.status).toBe(200);
+    expect(res.body.rejected).toEqual([
+      expect.objectContaining({ recordType: 'fasts', uuid: 'no-start', reason: expect.stringContaining('startTime') }),
+      expect.objectContaining({ recordType: 'fieldDefinitions', uuid: 'f-water', reason: expect.stringContaining('kind') }),
+      expect.objectContaining({ recordType: 'trackableEntries', uuid: 'e-bad', reason: expect.stringContaining('values') }),
+    ]);
+    expect(res.body.changes.fasts.map((f: { uuid: string }) => f.uuid)).toEqual(['good']);
+    expect(res.body.changes.trackableEntries.map((e: { id: string }) => e.id)).toEqual(['e-good']);
+  });
+
+  it('keeps syncing on later requests while a bad record is still on the device', async () => {
+    const poison = { ...entry('e-bad', 5, 1), trackableId: undefined };
+    await sync(syncBody(0, { trackableEntries: [poison] }));
+    const next = await sync(syncBody(0, { trackableEntries: [poison, entry('e-new', 6, 20)] }));
+    expect(next.status).toBe(200);
+    expect(next.body.changes.trackableEntries.map((e: { id: string }) => e.id)).toEqual(['e-new']);
+  });
+
+  it('accepts extra local-only properties such as the Dexie id on fasts', async () => {
+    const res = await sync(syncBody(0, { fasts: [{ ...fast('a', day(20), 10), id: 7 }] }));
+    expect(res.body.rejected).toEqual([]);
+  });
+
+  it('rejects a list field that is not a list, and invalid settings, without a 500', async () => {
+    const res = await sync({
+      cursor: 0,
+      changes: { fasts: { uuid: 'x' }, fieldDefinitions: [], trackableDefinitions: [], trackableEntries: [], settings: { id: 'other' } },
+      tombstones: [],
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.rejected.map((r: { recordType: string }) => r.recordType)).toEqual(['fasts', 'settings']);
+  });
+
+  it('skips tombstones with unknown record types instead of failing (including prototype keys)', async () => {
+    await sync(syncBody(0, { fasts: [fast('a', day(20), 10)] }));
+    const res = await sync(
+      syncBody(0, {}, [
+        { recordType: '__proto__', uuid: 'a', deletedAt: 20 },
+        { recordType: 'constructor', uuid: 'a', deletedAt: 20 },
+        { recordType: 'users', uuid: 'a', deletedAt: 20 },
+        { recordType: 'fasts', uuid: 'a', deletedAt: 20 },
+      ]),
+    );
+    expect(res.status).toBe(200);
+    expect(res.body.rejected).toHaveLength(3);
+    expect(res.body.changes.fasts[0].deletedAt).toBe(20);
+  });
+
+  it('clears notes, tags and values from a deleted entry and fast, but keeps the delete marker', async () => {
+    await sync(syncBody(0, { fasts: [fast('a', day(20), 10, { note: 'felt sick', moodRating: 2 })], trackableEntries: [entry('e1', 10, 12)] }));
+    await sync(
+      syncBody(0, {}, [
+        { recordType: 'fasts', uuid: 'a', deletedAt: 20 },
+        { recordType: 'trackableEntries', uuid: 'e1', deletedAt: 20 },
+      ]),
+    );
+    const f = await db.prepare('SELECT note, tags, moodRating, deletedAt, startDay FROM fasts WHERE uuid = ?').bind('a').first();
+    expect(f).toEqual({ note: null, tags: null, moodRating: null, deletedAt: 20, startDay: day(20) });
+    const e = await db.prepare('SELECT note, tags, fieldValues, deletedAt FROM trackableEntries WHERE id = ?').bind('e1').first();
+    expect(e).toEqual({ note: null, tags: null, fieldValues: null, deletedAt: 20 });
+  });
+
+  it('d1/scrub-deleted.sql clears rows deleted before this change and leaves live rows alone', async () => {
+    await sync(syncBody(0, { trackableEntries: [entry('live', 10, 12), entry('old-delete', 10, 8)] }));
+    // A soft delete as the old code wrote it: content still in place.
+    await db.prepare('UPDATE trackableEntries SET deletedAt = 20 WHERE id = ?').bind('old-delete').run();
+    const script = readFileSync('d1/scrub-deleted.sql', 'utf8')
+      .replace(/--.*$/gm, '')
+      .split(';')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    for (const s of script) await db.prepare(s).run();
+    const rows = await db.prepare('SELECT id, note, fieldValues FROM trackableEntries ORDER BY id').all();
+    expect(rows.results).toEqual([
+      { id: 'live', note: 'sample', fieldValues: '{"f-water":12}' },
+      { id: 'old-delete', note: null, fieldValues: null },
+    ]);
+  });
+});

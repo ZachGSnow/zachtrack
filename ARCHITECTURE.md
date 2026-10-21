@@ -529,11 +529,38 @@ doesn't cover (4.6) are exactly where a forged header would matter. A test
 against the old handler confirms it returned the full dataset for a token with
 a made-up signature. `server/access.ts` now verifies the token (RS256 via
 WebCrypto, keys from `https://<team>/cdn-cgi/access/certs`, cached for an hour
-and refetched once on an unknown `kid` for key rotation), and the endpoint
+and refetched on an unknown `kid` for key rotation, see 4.12), and the endpoint
 fails closed when it isn't configured. `tests/access.test.ts` and
 `tests/sync.test.ts` cover forged, foreign-key, expired, wrong-issuer,
 wrong-audience and wrong-email tokens. The key format was checked against a
 live team's certs endpoint (two RS256 keys with `kid`, `n`, `e`).
+
+### 4.12 Hardening after a production security review (2026-10-21)
+A passive review of the live deployment (headers, every hostname, the code)
+found no data exposure, and these hardening gaps, fixed together:
+- **Key refetch flood:** an unknown `kid` forced a certs fetch on every
+  request, so tokens with made-up kids could turn each request into an extra
+  subrequest. A forced refresh now happens at most once per 5 minutes; a
+  failed certs fetch returns 503 instead of throwing.
+- **One bad record failed every sync:** D1 rejects a whole `db.batch()` if
+  one statement fails, so a single malformed record (a client bug binding
+  `undefined` to a NOT NULL column) would have made every later sync fail.
+  `server/validate.ts` now checks every record against the schema first;
+  failures are skipped and reported in `rejected`, like day conflicts, and
+  the rest of the batch is stored. Checked against a copy of the real
+  database: all 190 live records pass. Unknown tombstone types (including
+  `__proto__`) are rejected instead of reaching the SQL builder.
+- **Deleted rows kept their content:** a delete only set `deletedAt`. It now
+  also clears notes, tags, ratings and values of fasts and entries (the row
+  and `deletedAt` stay so other devices still learn about the delete).
+  `d1/scrub-deleted.sql` applies the same clearing to rows deleted before
+  this change.
+- **No security headers:** `public/_headers` sets a strict CSP (only
+  same-origin scripts, styles, images, connections and workers;
+  `frame-ancestors 'none'`), `X-Frame-Options`, `Permissions-Policy`, HSTS
+  and COOP for static assets, and sync responses are `Cache-Control:
+  no-store`. Verified locally with `wrangler pages dev`: every tab and the
+  SVG charts render with no CSP violations.
 
 ## 5. Infrastructure inventory
 
@@ -565,7 +592,8 @@ are kept out of the repo, in the git-ignored `wrangler.toml` and a local
   free plan (30 days on a paid plan). Beyond that, take a manual
   `wrangler d1 export zachtrack-db --remote --output=<file>` before any
   schema change or migration, and keep the file outside the repo (it is
-  health data; `*.sql` other than the schema is git-ignored).
+  health data; `*.sql` other than `d1/schema.sql` and
+  `d1/scrub-deleted.sql` is git-ignored).
 
 ## 6. Deferred / discussed but not built
 
