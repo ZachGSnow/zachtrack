@@ -1,0 +1,12 @@
+# Cloudflare Pages response headers for every static asset.
+# The app loads only its own files: no inline scripts, no third-party hosts.
+# style-src needs 'unsafe-inline' for Svelte style attributes and ECharts tooltips.
+# Navigations to the Access login page are not affected by CSP.
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: same-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()
+  Cross-Origin-Opener-Policy: same-origin
+  Strict-Transport-Security: max-age=31536000

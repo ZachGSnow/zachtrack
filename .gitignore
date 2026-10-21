@@ -27,6 +27,7 @@ wrangler.toml
 # Database exports never belong in the repo
 *.sql
 !d1/schema.sql
+!d1/scrub-deleted.sql
 
 # Editor / OS
 .vscode/

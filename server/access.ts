@@ -30,7 +30,11 @@ export interface JsonWebKeySet {
 
 export type AccessResult = { ok: true; email: string } | { ok: false; reason: string };
 
+/** Failure reasons that mean the server couldn't check the token, not that the token is bad. */
+export const UNAVAILABLE_REASONS = new Set(['keys unavailable']);
+
 const KEY_CACHE_MS = 60 * 60 * 1000;
+const KEY_REFRESH_MIN_MS = 5 * 60 * 1000;
 const CLOCK_SKEW_S = 60;
 const keyCache = new Map<string, { fetchedAt: number; keys: JsonWebKeySet }>();
 
@@ -52,7 +56,13 @@ async function defaultFetchKeys(teamDomain: string): Promise<JsonWebKeySet> {
 async function getKeys(teamDomain: string, deps: AccessDeps, forceRefresh: boolean): Promise<JsonWebKeySet> {
   const now = (deps.now ?? Date.now)();
   const cached = keyCache.get(teamDomain);
-  if (!forceRefresh && cached && now - cached.fetchedAt < KEY_CACHE_MS) return cached.keys;
+  if (cached) {
+    const age = now - cached.fetchedAt;
+    // A forced refresh (unknown kid) is allowed at most once per
+    // KEY_REFRESH_MIN_MS, so tokens with made-up kids can't make every
+    // request fetch the certs again.
+    if (age < (forceRefresh ? KEY_REFRESH_MIN_MS : KEY_CACHE_MS)) return cached.keys;
+  }
   const keys = await (deps.fetchKeys ?? defaultFetchKeys)(teamDomain);
   keyCache.set(teamDomain, { fetchedAt: now, keys });
   return keys;
@@ -99,10 +109,15 @@ export async function verifyAccessJwt(token: string | null, config: AccessConfig
   if (!header.kid) return { ok: false, reason: 'missing kid' };
 
   const teamDomain = normalizeTeamDomain(config.teamDomain);
-  let jwk = (await getKeys(teamDomain, deps, false)).keys.find((k) => k.kid === header.kid);
-  if (!jwk) {
-    // Access rotates its signing keys; refetch once before giving up.
-    jwk = (await getKeys(teamDomain, deps, true)).keys.find((k) => k.kid === header.kid);
+  let jwk: (JsonWebKey & { kid?: string }) | undefined;
+  try {
+    jwk = (await getKeys(teamDomain, deps, false)).keys.find((k) => k.kid === header.kid);
+    if (!jwk) {
+      // Access rotates its signing keys; refetch (rate-limited) before giving up.
+      jwk = (await getKeys(teamDomain, deps, true)).keys.find((k) => k.kid === header.kid);
+    }
+  } catch {
+    return { ok: false, reason: 'keys unavailable' };
   }
   if (!jwk) return { ok: false, reason: 'unknown kid' };
 
