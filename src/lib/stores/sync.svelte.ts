@@ -21,7 +21,8 @@ const HISTORY_DETAILS_LIMIT = 20;
 /** Query param that forces a navigation past the service worker's app-shell fallback (see vite.config.ts). */
 const REAUTH_PARAM = 'reauth';
 
-export type SyncStatus = 'idle' | 'syncing' | 'error' | 'offline' | 'unauthenticated';
+/** `local`: there is no sync server at all (local-only install or `npm run dev`); data stays on the device. */
+export type SyncStatus = 'idle' | 'syncing' | 'error' | 'offline' | 'unauthenticated' | 'local';
 
 class UnauthenticatedError extends Error {
   constructor() {
@@ -32,7 +33,7 @@ class UnauthenticatedError extends Error {
 
 class NoBackendError extends Error {
   constructor() {
-    super('No sync server for this app -- data stays on this device.');
+    super('No sync server: your data stays on this device.');
     this.name = 'NoBackendError';
   }
 }
@@ -46,7 +47,7 @@ interface SyncResponseBody {
 /** One completed (or failed) sync attempt, kept for the sync-status pill's history popover. */
 export interface SyncHistoryEntry {
   completedAt: number;
-  outcome: 'success' | 'error' | 'offline';
+  outcome: 'success' | 'error' | 'offline' | 'local';
   /** Human-readable summary of what was pulled from the server, e.g. "2 fasts, 1 entry" or "No changes". */
   summary: string;
   rejectedCount: number;
@@ -260,6 +261,9 @@ class SyncStore {
 
   /** Debounced sync trigger used after local writes, so rapid edits batch into one call. */
   scheduleSync(): void {
+    // No server to sync with: don't retry on every edit. A tap on the pill or
+    // the next app start checks again.
+    if (this.status === 'local') return;
     if (this.debounceTimer) clearTimeout(this.debounceTimer);
     this.debounceTimer = setTimeout(() => {
       this.syncNow().catch(() => {
@@ -279,6 +283,7 @@ class SyncStore {
   }
 
   private async doSync(): Promise<void> {
+    const wasLocalOnly = this.status === 'local';
     this.status = 'syncing';
     this.lastError = undefined;
     try {
@@ -362,6 +367,15 @@ class SyncStore {
       this.syncedListeners = [];
       for (const listener of listeners) listener();
     } catch (err) {
+      if (err instanceof NoBackendError) {
+        // Not a failure: this install simply has no sync server (local-only
+        // use, `npm run dev`). Record it once, not on every edit.
+        this.status = 'local';
+        if (!wasLocalOnly) {
+          this.pushHistory({ completedAt: Date.now(), outcome: 'local', summary: err.message, rejectedCount: 0 });
+        }
+        throw err;
+      }
       const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
       const isUnauthenticated = err instanceof UnauthenticatedError;
       this.status = isOffline ? 'offline' : isUnauthenticated ? 'unauthenticated' : 'error';
