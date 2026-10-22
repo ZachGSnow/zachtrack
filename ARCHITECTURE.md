@@ -638,6 +638,16 @@ on a local D1) fails on the old code. General rule: a record the app creates
 on its own, rather than from a user edit, must not carry a current
 `updatedAt`.
 
+### 4.14 Synced settings didn't show until the app restarted
+Every screen reads its data through Dexie `liveQuery`, so records a sync pull
+or an import writes show up at once. The settings store was the exception: it
+read the settings row once at startup, so a height or goal weight synced from
+another device (or imported) was stored but not shown, and BMI and the goal
+line used the old values until the app was restarted. The store now follows
+the settings row with `liveQuery` too. Found by the browser test that imports
+sample data and then checks the Profile sheet (`e2e/app.spec.ts`), which fails
+on the old store.
+
 ## 5. Infrastructure inventory
 
 The deployment's real values (account, database id, domains, owner email)
