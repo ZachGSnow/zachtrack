@@ -11,6 +11,10 @@
 
   const PALETTE = ['#22ff88', '#a855f7', '#38bdf8', '#f97316', '#eab308', '#ec4899', '#818cf8', '#10b981', '#60a5fa'];
 
+  // One color per field from its place among all fields, so a pill and its line
+  // match whichever other fields are switched on.
+  const colorFor = (f: FieldDefinition) => PALETTE[Math.max(0, fields.indexOf(f)) % PALETTE.length];
+
   const weightField = $derived(fields.find((f) => f.name.toLowerCase() === 'weight' && f.kind === 'number'));
   const showBmiOption = $derived(!!weightField && !!settingsStore.data.heightInches);
 
@@ -54,7 +58,7 @@
     series: [
       ...fields
         .filter((f) => visible[f.id])
-        .map((f, i) => ({
+        .map((f) => ({
           name: f.name,
           type: 'line' as const,
           data: fieldSeriesById.get(f.id)?.values ?? [],
@@ -62,8 +66,8 @@
           connectNulls: true,
           showSymbol: true,
           symbolSize: 5,
-          itemStyle: { color: PALETTE[i % PALETTE.length] },
-          lineStyle: { color: PALETTE[i % PALETTE.length], width: 2 },
+          itemStyle: { color: colorFor(f) },
+          lineStyle: { color: colorFor(f), width: 2 },
           ...(f.id === weightField?.id && settingsStore.data.goalWeightLb
             ? {
                 markLine: {
@@ -97,11 +101,11 @@
 <div class="rounded-2xl border p-4" style="border-color: var(--color-border); background: var(--color-surface);">
   <p class="mb-2 text-sm font-medium text-text-muted">Fields over time</p>
   <div class="mb-2 flex flex-wrap gap-1.5">
-    {#each fields as field, i (field.id)}
+    {#each fields as field (field.id)}
       <button
         class="rounded-full border px-2.5 py-1 text-xs font-medium"
         style={visible[field.id]
-          ? `background: ${PALETTE[i % PALETTE.length]}22; color: ${PALETTE[i % PALETTE.length]}; border-color: ${PALETTE[i % PALETTE.length]}80;`
+          ? `background: ${colorFor(field)}22; color: ${colorFor(field)}; border-color: ${colorFor(field)}80;`
           : 'color: var(--color-text-muted); border-color: var(--color-border);'}
         onclick={() => toggle(field.id)}
       >{field.name}</button>

@@ -85,3 +85,37 @@ test('records the server refuses are listed by name with the reason', async ({ p
   await page.getByRole('button', { name: /No changes/ }).first().click();
   await expect(page.getByText('Trackable "Nutrition": Invalid record: color must be a string')).toBeVisible();
 });
+
+test("a field's chart line has the same color as its pill when an earlier field is hidden", async ({ page }) => {
+  const problems = watchForProblems(page);
+  await mockSync(page, noServer);
+  await importSampleData(page);
+  await page.goto('/#/trackables');
+  await page.getByText('Body Measurements', { exact: true }).click();
+  await page.getByRole('button', { name: 'Chart' }).first().click();
+
+  // Weight (first field) is shown by default; swap it for Waist.
+  await page.getByRole('button', { name: 'Weight', exact: true }).click();
+  const waistPill = page.getByRole('button', { name: 'Waist', exact: true });
+  await waistPill.click();
+
+  const toRgb = (color: string) =>
+    page.evaluate((c) => {
+      const el = document.createElement('span');
+      el.style.color = c;
+      document.body.append(el);
+      const rgb = getComputedStyle(el).color;
+      el.remove();
+      return rgb;
+    }, color);
+  const pillColor = await waistPill.evaluate((el) => getComputedStyle(el).color);
+  const chart = page.locator('[_echarts_instance_] svg').first();
+  await expect(chart).toBeVisible();
+  await expect
+    .poll(async () => {
+      const strokes = await chart.locator('path[stroke-width="2"]').evaluateAll((els) => els.map((el) => el.getAttribute('stroke') ?? ''));
+      return [...new Set(await Promise.all(strokes.map(toRgb)))];
+    })
+    .toEqual([pillColor]);
+  expect(problems).toEqual([]);
+});
