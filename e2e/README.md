@@ -17,6 +17,7 @@ already running server on port 8789 is reused, so stop it after changing code.
 | `app.spec.ts` | Service worker blocked, sync responses faked: a fresh local-only install, sample data imported through Profile > Import file and shown on the trackables, detail, Journey and Data screens with no console or CSP errors, imported settings shown, "Login expired" with Log in again, and refused records listed by name. |
 | `service-worker.spec.ts` | The real generated service worker: the app shell opens offline, while `?reauth=`, `/cdn-cgi/` and `/api/` navigations are never answered with it (ARCHITECTURE.md 4.9). Emptying `navigateFallbackDenylist` makes four of these fail. |
 | `sample-data.ts` | Three weeks of fictional sample data for the starter trackables, relative to today, from a seeded generator. Also used for the README screenshots. |
+| `screenshots.capture.ts` | `npm run screenshots` only (not part of `npm run e2e`): imports the sample data and writes `docs/screenshots/*.png` at phone size. Look at every image before committing it (standards: normal operation, sample data only). |
 
 Data only ever lives in the test browser's own storage; nothing reaches
 Cloudflare. The sync Function is reachable, but without an Access token it

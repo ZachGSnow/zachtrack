@@ -21,7 +21,11 @@ export default defineConfig({
     locale: 'en-US',
     trace: 'retain-on-failure',
   },
-  projects: [{ name: 'chromium', use: { browserName: 'chromium' } }],
+  projects: [
+    { name: 'chromium', use: { browserName: 'chromium' }, testMatch: '**/*.spec.ts' },
+    // `npm run screenshots` only: writes docs/screenshots/*.png from sample data.
+    { name: 'screenshots', use: { browserName: 'chromium' }, testMatch: '**/*.capture.ts' },
+  ],
   webServer: {
     command: `npm run build && npx wrangler pages dev dist --port ${PORT} --ip 127.0.0.1 --compatibility-date=2026-10-01`,
     url: `http://127.0.0.1:${PORT}`,

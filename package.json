@@ -10,7 +10,8 @@
     "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json && tsc -p tsconfig.functions.json && tsc -p tsconfig.test.json && tsc -p tsconfig.e2e.json",
     "icons": "node scripts/generate-icons.mjs",
     "test": "vitest run",
-    "e2e": "playwright test"
+    "e2e": "playwright test --project=chromium",
+    "screenshots": "playwright test --project=screenshots"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261021.1",
