@@ -33,12 +33,34 @@ jobs:
       - run: npm run build
       - run: npm test
 
-  # Single stable check name for branch protection; fails unless every matrix leg passed.
+  # Browser tests (Playwright, Chromium) against the production build served by
+  # `wrangler pages dev`: real service worker, CSP headers and sync Function.
+  e2e:
+    name: e2e
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run e2e
+      - name: Keep the report when a test fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+  # Single stable check name for branch protection; fails unless every job above passed.
   ci:
     name: ci
-    needs: [test]
+    needs: [test, e2e]
     if: always()
     runs-on: ubuntu-latest
     steps:
-      - name: All matrix legs passed
-        run: test "${{ needs.test.result }}" = "success"
+      - name: All matrix legs and the browser tests passed
+        run: test "${{ needs.test.result }}" = "success" && test "${{ needs.e2e.result }}" = "success"

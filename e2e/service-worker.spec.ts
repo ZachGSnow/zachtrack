@@ -51,6 +51,7 @@ test('online, the re-login marker goes to the network and is stripped afterwards
 
 test('online, a normal navigation is served from the service worker cache', async ({ page }) => {
   await installServiceWorker(page);
-  const response = await page.goto('/#/journey');
+  // A reload is a real navigation (a `#/route` change is not).
+  const response = await page.reload();
   expect(response?.fromServiceWorker()).toBe(true);
 });

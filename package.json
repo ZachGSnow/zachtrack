@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json && tsc -p tsconfig.functions.json && tsc -p tsconfig.test.json",
+    "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json && tsc -p tsconfig.functions.json && tsc -p tsconfig.test.json && tsc -p tsconfig.e2e.json",
     "icons": "node scripts/generate-icons.mjs",
     "test": "vitest run",
     "e2e": "playwright test"

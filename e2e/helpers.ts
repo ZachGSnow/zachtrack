@@ -37,8 +37,8 @@ export function watchForProblems(page: Page): string[] {
     if (msg.type() !== 'error') return;
     const text = msg.text();
     if (/ServiceWorker|service worker|registerSW/i.test(text)) return;
-    // The sync mocks answer 401/404 on purpose.
-    if (/Failed to load resource: the server responded with a status of (401|403|404)/.test(text)) return;
+    // Sync mocks answer 401/404 on purpose; the real Function answers 403 (no Access token) or 503 (CI, no wrangler.toml).
+    if (/Failed to load resource: the server responded with a status of (401|403|404|503)/.test(text)) return;
     problems.push(text);
   });
   page.on('pageerror', (err) => problems.push(`pageerror: ${err.message}`));

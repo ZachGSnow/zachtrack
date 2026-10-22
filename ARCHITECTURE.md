@@ -739,11 +739,19 @@ this," not a promise.
 ## 7. Validation conventions
 
 - After any non-trivial change: `npm run check` (must be 0 errors/warnings -
-  it runs four checks: the Svelte app, the Vite/Vitest configs, everything
-  under `functions/` and `server/`, and the tests), then `npm test`, then
-  `npm run build` (must succeed; the EChart-dependent lazy routes will always
-  warn about chunk size - that's expected, not a regression). CI runs the
-  same three on Linux and Windows.
+  it runs five checks: the Svelte app, the Vite/Vitest configs, everything
+  under `functions/`, `server/` and `workers/`, the unit tests and the browser
+  tests), then `npm test`, then `npm run build` (must succeed; the
+  EChart-dependent lazy routes will always warn about chunk size - that's
+  expected, not a regression), then `npm run e2e` for anything that touches
+  the UI, sync client or service worker. CI runs the first three on Linux and
+  Windows and the browser tests on Linux; the required `ci` check needs both.
+- Browser tests (Playwright, `e2e/`, see `e2e/README.md`): the production
+  build under `wrangler pages dev`, sample data imported through the real UI,
+  and the service worker's re-login path (4.9). Any change to
+  `vite-plugin-pwa` or the Workbox options must keep
+  `service-worker.spec.ts` passing; emptying `navigateFallbackDenylist` makes
+  four of its tests fail.
 - Tests (Vitest, `tests/`): day math across DST (run in `America/New_York`),
   same-day aggregation and the metric table, Access JWT verification, and the
   sync endpoint end to end against a local D1 (workerd via Wrangler's

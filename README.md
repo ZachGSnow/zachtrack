@@ -184,9 +184,11 @@ protocol, the real bugs hit along the way and how they were fixed.
 npm run check   # svelte-check + tsc for the app, configs, Functions and tests
 npm test        # Vitest
 npm run build
+npm run e2e     # Playwright browser tests (once: npx playwright install chromium)
 ```
 
-CI runs all three on Linux and Windows with Node 22 and 24.
+CI runs the first three on Linux and Windows with Node 22 and 24, and the
+browser tests on Linux. See [e2e/README.md](e2e/README.md).
 
 **Verified by tests:**
 - Day math across DST changes (run in `America/New_York`): streaks, ranges,
@@ -209,6 +211,12 @@ CI runs all three on Linux and Windows with Node 22 and 24.
   onto a fresh device, merge by newest version, no deletes, re-import is a
   no-op, invalid / orphan / same-day records skipped; and a new device's
   default settings never overwrite synced settings.
+- In a real browser on the production build (Playwright, Chromium): a
+  local-only install, sample data imported through the UI and shown on every
+  screen with no console or CSP errors, imported settings shown without a
+  restart, "Login expired" and Log in again, refused records listed; and the
+  service worker's re-login path: the app shell opens offline, while
+  `?reauth=`, `/cdn-cgi/` and `/api/` navigations always reach the network.
 
 **Verified by hand:**
 - The Access certs format against a live team's `/cdn-cgi/access/certs`
@@ -223,9 +231,9 @@ CI runs all three on Linux and Windows with Node 22 and 24.
 - Export and import in the browser: export, then import a modified file;
   the preview, the skipped record and the imported entry all show correctly.
 
-**Not verified by automated tests:** the Svelte UI, the service worker's
-re-login flow (ARCHITECTURE.md 4.9) and Access's own redirects. Those are
-checked by hand after a deploy.
+**Not verified by automated tests:** Access's own login and redirects (they
+only exist on Cloudflare), real sync against a production server, and the
+installed Android PWA. Those are checked by hand after a deploy.
 
 ## Health information
 

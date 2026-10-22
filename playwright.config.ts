@@ -23,7 +23,7 @@ export default defineConfig({
   },
   projects: [{ name: 'chromium', use: { browserName: 'chromium' } }],
   webServer: {
-    command: `npm run build && npx wrangler pages dev dist --port ${PORT} --ip 127.0.0.1`,
+    command: `npm run build && npx wrangler pages dev dist --port ${PORT} --ip 127.0.0.1 --compatibility-date=2026-10-01`,
     url: `http://127.0.0.1:${PORT}`,
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,
