@@ -1,4 +1,4 @@
-# Local-only config for tests/sync.test.ts: a throwaway in-memory D1.
+# Local-only config for the tests: throwaway in-memory D1 databases and R2.
 name = "zachtrack-test"
 compatibility_date = "2026-10-01"
 
@@ -6,3 +6,13 @@ compatibility_date = "2026-10-01"
 binding = "DB"
 database_name = "zachtrack-test-db"
 database_id = "00000000-0000-0000-0000-000000000000"
+
+# Second database to restore a backup into (tests/backup.test.ts).
+[[d1_databases]]
+binding = "RESTORE_DB"
+database_name = "zachtrack-test-restore-db"
+database_id = "00000000-0000-0000-0000-000000000001"
+
+[[r2_buckets]]
+binding = "BACKUPS"
+bucket_name = "zachtrack-test-backups"

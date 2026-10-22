@@ -9,5 +9,5 @@
     "skipLibCheck": true,
     "moduleDetection": "force"
   },
-  "include": ["functions/**/*.ts", "server/**/*.ts"]
+  "include": ["functions/**/*.ts", "server/**/*.ts", "workers/**/*.ts"]
 }

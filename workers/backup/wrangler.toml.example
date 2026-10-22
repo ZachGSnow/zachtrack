@@ -1,0 +1,22 @@
+# Copy to wrangler.toml in this folder (git-ignored) and fill in your values.
+# See README.md "Backups" for setup.
+name = "zachtrack-backup"
+main = "index.ts"
+compatibility_date = "2026-10-01"
+
+# No public URL: this Worker only runs on its schedule.
+workers_dev = false
+preview_urls = false
+
+[triggers]
+# Every day at 09:00 UTC.
+crons = ["0 9 * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "zachtrack-db"
+database_id = "00000000-0000-0000-0000-000000000000"
+
+[[r2_buckets]]
+binding = "BACKUPS"
+bucket_name = "zachtrack-backups"

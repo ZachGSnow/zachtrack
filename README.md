@@ -92,6 +92,37 @@ All values live in `wrangler.toml` (start from `wrangler.toml.example`).
 If `OWNER_EMAIL` or `ACCESS_TEAM_DOMAIN` is missing, the sync endpoint refuses
 every request instead of running unchecked.
 
+## Backups
+
+D1 keeps point-in-time history for 7 days on the free plan. For longer,
+`workers/backup/` is a small scheduled Worker that writes a restore-ready SQL
+file of the whole database to a private R2 bucket every night at 09:00 UTC
+(`zachtrack-db/YYYY-MM-DD.sql`). It has no public URL. A bucket lifecycle rule
+deletes files after 30 days.
+
+Set up once:
+
+```bash
+npx wrangler r2 bucket create zachtrack-backups
+npx wrangler r2 bucket lifecycle add zachtrack-backups expire-30-days --expire-days 30
+cd workers/backup
+cp wrangler.toml.example wrangler.toml   # set database_id; git-ignored
+npx wrangler deploy
+```
+
+Restore (replaces every row in the app tables):
+
+```bash
+npx wrangler r2 object get zachtrack-backups/zachtrack-db/2026-10-22.sql --remote --file=restore.sql
+npx wrangler d1 execute zachtrack-db --remote --file=restore.sql
+```
+
+Restored rows get a new sync sequence number, so every device pulls them.
+Devices then push their own local data as usual, and the newer version of each
+record wins; to roll every device back too, clear the site data on each device
+before it syncs again. The file is health data: keep it out of the repo and out
+of synced folders, and delete it when done.
+
 ## How it works
 
 - **Local-first:** every read and write goes through Dexie (IndexedDB). The UI
