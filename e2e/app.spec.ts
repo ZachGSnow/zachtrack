@@ -144,6 +144,6 @@ test('a field can be renamed and given a new unit, and BMI follows the renamed w
 
   await page.goto('/#/trackables');
   await page.getByRole('button', { name: 'Profile' }).click();
-  await expect(page.getByLabel('Weight field').locator('option:checked')).toHaveText('Body weight (Body Measurements)');
+  await expect(page.getByRole('combobox', { name: /^Weight field/ }).locator('option:checked')).toHaveText('Body weight (Body Measurements)');
   expect(problems).toEqual([]);
 });
