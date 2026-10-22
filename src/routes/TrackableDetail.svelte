@@ -6,10 +6,17 @@
   import { formatDateTime, formatShortDate } from '../lib/utils/time';
   import { formatPreciseAge, daysUntilNextBirthday, ageTurningOn, formatBirthdayCountdown } from '../lib/utils/age';
   import { rangeStartFor, type ChartRange } from '../lib/utils/stats';
-  import { buildBmiMetric, buildTrackableMetrics, GRANULARITIES, type Granularity, type MetricDef } from '../lib/utils/metrics';
+  import {
+    buildBmiMetric,
+    buildNavyBodyFatMetric,
+    buildTrackableMetrics,
+    GRANULARITIES,
+    type Granularity,
+    type MetricDef,
+  } from '../lib/utils/metrics';
   import { loadPrefs, oneOf, savePrefs } from '../lib/utils/prefs';
   import { settingsStore } from '../lib/stores/settings.svelte';
-  import { resolveWeightField } from '../lib/utils/health';
+  import { resolveBodyFieldIds } from '../lib/utils/health';
   import BottomSheet from '../lib/components/BottomSheet.svelte';
   import DataTable from '../lib/components/DataTable.svelte';
   import EntriesTable from '../lib/components/EntriesTable.svelte';
@@ -72,8 +79,8 @@
       : [],
   );
 
-  // Resolved across all fields, not just this trackable's, so only one field is ever "the" weight.
-  const weightFieldId = $derived(resolveWeightField($allFields ?? [], settingsStore.data.weightFieldId)?.id);
+  // Resolved across all fields, not just this trackable's, so only one field is ever "the" weight (or waist...).
+  const bodyFieldIds = $derived(resolveBodyFieldIds($allFields ?? [], settingsStore.data));
 
   const isAges = $derived($trackable?.displayMode === 'ages');
   const showTrendsTable = $derived(attachedFields.length === 0 || trendsView === 'table');
@@ -82,11 +89,18 @@
   const trendMetrics = $derived.by((): MetricDef[] => {
     const t = $trackable;
     if (!t) return [];
-    const defs = buildTrackableMetrics(t, $entries ?? [], attachedFields, () => t.color, weightFieldId);
+    const defs = buildTrackableMetrics(t, $entries ?? [], attachedFields, () => t.color, bodyFieldIds);
     defs[0] = { ...defs[0], column: 'Entries' };
     const height = settingsStore.data.heightInches;
     const weightIdx = defs.findIndex((d) => d.isWeightField);
     if (height && weightIdx >= 0) defs.splice(weightIdx + 1, 0, buildBmiMetric(defs[weightIdx], height));
+    // Navy body fat right after BMI, or after Waist when this trackable has no weight.
+    const sex = settingsStore.data.bodyFatSex;
+    const bodyFat = height && sex ? buildNavyBodyFatMetric(defs, sex, height) : undefined;
+    if (bodyFat) {
+      const anchors = [defs.findIndex((d) => d.id.endsWith(':bmi')), defs.findIndex((d) => d.isWeightField), defs.findIndex((d) => d.bodyRole === 'waist')];
+      defs.splice((anchors.find((i) => i >= 0) ?? defs.length - 1) + 1, 0, bodyFat);
+    }
     return defs;
   });
 
@@ -249,7 +263,7 @@
         {#if showTrendsTable}
           <DataTable metrics={trendMetrics} {granularity} {rangeStart} />
         {:else}
-          <TrackableFieldsChart entries={$entries ?? []} fields={attachedFields} {range} {weightFieldId} />
+          <TrackableFieldsChart entries={$entries ?? []} fields={attachedFields} {range} weightFieldId={bodyFieldIds.weight} bodyFatByDay={trendMetrics.find((d) => d.id.endsWith(':navy-body-fat'))?.valuesByDay} />
         {/if}
       </div>
 

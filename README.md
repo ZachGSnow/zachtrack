@@ -38,7 +38,9 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
   day, week or month with a 7-day rolling average or change vs the previous
   period, an Avg / Change / Per-week trend footer, and a Copy button that puts
   TSV on the clipboard. Each has a chart view (ECharts) behind a toggle.
-- **BMI** derived from your weight field (chosen in Profile) and your height.
+- **BMI** derived from your weight field (chosen in Profile) and your height,
+  and a **body-fat estimate** (US Navy method) from waist, neck and hip
+  measurements logged together.
 - **Offline and installable** (service worker, Android/Chrome PWA).
 - **Two-way sync** across devices: per-record last-write-wins, deletes that
   propagate, conflicts reported instead of guessed, and a sync status pill
@@ -90,6 +92,7 @@ your data goes to your account only.
 **Upgrading an existing database:** a release that adds a column says so in
 its notes. Add it before deploying that release, e.g. for v1.4.0:
 `npx wrangler d1 execute zachtrack-db --remote --command="ALTER TABLE settings ADD COLUMN weightFieldId TEXT"`.
+v1.5.0 adds `waistFieldId`, `neckFieldId`, `hipFieldId` and `bodyFatSex` (all `TEXT`) the same way.
 
 Install the app from your custom domain in Chrome (Add to Home screen).
 The Profile sheet (person icon on the Trackables tab) shows the version each

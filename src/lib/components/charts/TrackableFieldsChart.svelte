@@ -1,9 +1,10 @@
 <script lang="ts">
   import type { EChartsOption } from 'echarts';
   import type { FieldDefinition, TrackableEntry } from '../../db';
-  import { computeFieldSeries } from '../../utils/trackableStats';
+  import { computeFieldSeries, fieldSeriesDays } from '../../utils/trackableStats';
   import type { ChartRange } from '../../utils/stats';
   import { computeBMI } from '../../utils/health';
+  import { BODY_FAT_COLOR } from '../../utils/metrics';
   import { settingsStore } from '../../stores/settings.svelte';
   import EChart from '../EChart.svelte';
 
@@ -12,7 +13,16 @@
     fields,
     range,
     weightFieldId,
-  }: { entries: TrackableEntry[]; fields: FieldDefinition[]; range: ChartRange; weightFieldId?: string } = $props();
+    bodyFatByDay,
+  }: {
+    entries: TrackableEntry[];
+    fields: FieldDefinition[];
+    range: ChartRange;
+    weightFieldId?: string;
+    /** Navy body-fat % by day, when it can be worked out (see buildNavyBodyFatMetric). */
+    bodyFatByDay?: Map<number, number>;
+  } = $props();
+
 
   const PALETTE = ['#22ff88', '#a855f7', '#38bdf8', '#f97316', '#eab308', '#ec4899', '#818cf8', '#10b981', '#60a5fa'];
 
@@ -42,6 +52,16 @@
       ? (fieldSeriesById.get(weightField.id)?.values ?? []).map((w) =>
           w != null ? Number(computeBMI(w, settingsStore.data.heightInches!).toFixed(1)) : null,
         )
+      : null,
+  );
+
+  // On the same days as the x axis, which follows the first field.
+  const bodyFatValues = $derived(
+    bodyFatByDay && fields.length
+      ? fieldSeriesDays(entries, fields[0], range).map((day) => {
+          const v = bodyFatByDay.get(day);
+          return v != null ? Number(v.toFixed(1)) : null;
+        })
       : null,
   );
 
@@ -99,6 +119,21 @@
             },
           ]
         : []),
+      ...(visible['__bodyFat'] && bodyFatValues
+        ? [
+            {
+              name: 'Body fat (Navy)',
+              type: 'line' as const,
+              data: bodyFatValues,
+              smooth: false,
+              connectNulls: true,
+              showSymbol: true,
+              symbolSize: 5,
+              itemStyle: { color: BODY_FAT_COLOR },
+              lineStyle: { color: BODY_FAT_COLOR, width: 2, type: 'dashed' as const },
+            },
+          ]
+        : []),
     ],
   });
 </script>
@@ -123,6 +158,15 @@
           : 'color: var(--color-text-muted); border-color: var(--color-border);'}
         onclick={() => toggle('__bmi')}
       >BMI</button>
+    {/if}
+    {#if bodyFatValues}
+      <button
+        class="rounded-full border px-2.5 py-1 text-xs font-medium"
+        style={visible['__bodyFat']
+          ? `background: ${BODY_FAT_COLOR}22; color: ${BODY_FAT_COLOR}; border-color: ${BODY_FAT_COLOR}80;`
+          : 'color: var(--color-text-muted); border-color: var(--color-border);'}
+        onclick={() => toggle('__bodyFat')}
+      >Body fat (Navy)</button>
     {/if}
   </div>
   {#if !anyVisible}

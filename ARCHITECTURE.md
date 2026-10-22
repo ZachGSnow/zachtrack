@@ -94,6 +94,8 @@ interface SettingsRecord {
   defaultPresetId: string; notificationsEnabled: boolean;
   heightInches?: number; goalWeightLb?: number;
   weightFieldId?: string; // the field BMI and the goal line follow (3.14)
+  waistFieldId?: string; neckFieldId?: string; hipFieldId?: string; // Navy body fat (3.15)
+  bodyFatSex?: 'male' | 'female';
   updatedAt: number;      // added for sync
 }
 ```
@@ -434,6 +436,28 @@ is deployed, or every sync that carries settings fails. A device still on an
 older version that edits settings sends no `weightFieldId` and so clears it;
 the name fallback covers that until it is chosen again.
 
+### 3.15 Navy body-fat estimate next to BMI
+Body Measurements shows a derived "Body fat (Navy)" column right after BMI
+(table and chart), from the US Navy circumference method (DoD Instruction
+1308.3): male uses waist, neck and height; female adds hip. It is derived on
+the fly like BMI, never stored, so changing a setting recalculates history.
+- **Same-day readings only.** Tape measurements are logged together in one
+  entry, so a day gets an estimate when it has a waist and a neck (and a hip
+  for the female formula). No carrying values forward across days.
+- **Which fields.** The same mechanism as the weight field (3.14), generalised
+  in `utils/health.ts`: `resolveBodyField` per role (weight, waist, neck,
+  hip), with Profile pickers and the name fallback, and a rename pins any of
+  them. `MetricDef.bodyRole` marks them in the metric catalog.
+- **Units.** Height is in inches; each tape field is converted from its unit
+  label (`in`, `cm`, `mm` and spelled-out forms). A field whose unit isn't a
+  length gives no estimate rather than a wrong one.
+- **Off until chosen.** `settings.bodyFatSex` picks the formula; without it
+  (or without a height) there is no column.
+- The starter set now has Neck and no manual Body Fat % field.
+
+Four more `settings` columns: `waistFieldId`, `neckFieldId`, `hipFieldId`,
+`bodyFatSex`, added with `ALTER TABLE` before deploying, like 3.14.
+
 ## 4. Issues hit during implementation, and how they were resolved
 
 These are real bugs that shipped and got fixed during this project's build,
@@ -703,8 +727,8 @@ are kept out of the repo, in the git-ignored `wrangler.toml` and a local
   to a new database with
   `wrangler d1 execute zachtrack-db --remote --file=./d1/schema.sql`, and use
   `--command="ALTER TABLE ..."` for incremental additive changes (as was
-  done for the `displayMode`, `fieldDefinitions.aggregation` and
-  `settings.weightFieldId` columns).
+  done for the `displayMode`, `fieldDefinitions.aggregation`,
+  `settings.weightFieldId` and the body-fat settings columns).
 - **Pages project:** `zachtrack`, production branch `main`, deployed via
   **direct upload** (`npm run build`, then `wrangler pages deploy dist
   --project-name=zachtrack --branch=main`). Default URL

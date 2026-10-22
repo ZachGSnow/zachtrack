@@ -2,7 +2,7 @@ import type { FastRecord, FieldDefinition, TrackableDefinition } from '../db';
 import { addDays, formatShortDate, startOfDay } from './time';
 import { toIsoDate } from './stats';
 import { bucketStart, computeFieldValuesByDay, type BucketUnit, type TimestampedValues } from './trackableStats';
-import { computeBMI } from './health';
+import { computeBMI, computeNavyBodyFatByDay, type BodyFatSex, type BodyFieldIds, type BodyFieldRole } from './health';
 
 /**
  * Shared "metric catalog" + table math behind every data view (the Data tab,
@@ -42,6 +42,8 @@ export interface MetricDef {
   axisMin?: number;
   axisMax?: number;
   isWeightField?: boolean;
+  /** Which body measurement this field holds, if any (BMI, Navy body fat). */
+  bodyRole?: BodyFieldRole;
 }
 
 export const ROLLING_WINDOW_DAYS = 7;
@@ -171,8 +173,8 @@ export function buildTrackableMetrics(
   entries: TimestampedValues[],
   allFields: FieldDefinition[],
   colorFor: (field: FieldDefinition) => string,
-  /** The field BMI and the goal line follow (see resolveWeightField). */
-  weightFieldId?: string,
+  /** The fields BMI, the goal line and body fat follow (see resolveBodyFieldIds). */
+  bodyFieldIds: BodyFieldIds = {},
 ): MetricDef[] {
   const occByDay = new Map<number, number>();
   for (const e of entries) {
@@ -212,7 +214,8 @@ export function buildTrackableMetrics(
       axisLabel: field.kind === 'rating' ? 'Rating' : field.kind === 'boolean' ? 'Yes/No' : (field.unit ?? 'Value'),
       axisMin: field.kind === 'rating' ? (field.ratingMin ?? 1) : field.kind === 'boolean' ? 0 : undefined,
       axisMax: field.kind === 'rating' ? (field.ratingMax ?? 5) : field.kind === 'boolean' ? 1 : undefined,
-      isWeightField: weightFieldId != null && field.id === weightFieldId,
+      isWeightField: bodyFieldIds.weight != null && field.id === bodyFieldIds.weight,
+      bodyRole: (Object.keys(bodyFieldIds) as BodyFieldRole[]).find((role) => bodyFieldIds[role] === field.id),
     });
   }
 
@@ -234,6 +237,38 @@ export function buildBmiMetric(weight: MetricDef, heightInches: number): MetricD
     chartType: 'line',
     axisGroup: 'bmi',
     axisLabel: 'BMI',
+  };
+}
+
+export const BODY_FAT_COLOR = '#fbbf24';
+
+/**
+ * US Navy body-fat estimate, day by day, from the Waist, Neck (and for the
+ * female formula, Hip) metrics among `defs`. Undefined when one is missing or
+ * its unit isn't a length (see computeNavyBodyFatByDay).
+ */
+export function buildNavyBodyFatMetric(defs: MetricDef[], sex: BodyFatSex, heightInches: number): MetricDef | undefined {
+  const part = (role: BodyFieldRole) => {
+    const def = defs.find((d) => d.bodyRole === role);
+    return def ? { byDay: def.valuesByDay, unit: def.unit } : undefined;
+  };
+  const waist = defs.find((d) => d.bodyRole === 'waist');
+  const neck = part('neck');
+  if (!waist || !neck) return undefined;
+  const byDay = computeNavyBodyFatByDay({ waist: part('waist')!, neck, hip: part('hip') }, sex, heightInches);
+  if (!byDay) return undefined;
+  return {
+    id: `${waist.id}:navy-body-fat`,
+    label: 'Body fat (Navy)',
+    column: 'Body fat',
+    group: waist.group,
+    color: BODY_FAT_COLOR,
+    unit: '% Navy',
+    rollup: 'mean',
+    valuesByDay: byDay,
+    chartType: 'line',
+    axisGroup: 'bodyFat',
+    axisLabel: 'Body fat %',
   };
 }
 

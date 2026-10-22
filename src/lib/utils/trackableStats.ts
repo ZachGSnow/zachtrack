@@ -210,6 +210,17 @@ export function computeFieldValuesByDay(entries: TimestampedValues[], field: Agg
   return byDay;
 }
 
+/** The days (local start-of-day) a field's series covers over the selected range, oldest first. */
+export function fieldSeriesDays(entries: TimestampedValues[], field: AggregatableField, range: ChartRange): number[] {
+  const withValue = entries.filter((e) => e.values?.[field.id] != null);
+  const today = startOfDay(Date.now());
+  const rangeStart = rangeStartFor(range, withValue.map((e) => e.timestamp));
+  const numDays = Math.round((today - rangeStart) / DAY_MS) + 1;
+  const days: number[] = [];
+  for (let i = 0; i < numDays; i++) days.push(addDays(rangeStart, i));
+  return days;
+}
+
 /** Daily value for a single field over the selected range (see `computeFieldValuesByDay`). */
 export function computeFieldSeries(
   entries: TimestampedValues[],
@@ -217,19 +228,8 @@ export function computeFieldSeries(
   range: ChartRange,
 ): { categories: string[]; values: (number | null)[] } {
   const byDay = computeFieldValuesByDay(entries, field);
-  const withValue = entries.filter((e) => e.values?.[field.id] != null);
-  const today = startOfDay(Date.now());
-  const rangeStart = rangeStartFor(range, withValue.map((e) => e.timestamp));
-  const numDays = Math.round((today - rangeStart) / DAY_MS) + 1;
-
-  const categories: string[] = [];
-  const values: (number | null)[] = [];
-  for (let i = 0; i < numDays; i++) {
-    const day = addDays(rangeStart, i);
-    categories.push(formatShortDate(day));
-    values.push(byDay.get(day) ?? null);
-  }
-  return { categories, values };
+  const days = fieldSeriesDays(entries, field, range);
+  return { categories: days.map(formatShortDate), values: days.map((day) => byDay.get(day) ?? null) };
 }
 
 /** Today's combined value for a field (per its aggregation mode), or null if nothing logged today. */
