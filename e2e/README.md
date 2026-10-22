@@ -14,7 +14,7 @@ already running server on port 8789 is reused, so stop it after changing code.
 
 | File | What it covers |
 |---|---|
-| `app.spec.ts` | Service worker blocked, sync responses faked: a fresh local-only install, sample data imported through Profile > Import file and shown on the trackables, detail, Journey and Data screens with no console or CSP errors, imported settings shown, "Login expired" with Log in again, and refused records listed by name. |
+| `app.spec.ts` | Service worker blocked, sync responses faked: a fresh local-only install, sample data imported through Profile > Import file and shown on the trackables, detail, Journey and Data screens with no console or CSP errors, imported settings shown, "Login expired" with Log in again, refused records listed by name, and a trackable chart line keeping its pill's color when an earlier field is hidden. |
 | `sync-timer.spec.ts` | Service worker blocked: a fast started and then ended on another device arrives through sync pulls and the Fasting tab follows it without a reload; starting and ending a fast on this device still works. |
 | `service-worker.spec.ts` | The real generated service worker: the app shell opens offline, while `?reauth=`, `/cdn-cgi/` and `/api/` navigations are never answered with it (ARCHITECTURE.md 4.9). Emptying `navigateFallbackDenylist` makes four of these fail. |
 | `sample-data.ts` | Three weeks of fictional sample data for the starter trackables, relative to today, from a seeded generator. Also used for the README screenshots. |
