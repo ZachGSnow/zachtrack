@@ -9,6 +9,13 @@ updates:
         update-types: [minor, patch]
     commit-message:
       prefix: build
+    ignore:
+      # svelte-check peers on typescript ^5 || ^6; lift once it supports 7.
+      - dependency-name: typescript
+        update-types: [version-update:semver-major]
+      # Types track the Node versions CI runs (22 and 24); bump with the CI matrix.
+      - dependency-name: "@types/node"
+        update-types: [version-update:semver-major]
   - package-ecosystem: github-actions
     directory: /
     schedule:
