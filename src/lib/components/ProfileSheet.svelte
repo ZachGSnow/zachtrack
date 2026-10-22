@@ -28,7 +28,12 @@
 </script>
 
 <div class="space-y-4">
-  <h2 class="text-lg font-semibold text-text">Profile</h2>
+  <div class="flex items-baseline justify-between">
+    <h2 class="text-lg font-semibold text-text">Profile</h2>
+    <!-- Which build this device is running; the service worker updates on its own schedule. -->
+    <span class="text-xs text-text-muted" title="ZachTrack version">v{__APP_VERSION__}</span>
+  </div>
+  <p class="text-xs text-text-muted">Export and import are under Your data, at the bottom.</p>
 
   <label class="block text-sm">
     <span class="mb-1 block text-text-muted">Height (in)</span>

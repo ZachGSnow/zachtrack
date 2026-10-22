@@ -652,7 +652,10 @@ are kept out of the repo, in the git-ignored `wrangler.toml` and a local
 - **Pages project:** `zachtrack`, production branch `main`, deployed via
   **direct upload** (`npm run build`, then `wrangler pages deploy dist
   --project-name=zachtrack --branch=main`). Default URL
-  `zachtrack.pages.dev` (see 4.6).
+  `zachtrack.pages.dev` (see 4.6). The build bakes `package.json`'s version
+  into the app (`__APP_VERSION__`, shown at the top of the Profile sheet), so
+  after a deploy each device shows which build its service worker is serving;
+  a device still on the old number needs the app closed and reopened.
 - **Custom domain:** attached to the Pages project (dashboard-only step).
 - **Cloudflare Access:** one self-hosted Access application covering the
   whole custom-domain hostname (no path restriction), plus the `pages.dev`
