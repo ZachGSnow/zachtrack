@@ -345,6 +345,34 @@ Decisions baked in:
 
 No Dexie or D1 schema changes were involved.
 
+### 3.12 Nightly backups as restore-ready SQL in R2
+Pages projects can't run on a schedule, so backups are a separate Worker
+(`workers/backup/index.ts`) with only a `scheduled` handler, `workers_dev =
+false` and no routes: nothing can call it. It shares the D1 database through
+its own binding and writes to a private R2 bucket in the same account, so the
+data never leaves it.
+
+The file is SQL rather than JSON so restoring needs no tool beyond
+`wrangler d1 execute --file`:
+- `UPDATE syncSeq SET value = MAX(value, <backup's value>) + 1`, then for
+  each app table `DELETE FROM` and one `INSERT` per row with named columns
+  (live tables that gained columns via `ALTER TABLE` have a different column
+  order than `d1/schema.sql`; named columns make that irrelevant).
+- Every restored row's `serverSeq` is the new `syncSeq` value. Devices only
+  pull rows above their cursor, so without this a restore would be invisible
+  to devices that had synced since the backup (the same reason the duplicate
+  cleanup described in section 5 does).
+- One statement per line: newlines inside text become `' || char(10) || '`,
+  so a note containing `;` and a newline can't split a statement.
+- No `BEGIN`/`COMMIT`: D1 refuses explicit transactions in executed SQL.
+
+Retention is an R2 lifecycle rule (30 days), not code, so a failing Worker
+can't also fail to clean up. A failed run throws, which marks the cron run
+failed in the Worker's dashboard. `tests/backup.test.ts` restores a backup
+into a second local D1 and compares every table, including text with quotes,
+`;` + newline, CRLF and emoji; the same round trip was run once against a copy
+of the real database (all 237 rows identical).
+
 ## 4. Issues hit during implementation, and how they were resolved
 
 These are real bugs that shipped and got fixed during this project's build,
@@ -589,11 +617,20 @@ are kept out of the repo, in the git-ignored `wrangler.toml` and a local
   `functions/api/sync.ts`.
 - **Backups:** D1's built-in Time Travel is always-on with no setup -
   point-in-time restore to any minute within the last **7 days** on the
-  free plan (30 days on a paid plan). Beyond that, take a manual
-  `wrangler d1 export zachtrack-db --remote --output=<file>` before any
-  schema change or migration, and keep the file outside the repo (it is
-  health data; `*.sql` other than `d1/schema.sql` and
+  free plan (30 days on a paid plan). Beyond that, the `zachtrack-backup`
+  Worker (`workers/backup/`, its own git-ignored `wrangler.toml`) writes a
+  nightly restore-ready SQL file to the private R2 bucket `zachtrack-backups`,
+  kept 30 days by a lifecycle rule. See 3.12 for the format. Still take a
+  manual `wrangler d1 export zachtrack-db --remote --output=<file>` right
+  before any schema change or migration, and keep the file outside the repo
+  (it is health data; `*.sql` other than `d1/schema.sql` and
   `d1/scrub-deleted.sql` is git-ignored).
+- **Never hard-delete rows in D1 by hand.** A row removed with `DELETE`
+  leaves no `deletedAt` marker, so any device that still has the record
+  pushes it straight back on its next sync. That is how a duplicate starter
+  set created on 2026-07-28 reappeared on 2026-10-21. To remove records, set
+  `deletedAt` and `updatedAt` to now and `serverSeq` to a fresh value from
+  `syncSeq`, so every device pulls the delete.
 
 ## 6. Deferred / discussed but not built
 
@@ -618,10 +655,6 @@ this," not a promise.
   the most powerful of the three tag ideas (fits Charting's whole
   correlation-hunting purpose) but touches the data pipeline that builds
   chart series, not just a rendered list - separate scope from the other two.
-- **Longer-term D1 backups beyond the 7-day Time Travel window:** a
-  `wrangler d1 export`-based script (manual or scheduled) to dump the
-  database to a `.sql` file, optionally uploaded to an R2 bucket.
-  Discussed, not built.
 - **Push notifications:** true background Web Push (server-triggered, works
   with the browser fully closed) was explicitly called out as a natural
   future pairing with sync, but is out of scope for now. The existing
