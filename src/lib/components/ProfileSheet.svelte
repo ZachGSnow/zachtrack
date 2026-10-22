@@ -1,6 +1,7 @@
 <script lang="ts">
   import { settingsStore } from '../stores/settings.svelte';
   import { PRESETS } from '../data/presets';
+  import DataFileSection from './DataFileSection.svelte';
 
   let { open = $bindable(false) }: { open: boolean } = $props();
 
@@ -85,6 +86,8 @@
         : 'background: var(--color-surface-2); color: var(--color-text-muted);'}
     >{settingsStore.data.notificationsEnabled ? 'On' : 'Off'}</span>
   </button>
+
+  <DataFileSection />
 
   <button
     class="w-full rounded-xl py-2.5 text-sm font-semibold"

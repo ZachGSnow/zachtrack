@@ -1,4 +1,5 @@
-// Shape checks for records arriving at /api/sync.
+// Shape checks for records arriving at /api/sync, also used to check an
+// imported export file before anything is written (src/lib/dataFile.ts).
 //
 // D1 rejects a whole `db.batch()` when one statement fails (a NOT NULL
 // column bound to undefined, say), so one malformed record from a client bug
