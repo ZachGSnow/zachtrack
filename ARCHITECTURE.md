@@ -590,6 +590,18 @@ found no data exposure, and these hardening gaps, fixed together:
   no-store`. Verified locally with `wrangler pages dev`: every tab and the
   SVG charts render with no CSP violations.
 
+### 4.13 A new device reset everyone's settings
+`getSettings()` created the default settings on first launch with
+`updatedAt: Date.now()`. Because the client pushes its full dataset (3.4) and
+the server keeps the newer `updatedAt`, a fresh install's first sync made
+those defaults win and replaced the height, goal weight, default method and
+notification setting every other device had synced. Defaults are now created
+with `updatedAt: 0`, so any real edit beats them, locally and on the server.
+`tests/settings.test.ts` (real `db.ts` on `fake-indexeddb`, real sync endpoint
+on a local D1) fails on the old code. General rule: a record the app creates
+on its own, rather than from a user edit, must not carry a current
+`updatedAt`.
+
 ## 5. Infrastructure inventory
 
 The deployment's real values (account, database id, domains, owner email)

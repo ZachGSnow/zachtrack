@@ -297,7 +297,10 @@ export const db = new ZachTrackDB();
 export async function getSettings(): Promise<SettingsRecord> {
   const existing = await db.settings.get('app-settings');
   if (existing) return existing;
-  const fresh: SettingsRecord = { ...DEFAULT_SETTINGS, updatedAt: Date.now() };
+  // updatedAt 0, not now: these are defaults, not an edit. A new device pushes
+  // its whole dataset on its first sync, and "now" would make the defaults win
+  // last-write-wins and reset the height/goal weight other devices synced.
+  const fresh: SettingsRecord = { ...DEFAULT_SETTINGS, updatedAt: 0 };
   await db.settings.put(fresh);
   return fresh;
 }
