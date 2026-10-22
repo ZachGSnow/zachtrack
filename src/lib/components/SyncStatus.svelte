@@ -34,6 +34,7 @@
       error: 'Sync error',
       offline: 'Offline',
       unauthenticated: 'Login expired',
+      local: 'Local only',
     }[syncStore.status],
   );
 
@@ -65,9 +66,10 @@
     return isToday ? time : `${date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}, ${time}`;
   }
 
-  function dotColor(outcome: 'success' | 'error' | 'offline'): string {
+  function dotColor(outcome: 'success' | 'error' | 'offline' | 'local'): string {
     if (outcome === 'error') return '#ef4444';
     if (outcome === 'offline') return '#eab308';
+    if (outcome === 'local') return 'var(--color-text-muted)';
     return 'var(--color-brand-dim)';
   }
 
@@ -117,10 +119,12 @@
           ? '#eab308'
           : syncStore.status === 'syncing'
             ? 'var(--color-brand)'
-            : 'var(--color-brand-dim)'};"
+            : syncStore.status === 'local'
+              ? 'var(--color-text-muted)'
+              : 'var(--color-brand-dim)'};"
     ></span>
-    <span>{statusLabel}</span>
-    {#if syncStore.status !== 'syncing'}
+    <span title={syncStore.status === 'local' ? 'No sync server: data stays on this device' : undefined}>{statusLabel}</span>
+    {#if syncStore.status !== 'syncing' && syncStore.status !== 'local'}
       <span class="opacity-70">&middot; {timeAgo}</span>
     {/if}
     {#if syncStore.rejected.length > 0}

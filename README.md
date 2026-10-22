@@ -54,8 +54,9 @@ npm run dev
 ```
 
 Open the printed URL. Without a sync backend the app runs local-only: data
-stays in the browser's IndexedDB and the starter trackables are created on
-first launch.
+stays in the browser's IndexedDB, the starter trackables are created on first
+launch, and the sync pill reads "Local only" instead of an error. Export and
+import (Profile > Your data) move data between local-only installs.
 
 ## Deploy your own (Cloudflare)
 
