@@ -11,6 +11,7 @@ import {
   type RemoteSyncChanges,
 } from '../db';
 import { formatClockTime, formatDateTime } from '../utils/time';
+import { describeRejected, REJECTED_DETAILS_LIMIT, type RejectedRecord } from '../utils/rejected';
 
 const SYNC_ENDPOINT = '/api/sync';
 const DEBOUNCE_MS = 2500;
@@ -49,11 +50,29 @@ export interface SyncHistoryEntry {
   /** Human-readable summary of what was pulled from the server, e.g. "2 fasts, 1 entry" or "No changes". */
   summary: string;
   rejectedCount: number;
+  /** One readable line per record the server refused and why, capped at REJECTED_DETAILS_LIMIT. */
+  rejectedDetails?: string[];
   error?: string;
   /** One line per pulled record, human-readable (e.g. "Water: 12 oz -- Jul 30, 3:15 PM"), capped at HISTORY_DETAILS_LIMIT. */
   details?: string[];
   /** How many additional pulled records beyond `details` weren't included, if any. */
   moreDetailsCount?: number;
+}
+
+/** Names each rejected record from what this device has locally (see utils/rejected.ts). */
+async function describeRejectedLocally(rejected: RejectedRecord[]): Promise<string[]> {
+  const [fasts, entries, trackables, fields] = await Promise.all([
+    db.fasts.toArray(),
+    db.trackableEntries.toArray(),
+    db.trackableDefinitions.toArray(),
+    db.fieldDefinitions.toArray(),
+  ]);
+  return describeRejected(rejected, {
+    fasts: new Map(fasts.map((f) => [f.uuid, f] as const)),
+    entries: new Map(entries.map((e) => [e.id, e] as const)),
+    trackables: new Map(trackables.map((t) => [t.id, t] as const)),
+    fields: new Map(fields.map((f) => [f.id, f] as const)),
+  });
 }
 
 function pluralize(count: number, singular: string, plural = `${singular}s`): string {
@@ -158,6 +177,8 @@ class SyncStore {
   lastSyncedAt = $state<number | undefined>(undefined);
   lastError = $state<string | undefined>(undefined);
   rejected = $state<Array<{ recordType: string; uuid: string; reason: string }>>([]);
+  /** `rejected` as readable lines (record name and reason), for the pill's tooltip and history. */
+  rejectedDetails = $state<string[]>([]);
   /** Last few sync attempts (newest first), persisted per-device in localStorage. */
   history = $state<SyncHistoryEntry[]>(loadHistory());
 
@@ -318,6 +339,11 @@ class SyncStore {
 
       this.lastSyncedAt = Date.now();
       this.rejected = body.rejected ?? [];
+      this.rejectedDetails = this.rejected.length
+        ? await describeRejectedLocally(this.rejected).catch(() =>
+            this.rejected.map((r) => `${r.recordType} ${r.uuid}: ${r.reason}`),
+          )
+        : [];
       this.status = 'idle';
 
       const allDetails = await describePulledChanges(body.changes).catch(() => [] as string[]);
@@ -327,6 +353,7 @@ class SyncStore {
         outcome: 'success',
         summary: summarizePulledChanges(body.changes),
         rejectedCount: this.rejected.length,
+        rejectedDetails: this.rejectedDetails.length ? this.rejectedDetails.slice(0, REJECTED_DETAILS_LIMIT) : undefined,
         details: allDetails.slice(0, HISTORY_DETAILS_LIMIT),
         moreDetailsCount: Math.max(0, allDetails.length - HISTORY_DETAILS_LIMIT),
       });

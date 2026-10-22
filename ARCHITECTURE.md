@@ -272,6 +272,15 @@ record immediately before it's overwritten, which is meaningfully more
 invasive (touches the core sync-apply path for all five record types) and
 was deliberately scoped out for now.
 
+Records the server refused (a day conflict, or since 4.12 a record that fails
+validation) are listed too: the warning badge on the pill has a tooltip, and
+the history entry shows "N not synced" and, expanded, one amber line per record
+with its name and the server's reason, e.g. `Nutrition entry, Oct 20, 9:00 AM:
+Invalid record: values must be ...`. `utils/rejected.ts` names records from
+the local tables (falling back to a short id), capped at 10 lines per sync;
+the count is always exact. A refused record stays on the device and is pushed
+again on every sync, so it keeps showing until it's fixed or deleted.
+
 Double-click/double-tap (a click-count-within-a-time-window check) was
 chosen over long-press for opening the history popover: long-press needs
 manual pointer-down/up/cancel timers plus a movement-cancellation threshold

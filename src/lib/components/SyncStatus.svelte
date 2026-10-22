@@ -124,7 +124,11 @@
       <span class="opacity-70">&middot; {timeAgo}</span>
     {/if}
     {#if syncStore.rejected.length > 0}
-      <span class="text-amber-400">&#x26A0; {syncStore.rejected.length}</span>
+      <span
+        class="text-amber-400"
+        title={`Not synced (double-tap for details):\n${syncStore.rejectedDetails.join('\n')}`}
+        aria-label={`${syncStore.rejected.length} not synced`}>&#x26A0; {syncStore.rejected.length}</span
+      >
     {/if}
   </button>
   {#if showErrorPanel}
@@ -158,7 +162,7 @@
       {:else}
         <ul class="flex flex-col gap-1">
           {#each syncStore.history as entry (entry.completedAt)}
-            {@const hasDetails = !!entry.details && entry.details.length > 0}
+            {@const hasDetails = !!entry.details?.length || !!entry.rejectedDetails?.length}
             <li class="overflow-hidden rounded" style="background: var(--color-surface);">
               <button
                 type="button"
@@ -182,13 +186,23 @@
                 </span>
               </button>
               {#if entry.rejectedCount > 0}
-                <p class="px-1.5 pb-1 text-[10px] text-amber-400">&#x26A0; {entry.rejectedCount} rejected</p>
+                <p class="px-1.5 pb-1 text-left text-[10px] text-amber-400">
+                  &#x26A0; {entry.rejectedCount} not synced{entry.rejectedDetails?.length ? ' (tap for why)' : ''}
+                </p>
               {/if}
               {#if hasDetails && expandedEntryAt === entry.completedAt}
                 <ul
-                  class="flex flex-col gap-0.5 border-t px-1.5 py-1 text-[10px]"
+                  class="flex flex-col gap-0.5 border-t px-1.5 py-1 text-left text-[10px]"
                   style="border-color: var(--color-border);"
                 >
+                  {#each entry.rejectedDetails ?? [] as line, i (i)}
+                    <li class="break-words text-amber-400">{line}</li>
+                  {/each}
+                  {#if entry.rejectedDetails && entry.rejectedCount > entry.rejectedDetails.length}
+                    <li class="italic text-amber-400 opacity-80">
+                      +{entry.rejectedCount - entry.rejectedDetails.length} more not synced
+                    </li>
+                  {/if}
                   {#each entry.details ?? [] as line (line)}
                     <li class="break-words opacity-80" style="color: var(--color-text-muted);">{line}</li>
                   {/each}
