@@ -80,6 +80,9 @@ your data goes to your account only.
    `ACCESS_AUD` in `wrangler.toml`, then build and deploy again.
 
 Install the app from your custom domain in Chrome (Add to Home screen).
+The Profile sheet (person icon on the Trackables tab) shows the version each
+device is running. After a deploy, a device that still shows the old number
+picks up the new one when the app is closed and reopened.
 
 ## Configuration
 
