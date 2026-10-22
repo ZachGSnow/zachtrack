@@ -65,6 +65,30 @@ describe('streaks across DST', () => {
   });
 });
 
+describe('streaks with a fast in progress', () => {
+  // A 16:8 routine: a fast every evening, and last night's is still running
+  // at 6 a.m. The streak must not drop to 0 every morning until it ends.
+  it('counts the running fast for the day it started', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(local(2026, 10, 22, 6));
+    const fasts = [17, 18, 19, 20].map((d, i) => fast(local(2026, 10, d, 20), 16, i));
+    const running = { ...fast(local(2026, 10, 21, 20), 16, 9), endTime: undefined };
+    const stats = computeFastStats([...fasts, running]);
+    expect(stats.currentStreak).toBe(5);
+    expect(stats.longestStreak).toBe(5);
+    // Totals and averages still only count finished fasts.
+    expect(stats.totalFasts).toBe(4);
+  });
+
+  it('still breaks the streak on a day with no fast at all', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(local(2026, 10, 22, 6));
+    const fasts = [17, 18, 20].map((d, i) => fast(local(2026, 10, d, 20), 16, i));
+    const running = { ...fast(local(2026, 10, 21, 20), 16, 9), endTime: undefined };
+    expect(computeFastStats([...fasts, running]).currentStreak).toBe(2);
+  });
+});
+
 describe('ranges', () => {
   it('starts a 7-day range at local midnight after a DST change', () => {
     vi.useFakeTimers();

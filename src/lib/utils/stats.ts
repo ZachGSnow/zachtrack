@@ -10,7 +10,13 @@ export interface FastStats {
   longestStreak: number;
 }
 
-/** Streaks are counted as consecutive calendar days containing at least one completed fast. */
+/** A fast with no end time that started in the past (the one the timer shows). */
+const isRunning = (f: FastRecord) => f.endTime == null && f.startTime <= Date.now();
+
+/**
+ * Streaks are counted as consecutive calendar days on which a fast started and
+ * was completed or is still running. Totals and averages count completed fasts only.
+ */
 export function computeFastStats(fasts: FastRecord[]): FastStats {
   const completed = fasts.filter((f): f is FastRecord & { endTime: number } => f.endTime != null);
   const totalFasts = completed.length;
@@ -19,7 +25,9 @@ export function computeFastStats(fasts: FastRecord[]): FastStats {
   const averageHours = hoursList.length ? hoursList.reduce((a, b) => a + b, 0) / hoursList.length : 0;
   const longestHours = hoursList.length ? Math.max(...hoursList) : 0;
 
-  const dayKeys = new Set(completed.map((f) => startOfDay(f.startTime)));
+  // A fast still in progress counts for the day it started. Without it, an
+  // overnight fast made the current streak read 0 every morning until it ended.
+  const dayKeys = new Set(fasts.filter((f) => f.endTime != null || isRunning(f)).map((f) => startOfDay(f.startTime)));
   const sortedDays = Array.from(dayKeys).sort((a, b) => a - b);
 
   let longestStreak = 0;
