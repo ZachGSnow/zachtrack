@@ -1,3 +1,4 @@
+import { liveQuery, type Subscription } from 'dexie';
 import { addFast, getActiveFast, updateFast, type FastRecord } from '../db';
 import { getZoneForHour, type BioZone } from '../data/zones';
 import type { FastPreset } from '../data/presets';
@@ -16,6 +17,7 @@ class FastTimerStore {
 
   private tickHandle: ReturnType<typeof setInterval> | null = null;
   private cancelMilestones: (() => void) | null = null;
+  private subscription: Subscription | undefined;
 
   elapsedMs = $derived(this.activeFast ? this.now - this.activeFast.startTime : 0);
   elapsedHrs = $derived(this.activeFast ? elapsedHours(this.activeFast.startTime, this.now) : 0);
@@ -25,21 +27,32 @@ class FastTimerStore {
   );
 
   async init() {
-    const existing = await getActiveFast();
-    this.activeFast = existing ?? null;
-    if (existing) {
-      this.startTicking();
-      this.cancelMilestones = maybeScheduleMilestones(existing.startTime);
-    }
+    this.apply(await getActiveFast());
     this.ready = true;
+    // A fast can also start or end without a tap on this device: a sync pull
+    // from another device or an import writes it straight to IndexedDB. Follow
+    // the table with liveQuery like every other screen, so the timer shows a
+    // fast started elsewhere, and stops showing one ended elsewhere (ending it
+    // again here would overwrite the other device's end time).
+    this.subscription ??= liveQuery(() => getActiveFast()).subscribe({
+      next: (existing) => this.apply(existing),
+    });
   }
 
   /** Re-syncs `activeFast` from the DB - call after an external edit (e.g. from History). */
   async refreshActive() {
-    const existing = await getActiveFast();
+    this.apply(await getActiveFast());
+  }
+
+  /** Shows `existing` as the running fast (or none), restarting ticking and reminders only when the fast itself changed. */
+  private apply(existing: FastRecord | undefined) {
+    const previous = this.activeFast;
+    this.activeFast = existing ?? null;
+    if (existing && previous && previous.uuid === existing.uuid && previous.startTime === existing.startTime) {
+      return; // Same fast, e.g. a note or tag edit: keep the timer and reminders as they are.
+    }
     this.cancelMilestones?.();
     this.cancelMilestones = null;
-    this.activeFast = existing ?? null;
     if (existing) {
       this.startTicking();
       this.cancelMilestones = maybeScheduleMilestones(existing.startTime);

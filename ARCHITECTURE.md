@@ -656,6 +656,18 @@ for the day it started; totals, averages and the longest fast still count
 completed fasts only. Spotted in the README screenshots of sample data, then
 covered by tests in `tests/time.test.ts` that fail on the old code.
 
+### 4.16 The timer didn't follow fasts from other devices
+Like the settings store (4.14), the fasting timer store read the running fast
+once at startup and again only when the edit sheet asked it to. A fast started
+on another device didn't appear on the Fasting tab until the app was reopened,
+and one ended elsewhere kept running here; ending it again here would have
+written a newer `updatedAt` and so replaced the other device's end time and
+ratings. The store now follows the active fast with `liveQuery`, and restarts
+its tick and zone reminders only when the fast itself changes (a different
+fast or a new start time), not on a note or tag edit.
+`e2e/sync-timer.spec.ts` pulls a fast started and then ended "on another
+device" through the sync mock; it fails on the old store.
+
 ## 5. Infrastructure inventory
 
 The deployment's real values (account, database id, domains, owner email)
