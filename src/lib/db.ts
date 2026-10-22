@@ -1,6 +1,6 @@
 import Dexie, { type EntityTable } from 'dexie';
 import { startOfDay } from './utils/time';
-import { resolveWeightField } from './utils/health';
+import { BODY_FIELD_ROLES, BODY_FIELD_SETTING, resolveBodyField, type BodyFatSex } from './utils/health';
 
 export interface FastRecord {
   id?: number;
@@ -96,8 +96,14 @@ export interface SettingsRecord {
   heightInches?: number;
   /** Pounds; drawn as a dashed reference line on the weight field's charts. */
   goalWeightLb?: number;
-  /** The number field that holds body weight (BMI, goal line). Unset = the field named "Weight"; see resolveWeightField. */
+  /** The number field that holds body weight (BMI, goal line). Unset = the field named "Weight"; see resolveBodyField. */
   weightFieldId?: string;
+  /** Fields the Navy body-fat estimate reads. Unset = the field named "Waist" / "Neck" / "Hip". */
+  waistFieldId?: string;
+  neckFieldId?: string;
+  hipFieldId?: string;
+  /** Picks the Navy formula; no body-fat estimate until it's set. */
+  bodyFatSex?: BodyFatSex;
   updatedAt: number;
 }
 
@@ -374,13 +380,17 @@ export async function updateFieldDefinition(
   id: string,
   patch: Partial<Omit<FieldDefinition, 'id' | 'createdAt'>>,
 ): Promise<void> {
-  // Renaming the field BMI finds by its name ("Weight") would turn BMI and the
-  // goal line off, so pin it by id first. Once pinned, any name works.
+  // Renaming a field BMI or body fat finds by its name ("Weight", "Waist",
+  // ...) would turn them off, so pin it by id first. Once pinned, any name works.
   if (patch.name !== undefined) {
     const settings = await getSettings();
-    if (!settings.weightFieldId && resolveWeightField(await db.fieldDefinitions.toArray(), undefined)?.id === id) {
-      await updateSettings({ weightFieldId: id });
+    const fields = await db.fieldDefinitions.toArray();
+    const pins: Partial<SettingsRecord> = {};
+    for (const role of BODY_FIELD_ROLES) {
+      const key = BODY_FIELD_SETTING[role];
+      if (!settings[key] && resolveBodyField(fields, role, undefined)?.id === id) pins[key] = id;
     }
+    if (Object.keys(pins).length > 0) await updateSettings(pins);
   }
   await db.fieldDefinitions.update(id, { ...patch, updatedAt: Date.now() });
   notifyMutation();
@@ -595,9 +605,9 @@ export async function seedDefaultTrackablesIfEmpty(): Promise<void> {
   const fieldSpecs: Array<Omit<FieldDefinition, 'id' | 'createdAt' | 'updatedAt'>> = [
     { name: 'Weight', kind: 'number', unit: 'lb' },
     { name: 'Waist', kind: 'number', unit: 'in' },
-    { name: 'Chest', kind: 'number', unit: 'in' },
+    { name: 'Neck', kind: 'number', unit: 'in' },
     { name: 'Hip', kind: 'number', unit: 'in' },
-    { name: 'Body Fat %', kind: 'number', unit: '%' },
+    { name: 'Chest', kind: 'number', unit: 'in' },
     { name: 'Systolic BP', kind: 'number' },
     { name: 'Diastolic BP', kind: 'number' },
     { name: 'Temperature', kind: 'number', unit: '\u00b0F' },
@@ -631,7 +641,7 @@ export async function seedDefaultTrackablesIfEmpty(): Promise<void> {
   const fid = (name: string) => fieldByName.get(name)!.id;
 
   const trackableSpecs: Array<{ name: string; icon: string; color: string; fields: string[] }> = [
-    { name: 'Body Measurements', icon: '\u2696\ufe0f', color: '#a855f7', fields: ['Weight', 'Waist', 'Chest', 'Hip', 'Body Fat %'] },
+    { name: 'Body Measurements', icon: '\u2696\ufe0f', color: '#a855f7', fields: ['Weight', 'Waist', 'Neck', 'Hip', 'Chest'] },
     { name: 'Vitals', icon: '\u2764\ufe0f', color: '#ef4444', fields: ['Systolic BP', 'Diastolic BP', 'Temperature'] },
     {
       name: 'Nutrition',

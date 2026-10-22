@@ -66,7 +66,14 @@ export function buildSampleExport(starter: StarterDefinitions, now: Date) {
   for (let d = DAYS; d >= 0; d--) {
     // Weight drifts from about 182 to 179 lb, weighed most mornings.
     if (d % 3 !== 2) entry('Body Measurements', at(d, 7, 10), { [field('Weight')]: round1(182.4 - (DAYS - d) * 0.16 + between(-0.5, 0.5)) });
-    if (d % 7 === 0) entry('Body Measurements', at(d, 7, 12), { [field('Waist')]: round1(36.2 - (DAYS - d) * 0.03) });
+    // Tape measurements once a week, in one entry (the Navy body-fat estimate needs them on the same day).
+    if (d % 7 === 0) {
+      entry('Body Measurements', at(d, 7, 12), {
+        [field('Waist')]: round1(36.2 - (DAYS - d) * 0.03),
+        [field('Neck')]: 15.4,
+        [field('Hip')]: round1(40.1 - (DAYS - d) * 0.02),
+      });
+    }
 
     // Water three or four times a day (summed per day), one calorie total.
     for (const hour of [9, 12, 15, 19].slice(0, int(3, 4))) entry('Nutrition', at(d, hour), { [field('Water')]: int(12, 20) });
@@ -107,7 +114,7 @@ export function buildSampleExport(starter: StarterDefinitions, now: Date) {
       fieldDefinitions: [],
       trackableDefinitions: [],
       trackableEntries: entries,
-      settings: { id: 'app-settings', defaultPresetId: '16:8', notificationsEnabled: false, heightInches: 70, goalWeightLb: 176, updatedAt: created },
+      settings: { id: 'app-settings', defaultPresetId: '16:8', notificationsEnabled: false, heightInches: 70, goalWeightLb: 176, bodyFatSex: 'male', updatedAt: created },
     },
   };
 }

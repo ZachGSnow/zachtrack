@@ -2,7 +2,7 @@
   import { liveQuery } from 'dexie';
   import { db } from '../db';
   import { settingsStore } from '../stores/settings.svelte';
-  import { resolveWeightField } from '../utils/health';
+  import { BODY_FIELD_SETTING, resolveBodyFieldIds, type BodyFatSex } from '../utils/health';
   import { PRESETS } from '../data/presets';
   import DataFileSection from './DataFileSection.svelte';
 
@@ -20,7 +20,14 @@
         return { id: f.id, label: owners.length ? `${f.name} (${owners.join(', ')})` : f.name };
       }),
   );
-  const weightFieldId = $derived(resolveWeightField($allFields ?? [], settingsStore.data.weightFieldId)?.id ?? '');
+  const bodyFieldIds = $derived(resolveBodyFieldIds($allFields ?? [], settingsStore.data));
+  const weightFieldId = $derived(bodyFieldIds.weight ?? '');
+
+  const BODY_FAT_FIELDS = [
+    { role: 'waist', label: 'Waist field' },
+    { role: 'neck', label: 'Neck field' },
+    { role: 'hip', label: 'Hip field (female formula only)' },
+  ] as const;
 
   let heightDraft = $state('');
   let goalWeightDraft = $state('');
@@ -97,6 +104,45 @@
     />
     <span class="mt-1 block text-xs text-text-muted">Shown as a dashed goal line on your weight field's charts.</span>
   </label>
+
+  <div class="space-y-2 rounded-lg border p-3" style="border-color: var(--color-border);">
+    <p class="text-sm font-medium text-text">Body fat (Navy method)</p>
+    <p class="text-xs text-text-muted">
+      Estimated from waist, neck, hip and height on each day you log them together, shown next to BMI. Field units
+      must be in or cm. An estimate, typically within 3 to 4 points.
+    </p>
+    <label class="block text-sm">
+      <span class="mb-1 block text-text-muted">Formula</span>
+      <select
+        value={settingsStore.data.bodyFatSex ?? ''}
+        onchange={(e) => settingsStore.update({ bodyFatSex: ((e.target as HTMLSelectElement).value || undefined) as BodyFatSex | undefined })}
+        class="w-full rounded-lg border bg-transparent p-2 text-text"
+        style="border-color: var(--color-border);"
+      >
+        <option value="">Off</option>
+        <option value="male">Male (waist, neck)</option>
+        <option value="female">Female (waist, hip, neck)</option>
+      </select>
+    </label>
+    {#each BODY_FAT_FIELDS as item (item.role)}
+      <label class="block text-sm">
+        <span class="mb-1 block text-text-muted">{item.label}</span>
+        <select
+          value={bodyFieldIds[item.role] ?? ''}
+          onchange={(e) => settingsStore.update({ [BODY_FIELD_SETTING[item.role]]: (e.target as HTMLSelectElement).value || undefined })}
+          class="w-full rounded-lg border bg-transparent p-2 text-text"
+          style="border-color: var(--color-border);"
+        >
+          {#if !bodyFieldIds[item.role]}
+            <option value="">Not set</option>
+          {/if}
+          {#each numberFieldOptions as option (option.id)}
+            <option value={option.id}>{option.label}</option>
+          {/each}
+        </select>
+      </label>
+    {/each}
+  </div>
 
   <label class="block text-sm">
     <span class="mb-1 block text-text-muted">Default fasting method</span>

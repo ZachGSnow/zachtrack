@@ -147,3 +147,36 @@ test('a field can be renamed and given a new unit, and BMI follows the renamed w
   await expect(page.getByRole('combobox', { name: /^Weight field/ }).locator('option:checked')).toHaveText('Body weight (Body Measurements)');
   expect(problems).toEqual([]);
 });
+
+test('Body Measurements shows a Navy body-fat estimate right after BMI', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await mockSync(page, noServer);
+  await importSampleData(page);
+  await page.goto('/#/trackables');
+  await page.getByText('Body Measurements', { exact: true }).click();
+  await page.getByRole('button', { name: 'Table' }).first().click();
+
+  const table = page.getByRole('table').first();
+  await expect(table.locator('thead th[title="Body fat (Navy)"]')).toBeVisible();
+  const { titles, values } = await table.evaluate((t) => {
+    const titles = [...t.querySelectorAll('thead th[title]')].map((th) => th.getAttribute('title'));
+    const col = titles.indexOf('Body fat (Navy)');
+    const values = [...t.querySelectorAll('tbody tr')]
+      .map((tr) => parseFloat(tr.querySelectorAll('td')[col]?.textContent ?? ''))
+      .filter((v) => !Number.isNaN(v));
+    return { titles, values };
+  });
+  expect(titles.indexOf('Body fat (Navy)')).toBe(titles.indexOf('BMI') + 1);
+  // Sample data: waist about 36 in, neck 15.4 in, height 70 in -> about 20 %.
+  expect(values.length).toBeGreaterThan(0);
+  for (const v of values) {
+    expect(v).toBeGreaterThan(17);
+    expect(v).toBeLessThan(23);
+  }
+
+  await page.goto('/#/trackables');
+  await page.getByRole('button', { name: 'Profile' }).click();
+  await expect(page.getByRole('combobox', { name: /^Formula/ }).locator('option:checked')).toHaveText('Male (waist, neck)');
+  await expect(page.getByRole('combobox', { name: /^Neck field/ }).locator('option:checked')).toHaveText('Neck (Body Measurements)');
+  expect(problems).toEqual([]);
+});

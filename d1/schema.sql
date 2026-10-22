@@ -87,6 +87,10 @@ CREATE TABLE settings (
   heightInches REAL,
   goalWeightLb REAL,
   weightFieldId TEXT,    -- fieldDefinitions.id BMI follows; NULL = the field named Weight
+  waistFieldId TEXT,     -- fields the Navy body-fat estimate reads; NULL = the field named Waist / Neck / Hip
+  neckFieldId TEXT,
+  hipFieldId TEXT,
+  bodyFatSex TEXT,       -- 'male' | 'female'; picks the Navy formula, NULL = no estimate
   updatedAt INTEGER NOT NULL,
   serverSeq INTEGER NOT NULL
 );

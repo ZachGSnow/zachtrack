@@ -108,6 +108,10 @@ const checks: Record<Exclude<RecordKind, 'tombstones'>, Check> = {
       optional(r, 'heightInches', isNum, 'a number'),
       optional(r, 'goalWeightLb', isNum, 'a number'),
       optional(r, 'weightFieldId', isId, 'a non-empty string'),
+      optional(r, 'waistFieldId', isId, 'a non-empty string'),
+      optional(r, 'neckFieldId', isId, 'a non-empty string'),
+      optional(r, 'hipFieldId', isId, 'a non-empty string'),
+      optional(r, 'bodyFatSex', (v) => v === 'male' || v === 'female', "'male' or 'female'"),
     ),
 };
 

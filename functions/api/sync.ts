@@ -354,11 +354,14 @@ function buildEntryUpsert(db: D1Database, entry: TrackableEntry, serverSeq: numb
 function buildSettingsUpsert(db: D1Database, settings: SettingsRecord, serverSeq: number): D1PreparedStatement {
   return db
     .prepare(
-      `INSERT INTO settings (id, defaultPresetId, notificationsEnabled, heightInches, goalWeightLb, weightFieldId, updatedAt, serverSeq)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO settings (id, defaultPresetId, notificationsEnabled, heightInches, goalWeightLb, weightFieldId,
+         waistFieldId, neckFieldId, hipFieldId, bodyFatSex, updatedAt, serverSeq)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          defaultPresetId=excluded.defaultPresetId, notificationsEnabled=excluded.notificationsEnabled,
          heightInches=excluded.heightInches, goalWeightLb=excluded.goalWeightLb, weightFieldId=excluded.weightFieldId,
+         waistFieldId=excluded.waistFieldId, neckFieldId=excluded.neckFieldId, hipFieldId=excluded.hipFieldId,
+         bodyFatSex=excluded.bodyFatSex,
          updatedAt=excluded.updatedAt, serverSeq=excluded.serverSeq
        WHERE excluded.updatedAt > settings.updatedAt`,
     )
@@ -369,6 +372,10 @@ function buildSettingsUpsert(db: D1Database, settings: SettingsRecord, serverSeq
       settings.heightInches ?? null,
       settings.goalWeightLb ?? null,
       settings.weightFieldId ?? null,
+      settings.waistFieldId ?? null,
+      settings.neckFieldId ?? null,
+      settings.hipFieldId ?? null,
+      settings.bodyFatSex ?? null,
       settings.updatedAt,
       serverSeq,
     );
@@ -482,6 +489,10 @@ function mapSettingsRow(row: Record<string, unknown>): WireRow<SettingsRecord> {
     heightInches: (row.heightInches as number) ?? undefined,
     goalWeightLb: (row.goalWeightLb as number) ?? undefined,
     weightFieldId: (row.weightFieldId as string) ?? undefined,
+    waistFieldId: (row.waistFieldId as string) ?? undefined,
+    neckFieldId: (row.neckFieldId as string) ?? undefined,
+    hipFieldId: (row.hipFieldId as string) ?? undefined,
+    bodyFatSex: (row.bodyFatSex as SettingsRecord['bodyFatSex']) ?? undefined,
     updatedAt: row.updatedAt as number,
     deletedAt: (row.deletedAt as number) ?? undefined,
   };
