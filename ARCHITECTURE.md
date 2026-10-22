@@ -648,6 +648,14 @@ the settings row with `liveQuery` too. Found by the browser test that imports
 sample data and then checks the Profile sheet (`e2e/app.spec.ts`), which fails
 on the old store.
 
+### 4.15 The fasting streak read 0 every morning
+`computeFastStats` built streak days from completed fasts only, so with a fast
+every evening the current streak dropped to 0 each morning while last night's
+fast was still running, and came back when it ended. A running fast now counts
+for the day it started; totals, averages and the longest fast still count
+completed fasts only. Spotted in the README screenshots of sample data, then
+covered by tests in `tests/time.test.ts` that fail on the old code.
+
 ## 5. Infrastructure inventory
 
 The deployment's real values (account, database id, domains, owner email)
