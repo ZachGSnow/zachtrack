@@ -1,9 +1,26 @@
 <script lang="ts">
+  import { liveQuery } from 'dexie';
+  import { db } from '../db';
   import { settingsStore } from '../stores/settings.svelte';
+  import { resolveWeightField } from '../utils/health';
   import { PRESETS } from '../data/presets';
   import DataFileSection from './DataFileSection.svelte';
 
   let { open = $bindable(false) }: { open: boolean } = $props();
+
+  const allFields = liveQuery(() => db.fieldDefinitions.orderBy('name').toArray());
+  const allTrackables = liveQuery(() => db.trackableDefinitions.toArray());
+
+  /** Number fields, each labelled with the trackables it belongs to. */
+  const numberFieldOptions = $derived(
+    ($allFields ?? [])
+      .filter((f) => f.kind === 'number')
+      .map((f) => {
+        const owners = ($allTrackables ?? []).filter((t) => t.fieldIds.includes(f.id)).map((t) => t.name);
+        return { id: f.id, label: owners.length ? `${f.name} (${owners.join(', ')})` : f.name };
+      }),
+  );
+  const weightFieldId = $derived(resolveWeightField($allFields ?? [], settingsStore.data.weightFieldId)?.id ?? '');
 
   let heightDraft = $state('');
   let goalWeightDraft = $state('');
@@ -46,7 +63,25 @@
       class="w-full rounded-lg border bg-transparent p-2 text-text placeholder:text-text-muted"
       style="border-color: var(--color-border);"
     />
-    <span class="mt-1 block text-xs text-text-muted">Used to compute BMI wherever you log Weight.</span>
+    <span class="mt-1 block text-xs text-text-muted">Used to compute BMI from your weight field.</span>
+  </label>
+
+  <label class="block text-sm">
+    <span class="mb-1 block text-text-muted">Weight field</span>
+    <select
+      value={weightFieldId}
+      onchange={(e) => settingsStore.update({ weightFieldId: (e.target as HTMLSelectElement).value || undefined })}
+      class="w-full rounded-lg border bg-transparent p-2 text-text"
+      style="border-color: var(--color-border);"
+    >
+      {#if !weightFieldId}
+        <option value="">Not set</option>
+      {/if}
+      {#each numberFieldOptions as option (option.id)}
+        <option value={option.id}>{option.label}</option>
+      {/each}
+    </select>
+    <span class="mt-1 block text-xs text-text-muted">The field BMI and the goal line follow, whatever it is named.</span>
   </label>
 
   <label class="block text-sm">
@@ -60,7 +95,7 @@
       class="w-full rounded-lg border bg-transparent p-2 text-text placeholder:text-text-muted"
       style="border-color: var(--color-border);"
     />
-    <span class="mt-1 block text-xs text-text-muted">Shown as a dashed goal line on Weight charts.</span>
+    <span class="mt-1 block text-xs text-text-muted">Shown as a dashed goal line on your weight field's charts.</span>
   </label>
 
   <label class="block text-sm">

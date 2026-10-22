@@ -119,3 +119,31 @@ test("a field's chart line has the same color as its pill when an earlier field 
     .toEqual([pillColor]);
   expect(problems).toEqual([]);
 });
+
+test('a field can be renamed and given a new unit, and BMI follows the renamed weight field', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await mockSync(page, noServer);
+  await importSampleData(page);
+  await page.goto('/#/trackables');
+  await page.getByText('Body Measurements', { exact: true }).click();
+  await page.getByRole('button', { name: 'Table' }).first().click();
+  await expect(page.getByRole('columnheader', { name: /BMI/ }).first()).toBeVisible();
+
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit Weight', exact: true }).click();
+  await page.getByLabel('Field name').fill('Body weight');
+  await page.getByRole('button', { name: 'Save field' }).click();
+  await page.getByRole('button', { name: 'Edit Waist', exact: true }).click();
+  await page.getByLabel('Unit').fill('inch');
+  await page.getByRole('button', { name: 'Save field' }).click();
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+
+  await expect(page.getByRole('columnheader', { name: /Body weight/ }).first()).toBeVisible();
+  await expect(page.getByRole('columnheader', { name: /BMI/ }).first()).toBeVisible();
+  await expect(page.getByRole('columnheader', { name: /Waist\s*inch/ }).first()).toBeVisible();
+
+  await page.goto('/#/trackables');
+  await page.getByRole('button', { name: 'Profile' }).click();
+  await expect(page.getByLabel('Weight field').locator('option:checked')).toHaveText('Body weight (Body Measurements)');
+  expect(problems).toEqual([]);
+});

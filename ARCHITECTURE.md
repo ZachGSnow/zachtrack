@@ -68,7 +68,7 @@ interface FieldDefinition {
   unit?: string; ratingMin?: number; ratingMax?: number;
   aggregation?: FieldAggregation;
   createdAt: number;
-  updatedAt: number;    // added for sync; editable via updateFieldDefinition (aggregation only, today)
+  updatedAt: number;    // added for sync; name, unit, rating max and aggregation are editable (3.14)
 }
 
 type TrackableDisplayMode = 'occurrences' | 'ages';
@@ -93,6 +93,7 @@ interface SettingsRecord {
   id: 'app-settings';
   defaultPresetId: string; notificationsEnabled: boolean;
   heightInches?: number; goalWeightLb?: number;
+  weightFieldId?: string; // the field BMI and the goal line follow (3.14)
   updatedAt: number;      // added for sync
 }
 ```
@@ -409,6 +410,30 @@ Server-side backups (3.12) are the disaster recovery; this is the user's own
 copy, independent of Cloudflare, and the way a local-only install moves to a
 new device.
 
+### 3.14 Editable fields, and a weight field chosen by id
+Each attached field in the trackable edit sheet has an Edit button for its
+name, unit and rating maximum. Kind stays fixed, because logged values would
+stop making sense. Fields are shared between trackables, so the form names the
+other trackables a change also affects, and it saves straight away (like the
+combine mode) instead of waiting for the trackable's Save. A unit is only a
+label: changing it never converts values already logged.
+
+BMI and the goal-weight line used to find the weight field by the name
+"Weight", so renaming it would have turned both off without a word, and any
+other field named Weight would have picked up BMI. They now follow
+`settings.weightFieldId`, chosen in Profile > Weight field.
+`resolveWeightField` (`utils/health.ts`) falls back to the number field named
+Weight while the setting is empty, so installs from before it existed need no
+migration write (and none could carry a current `updatedAt`, see 4.13).
+Renaming the field that the fallback found first pins it by id, so a rename
+keeps BMI working.
+
+`weightFieldId` is a new column on D1's `settings` table: an existing database
+needs `ALTER TABLE settings ADD COLUMN weightFieldId TEXT` before this version
+is deployed, or every sync that carries settings fails. A device still on an
+older version that edits settings sends no `weightFieldId` and so clears it;
+the name fallback covers that until it is chosen again.
+
 ## 4. Issues hit during implementation, and how they were resolved
 
 These are real bugs that shipped and got fixed during this project's build,
@@ -678,7 +703,8 @@ are kept out of the repo, in the git-ignored `wrangler.toml` and a local
   to a new database with
   `wrangler d1 execute zachtrack-db --remote --file=./d1/schema.sql`, and use
   `--command="ALTER TABLE ..."` for incremental additive changes (as was
-  done for the `displayMode` and `fieldDefinitions.aggregation` columns).
+  done for the `displayMode`, `fieldDefinitions.aggregation` and
+  `settings.weightFieldId` columns).
 - **Pages project:** `zachtrack`, production branch `main`, deployed via
   **direct upload** (`npm run build`, then `wrangler pages deploy dist
   --project-name=zachtrack --branch=main`). Default URL

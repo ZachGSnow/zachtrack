@@ -86,6 +86,7 @@ CREATE TABLE settings (
   notificationsEnabled INTEGER,
   heightInches REAL,
   goalWeightLb REAL,
+  weightFieldId TEXT,    -- fieldDefinitions.id BMI follows; NULL = the field named Weight
   updatedAt INTEGER NOT NULL,
   serverSeq INTEGER NOT NULL
 );

@@ -1,5 +1,6 @@
 import Dexie, { type EntityTable } from 'dexie';
 import { startOfDay } from './utils/time';
+import { resolveWeightField } from './utils/health';
 
 export interface FastRecord {
   id?: number;
@@ -91,10 +92,12 @@ export interface SettingsRecord {
   id: 'app-settings';
   defaultPresetId: string;
   notificationsEnabled: boolean;
-  /** Inches; used to compute BMI from a "Weight" field's logged values. */
+  /** Inches; used to compute BMI from the weight field's logged values. */
   heightInches?: number;
-  /** Pounds; drawn as a dashed reference line on Weight charts. */
+  /** Pounds; drawn as a dashed reference line on the weight field's charts. */
   goalWeightLb?: number;
+  /** The number field that holds body weight (BMI, goal line). Unset = the field named "Weight"; see resolveWeightField. */
+  weightFieldId?: string;
   updatedAt: number;
 }
 
@@ -371,6 +374,14 @@ export async function updateFieldDefinition(
   id: string,
   patch: Partial<Omit<FieldDefinition, 'id' | 'createdAt'>>,
 ): Promise<void> {
+  // Renaming the field BMI finds by its name ("Weight") would turn BMI and the
+  // goal line off, so pin it by id first. Once pinned, any name works.
+  if (patch.name !== undefined) {
+    const settings = await getSettings();
+    if (!settings.weightFieldId && resolveWeightField(await db.fieldDefinitions.toArray(), undefined)?.id === id) {
+      await updateSettings({ weightFieldId: id });
+    }
+  }
   await db.fieldDefinitions.update(id, { ...patch, updatedAt: Date.now() });
   notifyMutation();
 }

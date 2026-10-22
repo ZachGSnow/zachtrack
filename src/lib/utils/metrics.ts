@@ -171,6 +171,8 @@ export function buildTrackableMetrics(
   entries: TimestampedValues[],
   allFields: FieldDefinition[],
   colorFor: (field: FieldDefinition) => string,
+  /** The field BMI and the goal line follow (see resolveWeightField). */
+  weightFieldId?: string,
 ): MetricDef[] {
   const occByDay = new Map<number, number>();
   for (const e of entries) {
@@ -210,7 +212,7 @@ export function buildTrackableMetrics(
       axisLabel: field.kind === 'rating' ? 'Rating' : field.kind === 'boolean' ? 'Yes/No' : (field.unit ?? 'Value'),
       axisMin: field.kind === 'rating' ? (field.ratingMin ?? 1) : field.kind === 'boolean' ? 0 : undefined,
       axisMax: field.kind === 'rating' ? (field.ratingMax ?? 5) : field.kind === 'boolean' ? 1 : undefined,
-      isWeightField: field.kind === 'number' && field.name.toLowerCase() === 'weight',
+      isWeightField: weightFieldId != null && field.id === weightFieldId,
     });
   }
 
