@@ -65,7 +65,7 @@ export function buildSampleExport(starter: StarterDefinitions, now: Date) {
   const fasts: Array<Record<string, unknown>> = [];
   for (let d = DAYS; d >= 0; d--) {
     // Weight drifts from about 182 to 179 lb, weighed most mornings.
-    if (d % 3 !== 1) entry('Body Measurements', at(d, 7, 10), { [field('Weight')]: round1(182.4 - (DAYS - d) * 0.16 + between(-0.5, 0.5)) });
+    if (d % 3 !== 2) entry('Body Measurements', at(d, 7, 10), { [field('Weight')]: round1(182.4 - (DAYS - d) * 0.16 + between(-0.5, 0.5)) });
     if (d % 7 === 0) entry('Body Measurements', at(d, 7, 12), { [field('Waist')]: round1(36.2 - (DAYS - d) * 0.03) });
 
     // Water three or four times a day (summed per day), one calorie total.
@@ -77,7 +77,7 @@ export function buildSampleExport(starter: StarterDefinitions, now: Date) {
     if (d % 3 === 0) entry('Activity', at(d, 18), { [field('Duration')]: int(25, 50), [field('Steps')]: int(6000, 11000) }, d === 0 ? 'Evening walk' : undefined);
 
     // A 16:8 fast most evenings; the one that started last night is still running.
-    if (d >= 1 && d % 6 !== 2) {
+    if (d >= 1 && d % 7 !== 5) {
       const start = at(d, 20, int(0, 40));
       const hours = d === 1 ? undefined : between(15.5, 18);
       fasts.push({

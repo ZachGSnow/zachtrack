@@ -5,7 +5,14 @@
 [![CI](https://github.com/ZachGSnow/zachtrack/actions/workflows/ci.yml/badge.svg)](https://github.com/ZachGSnow/zachtrack/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-<!-- TODO: screenshot from sample data, saved under docs/ and referenced as ![ZachTrack](docs/screenshot.png) -->
+<p>
+  <img src="docs/screenshots/fasting.png" alt="Fasting timer with a 16:8 fast in progress and the current metabolic zone" width="200">
+  <img src="docs/screenshots/trackables.png" alt="Trackables list showing when each was last logged" width="200">
+  <img src="docs/screenshots/trackable-trends.png" alt="Body Measurements trends table with weekly weight, BMI and waist" width="200">
+  <img src="docs/screenshots/journey.png" alt="Journey with fasting streaks and a weekly fasting table" width="200">
+</p>
+
+<sub>Fictional sample data, captured from the real app with <code>npm run screenshots</code>.</sub>
 
 ## Why
 
