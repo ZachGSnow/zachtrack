@@ -31,14 +31,14 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
   entries on one day combine (`sum` for Water, `last` for Weight, `average`).
   A starter set (Body Measurements, Vitals, Nutrition, Sleep, Wellness,
   Activity, Menstrual Cycle, Male Health) is created on a new install and is
-  fully editable.
+  fully editable, including each field's name, unit and rating scale.
 - **People and birthdays:** an "ages" display mode shows live ages and
   birthday countdowns instead of occurrence stats.
 - **Tables first:** the Data tab, Journey and each trackable show rows per
   day, week or month with a 7-day rolling average or change vs the previous
   period, an Avg / Change / Per-week trend footer, and a Copy button that puts
   TSV on the clipboard. Each has a chart view (ECharts) behind a toggle.
-- **BMI** derived from a Weight field and your height.
+- **BMI** derived from your weight field (chosen in Profile) and your height.
 - **Offline and installable** (service worker, Android/Chrome PWA).
 - **Two-way sync** across devices: per-record last-write-wins, deletes that
   propagate, conflicts reported instead of guessed, and a sync status pill
@@ -86,6 +86,10 @@ your data goes to your account only.
    (`*.zachtrack.pages.dev`).
 6. **Vars:** set `OWNER_EMAIL`, `ACCESS_TEAM_DOMAIN` and (recommended)
    `ACCESS_AUD` in `wrangler.toml`, then build and deploy again.
+
+**Upgrading an existing database:** a release that adds a column says so in
+its notes. Add it before deploying that release, e.g. for v1.4.0:
+`npx wrangler d1 execute zachtrack-db --remote --command="ALTER TABLE settings ADD COLUMN weightFieldId TEXT"`.
 
 Install the app from your custom domain in Chrome (Add to Home screen).
 The Profile sheet (person icon on the Trackables tab) shows the version each

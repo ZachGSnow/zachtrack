@@ -60,7 +60,7 @@ describe('default settings on a new device', () => {
         fieldDefinitions: [],
         trackableDefinitions: [],
         trackableEntries: [],
-        settings: { id: 'app-settings', defaultPresetId: '18:6', notificationsEnabled: true, heightInches: 70, goalWeightLb: 175, updatedAt: NOW - 86400000 },
+        settings: { id: 'app-settings', defaultPresetId: '18:6', notificationsEnabled: true, heightInches: 70, goalWeightLb: 175, weightFieldId: 'f-scale', updatedAt: NOW - 86400000 },
       },
       tombstones: [],
     });
@@ -71,8 +71,8 @@ describe('default settings on a new device', () => {
     const local = await getAllSyncableRecords();
     const res = await push({ cursor: 0, changes: local, tombstones: [] });
 
-    expect(res.changes.settings).toMatchObject({ heightInches: 70, goalWeightLb: 175, defaultPresetId: '18:6' });
-    const server = await proxy.env.DB.prepare('SELECT heightInches, goalWeightLb FROM settings').first();
-    expect(server).toEqual({ heightInches: 70, goalWeightLb: 175 });
+    expect(res.changes.settings).toMatchObject({ heightInches: 70, goalWeightLb: 175, weightFieldId: 'f-scale', defaultPresetId: '18:6' });
+    const server = await proxy.env.DB.prepare('SELECT heightInches, goalWeightLb, weightFieldId FROM settings').first();
+    expect(server).toEqual({ heightInches: 70, goalWeightLb: 175, weightFieldId: 'f-scale' });
   });
 });

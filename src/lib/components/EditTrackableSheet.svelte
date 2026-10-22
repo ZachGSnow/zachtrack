@@ -62,6 +62,7 @@
     fieldIds = trackable?.fieldIds ?? [];
     displayMode = trackable?.displayMode ?? 'occurrences';
     error = '';
+    editingFieldId = null;
     showNewField = false;
     newFieldName = '';
     newFieldKind = 'number';
@@ -102,6 +103,54 @@
     newFieldUnit = '';
     newFieldRatingMax = '5';
     newFieldAggregation = 'last';
+  }
+
+  // Editing a field's name, unit or scale. Fields are shared, so this saves
+  // straight away (like the combine mode) rather than with the trackable.
+  const allTrackables = liveQuery(() => db.trackableDefinitions.toArray());
+  let editingFieldId = $state<string | null>(null);
+  let editFieldName = $state('');
+  let editFieldUnit = $state('');
+  let editFieldRatingMax = $state('5');
+  let editFieldError = $state('');
+
+  /** Other trackables sharing the field being edited, which a rename also changes. */
+  const editingAlsoUsedBy = $derived(
+    editingFieldId
+      ? ($allTrackables ?? []).filter((t) => t.id !== trackable?.id && t.fieldIds.includes(editingFieldId!)).map((t) => t.name)
+      : [],
+  );
+
+  function startEditField(field: FieldDefinition) {
+    editingFieldId = field.id;
+    editFieldName = field.name;
+    editFieldUnit = field.unit ?? '';
+    editFieldRatingMax = String(field.ratingMax ?? 5);
+    editFieldError = '';
+  }
+
+  async function saveEditField(field: FieldDefinition) {
+    const trimmed = editFieldName.trim();
+    if (!trimmed) {
+      editFieldError = 'Please enter a name.';
+      return;
+    }
+    const patch: Partial<FieldDefinition> = { name: trimmed };
+    if (field.kind === 'number') patch.unit = editFieldUnit.trim() || undefined;
+    if (field.kind === 'rating') {
+      const max = Number(editFieldRatingMax);
+      if (!Number.isInteger(max) || max < 2 || max > 100) {
+        editFieldError = 'The scale must go from 1 to a whole number between 2 and 100.';
+        return;
+      }
+      patch.ratingMax = max;
+    }
+    try {
+      await updateFieldDefinition(field.id, patch);
+      editingFieldId = null;
+    } catch (e) {
+      editFieldError = e instanceof Error ? e.message : 'Could not save this field. Please try again.';
+    }
   }
 
   async function handleAggregationChange(fieldId: string, e: Event) {
@@ -215,9 +264,71 @@
         {#each attachedFields as field (field.id)}
           <li class="rounded-lg border p-2 text-sm" style="border-color: var(--color-border);">
             <div class="flex items-center justify-between gap-2">
-              <span class="text-text">{field.name} <span class="text-text-muted">({KIND_LABELS[field.kind]}{field.unit ? `, ${field.unit}` : ''})</span></span>
-              <button type="button" class="shrink-0 text-text-muted" onclick={() => removeField(field.id)} aria-label="Remove {field.name}">&times;</button>
+              <span class="text-text">{field.name} <span class="text-text-muted">({KIND_LABELS[field.kind]}{field.unit ? `, ${field.unit}` : ''}{field.kind === 'rating' ? `, 1 to ${field.ratingMax ?? 5}` : ''})</span></span>
+              <div class="flex shrink-0 items-center gap-3">
+                {#if editingFieldId !== field.id}
+                  <button type="button" class="text-xs font-medium" style="color: var(--color-brand);" onclick={() => startEditField(field)} aria-label="Edit {field.name}">Edit</button>
+                {/if}
+                <button type="button" class="text-text-muted" onclick={() => removeField(field.id)} aria-label="Remove {field.name}">&times;</button>
+              </div>
             </div>
+            {#if editingFieldId === field.id}
+              <div class="mt-2 space-y-2 rounded-lg border p-2" style="border-color: var(--color-border);">
+                <label class="block text-xs">
+                  <span class="mb-1 block text-text-muted">Field name</span>
+                  <input
+                    type="text"
+                    bind:value={editFieldName}
+                    class="w-full rounded-lg border bg-transparent p-1.5 text-sm text-text"
+                    style="border-color: var(--color-border);"
+                  />
+                </label>
+                {#if field.kind === 'number'}
+                  <label class="block text-xs">
+                    <span class="mb-1 block text-text-muted">Unit</span>
+                    <input
+                      type="text"
+                      bind:value={editFieldUnit}
+                      placeholder="e.g. in"
+                      class="w-full rounded-lg border bg-transparent p-1.5 text-sm text-text placeholder:text-text-muted"
+                      style="border-color: var(--color-border);"
+                    />
+                    <span class="mt-1 block text-text-muted">Only the label changes. Values you already logged are not converted.</span>
+                  </label>
+                {:else if field.kind === 'rating'}
+                  <label class="block text-xs">
+                    <span class="mb-1 block text-text-muted">Scale: 1 to</span>
+                    <input
+                      type="text"
+                      inputmode="numeric"
+                      bind:value={editFieldRatingMax}
+                      class="w-20 rounded-lg border bg-transparent p-1.5 text-sm text-text"
+                      style="border-color: var(--color-border);"
+                    />
+                  </label>
+                {/if}
+                {#if editingAlsoUsedBy.length > 0}
+                  <p class="text-xs text-text-muted">Also changes it in: {editingAlsoUsedBy.join(', ')}</p>
+                {/if}
+                {#if editFieldError}
+                  <p class="text-xs" style="color: #f87171;">{editFieldError}</p>
+                {/if}
+                <div class="flex gap-2">
+                  <button
+                    type="button"
+                    class="flex-1 rounded-lg border py-1.5 text-xs font-medium text-text-muted"
+                    style="border-color: var(--color-border);"
+                    onclick={() => (editingFieldId = null)}
+                  >Cancel</button>
+                  <button
+                    type="button"
+                    class="flex-1 rounded-lg py-1.5 text-xs font-semibold"
+                    style="background: var(--color-brand); color: #06140c;"
+                    onclick={() => saveEditField(field)}
+                  >Save field</button>
+                </div>
+              </div>
+            {/if}
             {#if field.kind !== 'boolean'}
               <label class="mt-1.5 block text-xs">
                 <span class="mb-1 block text-text-muted">Combine same-day entries by</span>

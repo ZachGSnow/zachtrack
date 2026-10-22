@@ -354,11 +354,11 @@ function buildEntryUpsert(db: D1Database, entry: TrackableEntry, serverSeq: numb
 function buildSettingsUpsert(db: D1Database, settings: SettingsRecord, serverSeq: number): D1PreparedStatement {
   return db
     .prepare(
-      `INSERT INTO settings (id, defaultPresetId, notificationsEnabled, heightInches, goalWeightLb, updatedAt, serverSeq)
-       VALUES (?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO settings (id, defaultPresetId, notificationsEnabled, heightInches, goalWeightLb, weightFieldId, updatedAt, serverSeq)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          defaultPresetId=excluded.defaultPresetId, notificationsEnabled=excluded.notificationsEnabled,
-         heightInches=excluded.heightInches, goalWeightLb=excluded.goalWeightLb,
+         heightInches=excluded.heightInches, goalWeightLb=excluded.goalWeightLb, weightFieldId=excluded.weightFieldId,
          updatedAt=excluded.updatedAt, serverSeq=excluded.serverSeq
        WHERE excluded.updatedAt > settings.updatedAt`,
     )
@@ -368,6 +368,7 @@ function buildSettingsUpsert(db: D1Database, settings: SettingsRecord, serverSeq
       settings.notificationsEnabled ? 1 : 0,
       settings.heightInches ?? null,
       settings.goalWeightLb ?? null,
+      settings.weightFieldId ?? null,
       settings.updatedAt,
       serverSeq,
     );
@@ -480,6 +481,7 @@ function mapSettingsRow(row: Record<string, unknown>): WireRow<SettingsRecord> {
     notificationsEnabled: Boolean(row.notificationsEnabled),
     heightInches: (row.heightInches as number) ?? undefined,
     goalWeightLb: (row.goalWeightLb as number) ?? undefined,
+    weightFieldId: (row.weightFieldId as string) ?? undefined,
     updatedAt: row.updatedAt as number,
     deletedAt: (row.deletedAt as number) ?? undefined,
   };

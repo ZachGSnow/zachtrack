@@ -14,6 +14,7 @@
   } from '../lib/utils/metrics';
   import { loadPrefs, oneOf, savePrefs } from '../lib/utils/prefs';
   import { settingsStore } from '../lib/stores/settings.svelte';
+  import { resolveWeightField } from '../lib/utils/health';
   import EChart from '../lib/components/EChart.svelte';
   import DataTable from '../lib/components/DataTable.svelte';
   import SegmentedControl from '../lib/components/SegmentedControl.svelte';
@@ -86,9 +87,12 @@
   const catalog = $derived.by((): MetricDef[] => {
     let colorCursor = 0;
     const nextColor = () => PALETTE[colorCursor++ % PALETTE.length];
+    const weightFieldId = resolveWeightField($allFields ?? [], settingsStore.data.weightFieldId)?.id;
     return [
       ...buildFastingMetrics($fasts ?? []),
-      ...($trackables ?? []).flatMap((t) => buildTrackableMetrics(t, entriesByTrackable.get(t.id) ?? [], $allFields ?? [], nextColor)),
+      ...($trackables ?? []).flatMap((t) =>
+        buildTrackableMetrics(t, entriesByTrackable.get(t.id) ?? [], $allFields ?? [], nextColor, weightFieldId),
+      ),
     ];
   });
 

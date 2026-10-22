@@ -7,7 +7,12 @@
   import { settingsStore } from '../../stores/settings.svelte';
   import EChart from '../EChart.svelte';
 
-  let { entries, fields, range }: { entries: TrackableEntry[]; fields: FieldDefinition[]; range: ChartRange } = $props();
+  let {
+    entries,
+    fields,
+    range,
+    weightFieldId,
+  }: { entries: TrackableEntry[]; fields: FieldDefinition[]; range: ChartRange; weightFieldId?: string } = $props();
 
   const PALETTE = ['#22ff88', '#a855f7', '#38bdf8', '#f97316', '#eab308', '#ec4899', '#818cf8', '#10b981', '#60a5fa'];
 
@@ -15,7 +20,7 @@
   // match whichever other fields are switched on.
   const colorFor = (f: FieldDefinition) => PALETTE[Math.max(0, fields.indexOf(f)) % PALETTE.length];
 
-  const weightField = $derived(fields.find((f) => f.name.toLowerCase() === 'weight' && f.kind === 'number'));
+  const weightField = $derived(weightFieldId ? fields.find((f) => f.id === weightFieldId) : undefined);
   const showBmiOption = $derived(!!weightField && !!settingsStore.data.heightInches);
 
   let visible = $state<Record<string, boolean>>({});

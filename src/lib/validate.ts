@@ -107,6 +107,7 @@ const checks: Record<Exclude<RecordKind, 'tombstones'>, Check> = {
       optional(r, 'notificationsEnabled', (v) => typeof v === 'boolean', 'a boolean'),
       optional(r, 'heightInches', isNum, 'a number'),
       optional(r, 'goalWeightLb', isNum, 'a number'),
+      optional(r, 'weightFieldId', isId, 'a non-empty string'),
     ),
 };
 

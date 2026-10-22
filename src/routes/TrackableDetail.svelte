@@ -9,6 +9,7 @@
   import { buildBmiMetric, buildTrackableMetrics, GRANULARITIES, type Granularity, type MetricDef } from '../lib/utils/metrics';
   import { loadPrefs, oneOf, savePrefs } from '../lib/utils/prefs';
   import { settingsStore } from '../lib/stores/settings.svelte';
+  import { resolveWeightField } from '../lib/utils/health';
   import BottomSheet from '../lib/components/BottomSheet.svelte';
   import DataTable from '../lib/components/DataTable.svelte';
   import EntriesTable from '../lib/components/EntriesTable.svelte';
@@ -71,6 +72,9 @@
       : [],
   );
 
+  // Resolved across all fields, not just this trackable's, so only one field is ever "the" weight.
+  const weightFieldId = $derived(resolveWeightField($allFields ?? [], settingsStore.data.weightFieldId)?.id);
+
   const isAges = $derived($trackable?.displayMode === 'ages');
   const showTrendsTable = $derived(attachedFields.length === 0 || trendsView === 'table');
 
@@ -78,7 +82,7 @@
   const trendMetrics = $derived.by((): MetricDef[] => {
     const t = $trackable;
     if (!t) return [];
-    const defs = buildTrackableMetrics(t, $entries ?? [], attachedFields, () => t.color);
+    const defs = buildTrackableMetrics(t, $entries ?? [], attachedFields, () => t.color, weightFieldId);
     defs[0] = { ...defs[0], column: 'Entries' };
     const height = settingsStore.data.heightInches;
     const weightIdx = defs.findIndex((d) => d.isWeightField);
@@ -245,7 +249,7 @@
         {#if showTrendsTable}
           <DataTable metrics={trendMetrics} {granularity} {rangeStart} />
         {:else}
-          <TrackableFieldsChart entries={$entries ?? []} fields={attachedFields} {range} />
+          <TrackableFieldsChart entries={$entries ?? []} fields={attachedFields} {range} {weightFieldId} />
         {/if}
       </div>
 
