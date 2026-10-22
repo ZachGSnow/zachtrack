@@ -35,3 +35,8 @@ wrangler.toml
 Thumbs.db
 Desktop.ini
 .DS_Store
+
+# Playwright output
+test-results/
+playwright-report/
+blob-report/
