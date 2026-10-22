@@ -7,7 +7,7 @@ import type {
   SyncRecordType,
 } from '../../src/lib/db';
 import { UNAVAILABLE_REASONS, verifyAccessJwt, type AccessDeps } from '../../server/access';
-import { invalidReason, recordKey, type RecordKind } from '../../server/validate';
+import { invalidReason, recordKey, type RecordKind } from '../../src/lib/validate';
 
 export interface Env {
   DB: D1Database;
@@ -156,7 +156,7 @@ async function applyIncomingChanges(db: D1Database, body: SyncRequestBody): Prom
   const rejected: RejectedRecord[] = [];
 
   // Drop (and report) anything that doesn't match the schema before any SQL
-  // runs, so one bad record can't fail a whole batch (see server/validate.ts).
+  // runs, so one bad record can't fail a whole batch (see src/lib/validate.ts).
   function valid<T>(kind: RecordKind, list: unknown): T[] {
     if (list == null) return [];
     if (!Array.isArray(list)) {

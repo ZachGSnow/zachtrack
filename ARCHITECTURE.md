@@ -373,6 +373,33 @@ into a second local D1 and compares every table, including text with quotes,
 `;` + newline, CRLF and emoji; the same round trip was run once against a copy
 of the real database (all 237 rows identical).
 
+### 3.13 Export and import are a merge, never a replace
+Profile > Your data exports every record on the device as one JSON file
+(`src/lib/dataFile.ts`, format `zachtrack-export` version 1; fasts without
+Dexie's local `id`). Import is deliberately not a restore:
+- **Checked first, written after a confirm.** `planImport` validates every
+  record with the same `src/lib/validate.ts` the sync endpoint uses, then
+  works out what would change and shows it (added / updated / unchanged /
+  skipped with reasons). Nothing is written until the user confirms.
+- **Same rules as sync.** A record is taken only if it is new here or its
+  `updatedAt` is newer, so importing an old file over newer data changes
+  nothing and importing the same file twice is a no-op. A fast on a start
+  day another fast owns is skipped (the server would reject it anyway), and
+  an entry whose trackable is neither on the device nor in the file is
+  skipped rather than written invisible.
+- **Never deletes**, and carries no deletes: a record missing from the file
+  stays. Rolling a device back to a file means clearing its site data first.
+- **Then it syncs.** `importRecords` writes through `applyRemoteChanges` and
+  then fires the local-mutation hook, so the next sync pushes the imported
+  records like any edit. Settings from a file apply over a fresh device's
+  defaults because those are created with `updatedAt: 0` (4.13).
+- The plan is kept in `$state.raw`: a deep `$state` proxy can't be cloned into
+  IndexedDB (4.4), which a browser check of the first version hit.
+
+Server-side backups (3.12) are the disaster recovery; this is the user's own
+copy, independent of Cloudflare, and the way a local-only install moves to a
+new device.
+
 ## 4. Issues hit during implementation, and how they were resolved
 
 These are real bugs that shipped and got fixed during this project's build,
@@ -573,7 +600,7 @@ found no data exposure, and these hardening gaps, fixed together:
 - **One bad record failed every sync:** D1 rejects a whole `db.batch()` if
   one statement fails, so a single malformed record (a client bug binding
   `undefined` to a NOT NULL column) would have made every later sync fail.
-  `server/validate.ts` now checks every record against the schema first;
+  `src/lib/validate.ts` (shared with the app's import, 3.13) now checks every record against the schema first;
   failures are skipped and reported in `rejected`, like day conflicts, and
   the rest of the batch is stored. Checked against a copy of the real
   database: all 190 live records pass. Unknown tombstone types (including

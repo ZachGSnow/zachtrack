@@ -563,6 +563,16 @@ export async function applyRemoteChanges(changes: RemoteSyncChanges): Promise<vo
   );
 }
 
+/**
+ * Writes the records of a confirmed import (see `planImport` in dataFile.ts,
+ * which has already kept only new or newer records and never includes
+ * deletes), then notifies listeners so sync pushes them like any local edit.
+ */
+export async function importRecords(changes: RemoteSyncChanges): Promise<void> {
+  await applyRemoteChanges(changes);
+  notifyMutation();
+}
+
 // ---------------------------------------------------------------------------
 // Default seed data (first run only)
 // ---------------------------------------------------------------------------

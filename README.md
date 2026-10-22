@@ -36,6 +36,9 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
 - **Two-way sync** across devices: per-record last-write-wins, deletes that
   propagate, conflicts reported instead of guessed, and a sync status pill
   with a per-device history of the last 5 syncs.
+- **Export and import** (Profile > Your data): a JSON file of everything on
+  the device, and an import that previews what it will add or update, merges
+  by newest version, never deletes, then syncs.
 
 US units only (lb, in, &deg;F).
 
@@ -137,7 +140,7 @@ of synced folders, and delete it when done.
   expiry, audience, email), because `*.pages.dev` hostnames can reach it
   without Access (`server/access.ts`).
 - **Input checks:** every incoming record is validated against the schema
-  (`server/validate.ts`); a bad one is skipped and reported back, and the
+  (`src/lib/validate.ts`); a bad one is skipped and reported back, and the
   rest of the sync goes through.
 - **Headers:** `public/_headers` sets a strict Content-Security-Policy
   (same-origin only, no framing), HSTS and related headers; sync responses
@@ -167,6 +170,9 @@ protocol, the real bugs hit along the way and how they were fixed.
   and D1 Time Travel keeps earlier versions for 7 days.
 - **Per-device only:** sync history and view preferences stay in that
   browser's `localStorage`.
+- **Export files** are plain JSON with all of the above in readable form.
+  Keep them out of shared or synced folders and delete them when you no
+  longer need them.
 
 ## Testing
 
@@ -193,6 +199,12 @@ CI runs all three on Linux and Windows with Node 22 and 24.
   one request, malformed records rejected one by one without failing the
   batch, unknown delete types skipped, content cleared on delete, and
   `d1/scrub-deleted.sql`.
+- Backups: a backup restored into a second local D1 matches every table,
+  including awkward text, and devices pull the restored rows.
+- Export and import with the real `db.ts` on fake IndexedDB: a full restore
+  onto a fresh device, merge by newest version, no deletes, re-import is a
+  no-op, invalid / orphan / same-day records skipped; and a new device's
+  default settings never overwrite synced settings.
 
 **Verified by hand:**
 - The Access certs format against a live team's `/cdn-cgi/access/certs`
@@ -202,6 +214,10 @@ CI runs all three on Linux and Windows with Node 22 and 24.
   passes.
 - The CSP under `wrangler pages dev`: every tab and the charts render with no
   violations.
+- Backup and export round trips on a copy of a real database: every record
+  comes back identical.
+- Export and import in the browser: export, then import a modified file;
+  the preview, the skipped record and the imported entry all show correctly.
 
 **Not verified by automated tests:** the Svelte UI, the service worker's
 re-login flow (ARCHITECTURE.md 4.9) and Access's own redirects. Those are
