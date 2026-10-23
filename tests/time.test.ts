@@ -67,15 +67,19 @@ describe('streaks across DST', () => {
 
 describe('streaks with a fast in progress', () => {
   // A 16:8 routine: a fast every evening, and last night's is still running
-  // at 6 a.m. The streak must not drop to 0 every morning until it ends.
-  it('counts the running fast for the day it started', () => {
+  // at 6 a.m. The streak must not drop to 0 every morning until it ends; the
+  // running fast counts once it meets its goal (count-up: 12h), not before.
+  it("doesn't let a running fast short of its goal break the streak", () => {
     vi.useFakeTimers();
     vi.setSystemTime(local(2026, 10, 22, 6));
     const fasts = [17, 18, 19, 20].map((d, i) => fast(local(2026, 10, d, 20), 16, i));
     const running = { ...fast(local(2026, 10, 21, 20), 16, 9), endTime: undefined };
     const stats = computeFastStats([...fasts, running]);
-    expect(stats.currentStreak).toBe(5);
-    expect(stats.longestStreak).toBe(5);
+    expect(stats.currentStreak).toBe(4);
+    expect(stats.longestStreak).toBe(4);
+    // Past its goal at 9 a.m. (13h), it counts.
+    vi.setSystemTime(local(2026, 10, 22, 9));
+    expect(computeFastStats([...fasts, running]).currentStreak).toBe(5);
     // Totals and averages still only count finished fasts.
     expect(stats.totalFasts).toBe(4);
   });
@@ -85,7 +89,7 @@ describe('streaks with a fast in progress', () => {
     vi.setSystemTime(local(2026, 10, 22, 6));
     const fasts = [17, 18, 20].map((d, i) => fast(local(2026, 10, d, 20), 16, i));
     const running = { ...fast(local(2026, 10, 21, 20), 16, 9), endTime: undefined };
-    expect(computeFastStats([...fasts, running]).currentStreak).toBe(2);
+    expect(computeFastStats([...fasts, running]).currentStreak).toBe(1);
   });
 });
 

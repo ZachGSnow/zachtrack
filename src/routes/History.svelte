@@ -5,6 +5,7 @@
   import BottomSheet from '../lib/components/BottomSheet.svelte';
   import EditFastSheet from '../lib/components/EditFastSheet.svelte';
   import TagFilter from '../lib/components/TagFilter.svelte';
+  import AddPastFastSheet from '../lib/components/AddPastFastSheet.svelte';
 
   const fasts = liveQuery(() => db.fasts.orderBy('startTime').reverse().toArray());
 
@@ -13,6 +14,7 @@
 
   let sheetOpen = $state(false);
   let selectedFast = $state<FastRecord | null>(null);
+  let addOpen = $state(false);
 
   function openFast(fast: FastRecord) {
     selectedFast = fast;
@@ -21,7 +23,14 @@
 </script>
 
 <div class="mx-auto flex w-full flex-1 lg:max-w-3xl flex-col gap-3 px-5 py-6">
-  <h1 class="text-xl font-semibold text-text">History</h1>
+  <div class="flex items-center justify-between gap-2">
+    <h1 class="text-xl font-semibold text-text">History</h1>
+    <button
+      class="rounded-lg border px-3 py-1.5 text-sm text-text-muted"
+      style="border-color: var(--color-border);"
+      onclick={() => (addOpen = true)}>+ Log a past fast</button
+    >
+  </div>
 
   {#if $fasts === undefined}
     <p class="text-sm text-text-muted">Loading&hellip;</p>
@@ -66,4 +75,8 @@
 
 <BottomSheet bind:open={sheetOpen}>
   <EditFastSheet bind:open={sheetOpen} fast={selectedFast} />
+</BottomSheet>
+
+<BottomSheet bind:open={addOpen}>
+  <AddPastFastSheet bind:open={addOpen} />
 </BottomSheet>

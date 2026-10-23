@@ -165,8 +165,15 @@
         <li><strong>End Fast</strong> shows how long it was and how it compares with the goal; Add details for how you felt, tags and a note, or just Save & Finish.</li>
       </ul>
       <p>
-        With a daily start time (Settings > Fasting) the Fasting tab counts down to your next fast and says when you're late.
-        Journey has your streaks, how often you hit the target, and charts.
+        Between fasts, the Fasting tab shows your eating window: the rest of the day after a fast under 24 hours (8 hours after
+        16:8), and how long ago the last fast ended. With a daily start time (Settings > Fasting) it counts down to your next
+        fast and says when you're late. Forgot to time a fast altogether? History > Log a past fast.
+      </p>
+      <p>
+        <strong>Journey:</strong> the goal streak counts days in a row with a fast that met its goal (a count-up fast counts
+        from 12 hours), next to the days you fasted in the last 30. Below: this week against last week, a habit grid of fasting
+        days (a full square met its goal), insights, the table and charts. The weight insight compares how your weight changes
+        the day after a goal fast with other days, and only shows with at least 5 days on each side and a clear difference.
       </p>
       <p class="text-text-muted">
         The zone descriptions are general information, not medical advice. Talk to a doctor before extended fasting.

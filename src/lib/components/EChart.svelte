@@ -1,12 +1,10 @@
 <script lang="ts">
   import * as echarts from 'echarts/core';
-  import { BarChart, LineChart, HeatmapChart } from 'echarts/charts';
+  import { BarChart, LineChart } from 'echarts/charts';
   import {
     GridComponent,
     LegendComponent,
     TooltipComponent,
-    CalendarComponent,
-    VisualMapComponent,
     MarkLineComponent,
   } from 'echarts/components';
   import { SVGRenderer } from 'echarts/renderers';
@@ -15,12 +13,9 @@
   echarts.use([
     BarChart,
     LineChart,
-    HeatmapChart,
     GridComponent,
     LegendComponent,
     TooltipComponent,
-    CalendarComponent,
-    VisualMapComponent,
     MarkLineComponent,
     SVGRenderer,
   ]);

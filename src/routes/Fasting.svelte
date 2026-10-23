@@ -16,6 +16,7 @@
   import { addDays, fromDatetimeLocal, startOfDay, toDatetimeLocal } from '../lib/utils/time';
   import { scheduleStatus } from '../lib/utils/fastingSchedule';
   import { endSummary, fastTimeline, startedAgo } from '../lib/utils/fastProgress';
+  import { eatingWindowStatus } from '../lib/utils/fastingJourney';
 
   // The schedule countdown and the timeline lines change with the clock, also while no fast runs.
   let now = $state(Date.now());
@@ -25,6 +26,9 @@
   });
   const recentFasts = liveQuery(() => db.fasts.where('startDay').aboveOrEqual(addDays(startOfDay(Date.now()), -1)).toArray());
   const schedule = $derived(fastTimer.activeFast ? null : scheduleStatus(settingsStore.data.fastScheduleTime, $recentFasts ?? [], now));
+  // A fast can run past a day, so the eating window looks a few days back for the last one that ended.
+  const lastFasts = liveQuery(() => db.fasts.where('startDay').aboveOrEqual(addDays(startOfDay(Date.now()), -3)).toArray());
+  const eatingWindow = $derived(fastTimer.activeFast ? null : eatingWindowStatus($lastFasts ?? [], now));
   const timeline = $derived(fastTimer.activeFast ? fastTimeline(fastTimer.activeFast, Math.max(now, fastTimer.now)) : null);
 
   let selectedPresetId = $state(DEFAULT_PRESET_ID);
@@ -266,6 +270,14 @@
         <span class="text-5xl">&#x2744;&#xFE0F;</span>
         <h1 class="text-2xl font-semibold text-text">Ready when you are</h1>
         <p class="text-sm text-text-muted">Pick a method and start your fast.</p>
+        {#if eatingWindow}
+          <div class="mt-1 text-sm" aria-label="Eating window">
+            {#if eatingWindow.text}
+              <p class="font-medium" style="color: {eatingWindow.open ? 'var(--color-brand)' : 'var(--color-text-muted)'};">{eatingWindow.text}</p>
+            {/if}
+            <p class="text-xs text-text-muted">{eatingWindow.lastFast}</p>
+          </div>
+        {/if}
         {#if schedule}
           <p class="text-sm font-medium" style="color: {schedule.late ? '#fbbf24' : 'var(--color-text-muted)'};">{schedule.text}</p>
         {/if}
