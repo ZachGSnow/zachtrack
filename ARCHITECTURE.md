@@ -644,6 +644,17 @@ reload can't start another. The query doesn't match the service worker's
   or more shows short refeeding advice. Both say "General information, not
   medical advice", like the zone descriptions.
 
+### 3.37 Zone text follows the research (v1.11.1)
+The zone panels (`data/zones.ts`) were rewritten against human research, with
+the sources in the file's header comment. Claims that came from animal studies
+or marketing (peak autophagy at 24h, an immune reset and stem cell
+regeneration at 48h, BDNF, gut repair) now say what is known in people, and
+each zone has an `evidence` line ("How sure is this") shown in both panels.
+Titles name what is measurable (ketones rising, into ketosis, growth hormone
+up). Zone ids and hour boundaries are unchanged, so milestones, colors and
+the zone-hours chart are unaffected. Preset descriptions dropped the same
+claims.
+
 ### 3.21 Trackables list: pin, archive, order; tag filters
 - **Sort** (per device, `zachtrack:trackables-view`): Due first (goal
   urgency from 3.18: overdue, then due, then the rest, then trackables

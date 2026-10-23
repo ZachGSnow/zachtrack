@@ -29,7 +29,7 @@ test('a fast started an hour ago shows its start, goal and next zone, and its go
   await expect(page.getByText(/^01:00:\d\d$/)).toBeVisible();
   await expect(page.getByText(/^Started \d/)).toBeVisible();
   await expect(page.getByText(/^Goal .*, 15h left$/)).toBeVisible();
-  await expect(page.getByText(/^Next: Post-Absorptive \(Catabolic\) State in 3h$/)).toBeVisible();
+  await expect(page.getByText(/^Next: Post-absorptive: stored glycogen in 3h$/)).toBeVisible();
 
   await page.getByRole('button', { name: 'Change goal' }).click();
   await page.getByRole('button', { name: '18:6', exact: true }).click();
@@ -45,7 +45,7 @@ test('a reached milestone shows in the app until dismissed, with a dot on the Fa
   await page.getByLabel('Fast started at').fill(await hoursAgo(page, 13));
   await page.getByRole('button', { name: 'Start Fast' }).click();
 
-  const banner = page.getByRole('status').filter({ hasText: 'You reached Metabolic Shift & Lipolysis (12h)' });
+  const banner = page.getByRole('status').filter({ hasText: 'You reached Metabolic switch: more fat (12h)' });
   await expect(banner).toBeVisible();
   await expect(page.getByLabel('new fasting milestone').first()).toBeAttached();
 
@@ -123,7 +123,7 @@ test("the weekly plan picks today's method, and a rest day isn't late", async ({
   await openSettings(page);
   await page.getByLabel(`${today} method`).selectOption({ label: '18:6' });
   await page.goto('/');
-  await expect(page.getByText('Reaches mild ketosis')).toBeVisible(); // 18:6 selected
+  await expect(page.getByText('Into the metabolic switch, with ketones starting to rise')).toBeVisible(); // 18:6 selected
 
   // A daily start long past, but today rests: nothing is late, and the next planned day is shown.
   await openSettings(page);

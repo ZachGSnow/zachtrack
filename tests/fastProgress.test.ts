@@ -10,7 +10,7 @@ describe('timeline', () => {
     const t = fastTimeline(fast(oct(21, 20), 16), oct(22, 8));
     expect(t.started).toMatch(/^Started 8:00\sPM yesterday$/);
     expect(t.goal).toMatch(/^Goal 12:00\sPM, 4h left$/);
-    expect(t.next).toBe('Mild Ketosis & Brain Fuel in 4h'); // 12h in: lipolysis now, ketosis at 16h
+    expect(t.next).toBe('Ketones rising in 4h'); // 12h in: lipolysis now, ketosis at 16h
   });
 
   it('says when the goal was reached, and nothing about a goal for a count-up fast', () => {
@@ -31,7 +31,7 @@ describe('milestones', () => {
   it('the deepest zone reached, keyed per fast', () => {
     const m = latestMilestone(fast(oct(22, 0), 16), oct(22, 13))!;
     expect(m.key).toBe('f1:lipolysis');
-    expect(m.title).toBe('You reached Metabolic Shift & Lipolysis (12h)');
+    expect(m.title).toBe('You reached Metabolic switch: more fat (12h)');
   });
 
   it('the goal once reached, unless a later zone came after it', () => {
@@ -47,7 +47,7 @@ describe('ending', () => {
       duration: '14h 40m',
       goal: '1h 20m short of 16h',
       goalMet: false,
-      zone: 'Metabolic Shift & Lipolysis',
+      zone: 'Metabolic switch: more fat',
     });
     expect(endSummary(fast(oct(22, 0), 16), oct(22, 16, 12))).toMatchObject({ goal: 'Goal of 16h reached', goalMet: true });
     expect(endSummary(fast(oct(22, 0)), oct(22, 5))).toMatchObject({ goal: null, goalMet: null });
