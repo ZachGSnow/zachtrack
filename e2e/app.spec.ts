@@ -39,8 +39,8 @@ test('sample data imports through Settings and shows up on every screen', async 
 
   // Journey: the imported fasts count.
   await page.goto('/#/journey');
-  await expect(page.getByText('Total fasts')).toBeVisible();
-  await expect(page.locator('main')).toContainText(/Total fasts\s*1\d/);
+  await expect(page.getByText('Hit target')).toBeVisible();
+  await expect(page.locator('main')).toContainText(/Hit target\s*\d+%\s*\d+ of 1\d/);
 
   // Data tab renders its table.
   await page.goto('/#/charting');
