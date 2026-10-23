@@ -210,7 +210,8 @@
       <p>
         Trends tables show one row per day, week or month: weekly and monthly rows average the days you logged, and the gray
         line is the change from the previous period (or a 7-day average in day view). Copy puts a table on the clipboard for a
-        spreadsheet. Insights lines up any mix of fasting and trackable columns to compare them.
+        spreadsheet. The Insights tab starts with an overview (fasting and each trackable's last 30 days and streak) and
+        the clearest patterns across your trackables, then Compare lines up any mix of fasting and trackable columns.
       </p>
       <p>
         Settings > Your data: <strong>Export data</strong> saves everything as a JSON file, the one to restore from;

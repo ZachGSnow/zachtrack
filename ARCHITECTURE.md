@@ -711,6 +711,14 @@ marked `current`. Routes and home-screen shortcuts are unchanged. A "Today"
 tab combining the timer, Needs attention and Coming up was considered and
 left out: Needs attention and the badges already cover it.
 
+Insights (`routes/Insights.svelte`, the former Charting page) opens with an
+Overview and Patterns (`InsightsSummary.svelte`): fasting's goal fasts over
+30 days and goal streak, then one line per trackable from its own insights
+(3.28) and goal streak, goal trackables first, leaving out trackables never
+logged and without a goal; Patterns gathers the first five "By weekday" and
+"On days with" lines across trackables. Each line links to its page. The
+compare table and chart follow under Compare, unchanged.
+
 ### 3.21 Trackables list: pin, archive, order; tag filters
 - **Sort** (per device, `zachtrack:trackables-view`): Due first (goal
   urgency from 3.18: overdue, then due, then the rest, then trackables
