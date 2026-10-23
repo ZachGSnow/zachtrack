@@ -369,3 +369,30 @@ test('on a phone the tab bar marks the current page', async ({ page }) => {
   await page.goto('/#/journey');
   await expect(page.getByRole('navigation', { name: 'Main' }).locator('a.active:visible')).toHaveText(/Journey/);
 });
+
+test('the history grid shows a day and adds an entry for it', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await mockSync(page, noServer);
+  await importSampleData(page);
+  await page.goto('/#/trackables');
+  await page.getByRole('link', { name: /Wellness Check-in/ }).click();
+
+  const history = page.locator('div', { has: page.getByText('History', { exact: true }) }).last();
+  // The six-month view always includes yesterday; each day is a button named by its date.
+  await history.getByRole('button', { name: '6 mo' }).click();
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const label = yesterday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  await page.getByRole('group', { name: 'Days' }).getByRole('button', { name: new RegExp(`^${label},`) }).click();
+  await page.getByRole('button', { name: '+ Add an entry for this day' }).click();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  await expect(page.getByLabel('Date & time')).toHaveValue(
+    new RegExp(`^${yesterday.getFullYear()}-${pad(yesterday.getMonth() + 1)}-${pad(yesterday.getDate())}T12:00`),
+  );
+
+  // The Year view draws a whole year of cells without the old chart.
+  await page.keyboard.press('Escape');
+  await history.getByRole('button', { name: 'Year' }).click();
+  await expect(page.getByRole('group', { name: 'Days' }).getByRole('button').first()).toBeVisible();
+  expect(problems).toEqual([]);
+});

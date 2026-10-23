@@ -1,5 +1,5 @@
 import { addDays, DAY_MS, formatShortDate, startOfDay } from './time';
-import { rangeStartFor, toIsoDate, type ChartRange } from './stats';
+import { rangeStartFor, type ChartRange } from './stats';
 import type { FieldAggregation } from '../db';
 
 export interface TimestampedValues {
@@ -152,33 +152,6 @@ export function computeIntervalTrend(entries: { timestamp: number }[]): { catego
     intervalHours.push(Number(((sorted[i].timestamp - sorted[i - 1].timestamp) / 3600000).toFixed(1)));
   }
   return { categories, intervalHours };
-}
-
-export interface HeatmapData {
-  start: string;
-  end: string;
-  data: [string, number][];
-}
-
-/** Daily occurrence counts as [isoDate, count] pairs, for an ECharts calendar heatmap. */
-export function computeTrackableHeatmapData(entries: { timestamp: number }[], range: ChartRange): HeatmapData {
-  const today = startOfDay(Date.now());
-  const rangeStart = rangeStartFor(range, entries.map((e) => e.timestamp));
-  const numDays = Math.round((today - rangeStart) / DAY_MS) + 1;
-
-  const countByDay = new Map<number, number>();
-  for (const e of entries) {
-    const day = startOfDay(e.timestamp);
-    countByDay.set(day, (countByDay.get(day) ?? 0) + 1);
-  }
-
-  const data: [string, number][] = [];
-  for (let i = 0; i < numDays; i++) {
-    const day = addDays(rangeStart, i);
-    data.push([toIsoDate(day), countByDay.get(day) ?? 0]);
-  }
-
-  return { start: toIsoDate(rangeStart), end: toIsoDate(today), data };
 }
 
 /**

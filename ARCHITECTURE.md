@@ -597,6 +597,27 @@ Phones keep the one-column layout with tabs at the bottom. From Tailwind's
   `/trackables/*` pattern didn't match `/trackables` itself, so no tab was
   highlighted on Trackables, Journey or History.
 
+### 3.23 The habit grid
+The ECharts calendar heatmap ("Consistency") had fixed 13px cells, started
+mid-week at the first entry, coloured by raw count relative to the busiest
+day, and couldn't be tapped. It is replaced by our own grid:
+- `utils/habitGrid.ts` builds whole weeks, Monday to Sunday, ending with the
+  current week (or a calendar month's weeks for the Month view), stepping
+  calendar days so DST changes don't shift cells. Each day's **level** is goal
+  progress: the share of a daily total, done/not done for other goals and for
+  trackables without one, inverted for avoid (clean days are full), and an
+  every-N-days goal marks the day it fell overdue. Future days are blank;
+  days before the trackable existed are faint.
+- `HabitGrid.svelte` is a plain CSS grid of square cells that fill their
+  container up to a cap, so it works on a phone and across a laptop; weeks as
+  columns (the habit-tracker look) or as rows (a calendar). Cells are buttons
+  named by date and progress.
+- On a trackable's page, `HabitHistory.svelte` shows it for trackables with a
+  goal, events and check-ins, right under Log Entry: Week, Month (with
+  previous/next), 6 months, Year. Tapping a day lists that day's entries (tap
+  one to edit) and offers to add an entry for that date (midday, or now for
+  today) through the log sheet's new `defaultTimestamp`.
+
 ## 4. Issues hit during implementation, and how they were resolved
 
 These are real bugs that shipped and got fixed during this project's build,
