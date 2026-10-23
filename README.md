@@ -37,7 +37,10 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
   change (readings like Weight), today's total (Calories, Water) or logged
   today with a streak (check-ins). Optional goals: a daily total, N times a
   week, every N days (with due and overdue) or avoid, each with its own
-  streak. A trackable without fields logs in one tap, with undo. The list
+  streak. A trackable with a goal gets a habit-grid strip on its card and a
+  check button for today; each trackable's page has the full grid by week,
+  month, six months or year. A trackable without fields logs in one tap,
+  with undo. The list
   sorts by what's due (or your own order, or A-Z), with pinning and
   archiving; fasts and entries can be filtered by tag.
   A starter set (Body Measurements, Vitals, Nutrition, Sleep, Wellness,

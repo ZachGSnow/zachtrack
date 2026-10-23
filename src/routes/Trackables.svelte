@@ -14,6 +14,7 @@
   import { goalStatus } from '../lib/utils/trackableGoals';
   import { LIST_SORTS, moveInOrder, orderTrackables, type ListSort } from '../lib/utils/trackableList';
   import { loadPrefs, oneOf, savePrefs } from '../lib/utils/prefs';
+  import { startOfDay } from '../lib/utils/time';
   import SegmentedControl from '../lib/components/SegmentedControl.svelte';
   import TrackableCard from '../lib/components/TrackableCard.svelte';
   import BottomSheet from '../lib/components/BottomSheet.svelte';
@@ -88,9 +89,17 @@
     editOpen = true;
   }
 
-  // A trackable with no fields has nothing to fill in, so "+" logs it right
-  // away (the "I just did it" of a days-since app) with a few seconds to undo.
-  let undo = $state<{ entryId: string; name: string } | null>(null);
+  // A trackable with no fields has nothing to fill in, so "+" (or its check
+  // button) logs it right away, the "I just did it" of a days-since app, and
+  // checking it again takes today's entry back off. Either way there are a few
+  // seconds to undo.
+  let undo = $state<{ message: string; revert: () => Promise<unknown> } | null>(null);
+
+  function offerUndo(message: string, revert: () => Promise<unknown>) {
+    clearTimeout(undoTimer);
+    undo = { message, revert };
+    undoTimer = setTimeout(() => (undo = null), 6000);
+  }
   let undoTimer: ReturnType<typeof setTimeout> | undefined;
   let quickLogError = $state('');
 
@@ -103,20 +112,35 @@
     quickLogError = '';
     try {
       const entry = await addTrackableEntry({ trackableId: t.id, timestamp: Date.now() });
-      clearTimeout(undoTimer);
-      undo = { entryId: entry.id, name: t.name };
-      undoTimer = setTimeout(() => (undo = null), 6000);
+      offerUndo(`Logged ${t.name}`, () => deleteTrackableEntry(entry.id));
     } catch (e) {
       quickLogError = e instanceof Error ? e.message : 'Could not log it. Please try again.';
     }
   }
 
+  /** Unchecks today: removes today's latest entry; Undo puts it back. */
+  async function uncheckToday(t: TrackableDefinition) {
+    const today = startOfDay(Date.now());
+    const latest = (entriesByTrackable.get(t.id) ?? [])
+      .filter((e) => startOfDay(e.timestamp) === today)
+      .sort((a, b) => b.timestamp - a.timestamp)[0];
+    if (!latest) return;
+    quickLogError = '';
+    try {
+      await deleteTrackableEntry(latest.id);
+      const { timestamp, note, tags, values } = latest;
+      offerUndo(`Unchecked ${t.name}`, () => addTrackableEntry({ trackableId: t.id, timestamp, note, tags, values }));
+    } catch (e) {
+      quickLogError = e instanceof Error ? e.message : 'Could not uncheck it. Please try again.';
+    }
+  }
+
   async function undoQuickLog() {
     if (!undo) return;
-    const { entryId } = undo;
+    const { revert } = undo;
     undo = null;
     clearTimeout(undoTimer);
-    await deleteTrackableEntry(entryId);
+    await revert();
   }
 
   function handleCreated(id: string) {
@@ -165,6 +189,7 @@
           fields={$allFields ?? []}
           entries={entriesByTrackable.get(t.id) ?? []}
           onQuickLog={() => openQuickLog(t)}
+          onUncheck={() => uncheckToday(t)}
           onMove={reordering ? (direction) => move(t, direction) : undefined}
         />
       {/each}
@@ -190,7 +215,7 @@
     style="border-color: var(--color-border); background: var(--color-surface);"
     role="status"
   >
-    <span class="truncate text-text">Logged {undo.name}</span>
+    <span class="truncate text-text">{undo.message}</span>
     <button class="shrink-0 font-semibold" style="color: var(--color-brand);" onclick={undoQuickLog}>Undo</button>
   </div>
 {/if}

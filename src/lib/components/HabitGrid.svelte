@@ -46,7 +46,8 @@
   function fill(d: GridDay): string {
     if (d.future) return 'transparent';
     if (d.outside) return 'color-mix(in srgb, var(--color-surface-2) 45%, transparent)';
-    if (d.level <= 0) return 'var(--color-surface-2)';
+    // An every-N-days goal fell overdue: a quiet red tint (an outline turned an every-day goal into a wall of boxes).
+    if (d.level <= 0) return d.missed ? 'color-mix(in srgb, #f87171 30%, var(--color-surface-2))' : 'var(--color-surface-2)';
     return `color-mix(in srgb, ${color} ${Math.round(30 + 70 * d.level)}%, var(--color-surface-2))`;
   }
 
@@ -94,7 +95,7 @@
         <button
           type="button"
           class="cell"
-          style="background: {fill(d)}; {d.isToday ? 'outline: 1.5px solid var(--color-text-muted); outline-offset: 1px;' : ''} {d.missed ? 'box-shadow: inset 0 0 0 1.5px #f8717199;' : ''}"
+          style="background: {fill(d)}; {d.isToday ? 'outline: 1.5px solid var(--color-text-muted); outline-offset: 1px;' : ''}"
           aria-label={describe(d)}
           title={describe(d)}
           onclick={() => onSelect(d)}
@@ -104,7 +105,7 @@
       {:else}
         <span
           class="cell"
-          style="background: {fill(d)}; {d.isToday ? 'outline: 1.5px solid var(--color-text-muted); outline-offset: 1px;' : ''} {d.missed ? 'box-shadow: inset 0 0 0 1.5px #f8717199;' : ''}"
+          style="background: {fill(d)}; {d.isToday ? 'outline: 1.5px solid var(--color-text-muted); outline-offset: 1px;' : ''}"
           title={d.outside ? undefined : describe(d)}
         >
           {#if dayNumbers && !d.outside}<span class:dark={d.level >= 0.5}>{new Date(d.day).getDate()}</span>{/if}

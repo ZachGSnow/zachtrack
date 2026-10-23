@@ -396,3 +396,42 @@ test('the history grid shows a day and adds an entry for it', async ({ page }) =
   await expect(page.getByRole('group', { name: 'Days' }).getByRole('button').first()).toBeVisible();
   expect(problems).toEqual([]);
 });
+
+test('a trackable with a goal gets a grid strip and a check button for today', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await mockSync(page, noServer);
+  await importSampleData(page);
+  const setGoal = async (name: string, type: string, value: string) => {
+    await page.goto('/#/trackables');
+    await page.getByRole('link', { name: new RegExp(name) }).click();
+    await page.getByRole('button', { name: 'Edit', exact: true }).click();
+    await page.getByRole('combobox', { name: /^Goal/ }).selectOption(type);
+    await page.locator('input[inputmode="decimal"]').last().fill(value);
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+  };
+  await setGoal('Male Health', 'everyDays', '3');
+  await setGoal('Body Measurements', 'everyDays', '1');
+  await page.goto('/#/trackables');
+
+  // Male Health has no fields: the button checks today, checks off again, and Undo restores it.
+  const check = page.getByRole('button', { name: 'Check Male Health for today' });
+  await check.click();
+  await expect(page.getByRole('status')).toContainText('Logged Male Health');
+  const uncheck = page.getByRole('button', { name: 'Uncheck Male Health for today' });
+  await expect(uncheck).toHaveAttribute('aria-pressed', 'true');
+  await uncheck.click();
+  await expect(page.getByRole('status')).toContainText('Unchecked Male Health');
+  await expect(check).toHaveAttribute('aria-pressed', 'false');
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(uncheck).toBeVisible();
+
+  // Each goal card has a strip of the habit grid; cards without a goal don't.
+  const cardOf = (name: string) => page.locator('div.rounded-2xl', { has: page.getByRole('link', { name: new RegExp(name) }) });
+  await expect(cardOf('Male Health').getByRole('group', { name: 'Days' })).toBeVisible();
+  await expect(cardOf('Vitals').getByRole('group', { name: 'Days' })).toHaveCount(0);
+
+  // A trackable with fields opens the log sheet instead.
+  await page.getByRole('button', { name: 'Log Body Measurements' }).click();
+  await expect(page.getByLabel('Date & time')).toBeVisible();
+  expect(problems).toEqual([]);
+});
