@@ -51,21 +51,31 @@
   const goalCard = $derived(!!trackable.goalType && trackable.goalType !== 'avoid' && kind !== 'ages');
   const noFields = $derived(trackable.fieldIds.length === 0);
   const loggedToday = $derived(entries.some((e) => startOfDay(e.timestamp) === startOfDay(now)));
-  const doneToday = $derived(trackable.goalType === 'dailyTotal' ? goal?.state === 'done' : loggedToday);
-  const ring = $derived(trackable.goalType === 'dailyTotal' && !doneToday ? (goal?.progress ?? 0) : null);
+  const counted = $derived(trackable.goalType === 'dailyTotal' || trackable.goalType === 'perDay');
+  const todayCount = $derived(entries.filter((e) => startOfDay(e.timestamp) === startOfDay(now)).length);
+  const doneToday = $derived(counted ? goal?.state === 'done' : loggedToday);
+  // Daily totals and times-per-day show a ring filling toward today's goal until it's met.
+  const ring = $derived(counted && !doneToday ? (goal?.progress ?? 0) : null);
 
   // As many whole weeks as fit the card at about 14px a cell.
   let stripWidth = $state(0);
   const stripWeeks = $derived(Math.max(8, Math.min(53, Math.floor((stripWidth + 3) / 17))));
   const strip = $derived(goalCard ? habitGridWeeks(trackable, entries, attachedFields, stripWeeks, now) : []);
 
+  // Without fields a tap logs one more until today is done; then it takes the last one back off.
   function check() {
-    if (noFields && loggedToday && onUncheck) onUncheck();
+    if (noFields && doneToday && onUncheck) onUncheck();
     else onQuickLog();
   }
 
   const checkLabel = $derived(
-    noFields ? (loggedToday ? `Uncheck ${trackable.name} for today` : `Check ${trackable.name} for today`) : `Log ${trackable.name}`,
+    !noFields
+      ? `Log ${trackable.name}`
+      : doneToday
+        ? `Uncheck ${trackable.name} for today`
+        : trackable.goalType === 'perDay'
+          ? `Log one ${trackable.name} (${todayCount} of ${trackable.goalValue} today)`
+          : `Check ${trackable.name} for today`,
   );
 
   const subtitle = $derived(
@@ -117,14 +127,14 @@
           : `box-shadow: inset 0 0 0 2px ${ring != null ? `${trackable.color}33` : `${trackable.color}99`}; color: ${trackable.color};`}
         onclick={check}
         aria-label={checkLabel}
-        aria-pressed={noFields ? loggedToday : undefined}
+        aria-pressed={noFields ? doneToday : undefined}
       >
         {#if ring != null}
           <!-- Progress toward today's total. -->
           <svg class="absolute inset-0 -rotate-90" viewBox="0 0 40 40" aria-hidden="true">
             <circle cx="20" cy="20" r="19" fill="none" stroke={trackable.color} stroke-width="2" stroke-linecap="round" pathLength="100" stroke-dasharray="{ring * 100} 100" />
           </svg>
-          <span class="text-base">+</span>
+          <span class="text-sm">{trackable.goalType === 'perDay' && noFields ? todayCount : '+'}</span>
         {:else if doneToday}
           &#10003;
         {:else if !noFields}

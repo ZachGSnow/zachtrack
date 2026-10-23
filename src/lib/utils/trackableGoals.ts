@@ -6,19 +6,56 @@ import { bucketStart, computeFieldValuesByDay, formatTimeSinceAdaptive, type Tim
  * Optional goals, the part of a habit or "days since" app that makes streaks
  * and reminders mean something:
  * - dailyTotal: reach an amount of the first number field each day (2,000 kcal, 64 oz)
+ * - perDay:     log it N times each day (water 8 times, stretch 3 times)
  * - perWeek:    log on N days each week, Monday to Sunday (gym 3 times a week)
  * - everyDays:  do it every N days; due and overdue follow from the last entry
  * - avoid:      less is better; the streak is the time since it last happened
+ *
+ * The daily goals (dailyTotal, perDay) can apply on chosen weekdays only
+ * (scheduleDays). Days off the schedule, skipped days and days while paused
+ * neither count toward a streak nor break it; while paused nothing is due.
  */
 
-export const GOAL_TYPES: TrackableGoalType[] = ['dailyTotal', 'perWeek', 'everyDays', 'avoid'];
+export const GOAL_TYPES: TrackableGoalType[] = ['dailyTotal', 'perDay', 'perWeek', 'everyDays', 'avoid'];
 
 export const GOAL_LABELS: Record<TrackableGoalType, string> = {
   dailyTotal: 'Reach a total each day',
+  perDay: 'Times per day',
   perWeek: 'Times per week',
   everyDays: 'Every N days',
   avoid: 'Avoid it',
 };
+
+/** Goals that apply day by day, and so can follow a weekday schedule. */
+export const DAILY_GOALS: readonly TrackableGoalType[] = ['dailyTotal', 'perDay'];
+
+export const WEEKDAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+type Scheduled = Pick<TrackableDefinition, 'goalType' | 'scheduleDays' | 'skipDays' | 'pausedUntil'>;
+
+/** "YYYY-MM-DD" for a local day, the form `skipDays` stores. */
+export function isoDay(day: number): string {
+  const d = new Date(day);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** Monday = 0 ... Sunday = 6. */
+export function weekdayIndex(day: number): number {
+  return (new Date(day).getDay() + 6) % 7;
+}
+
+export function isPaused(trackable: Pick<TrackableDefinition, 'pausedUntil'>, day: number): boolean {
+  return trackable.pausedUntil != null && startOfDay(day) <= startOfDay(trackable.pausedUntil);
+}
+
+/** Why a day doesn't count for this trackable's goal, or null when it does. */
+export function offDayReason(trackable: Scheduled, day: number): 'paused' | 'skipped' | 'rest' | null {
+  if (isPaused(trackable, day)) return 'paused';
+  if (trackable.skipDays?.includes(isoDay(day))) return 'skipped';
+  const daily = trackable.goalType != null && DAILY_GOALS.includes(trackable.goalType);
+  if (daily && trackable.scheduleDays?.length && !trackable.scheduleDays.includes(weekdayIndex(day))) return 'rest';
+  return null;
+}
 
 export type GoalState = 'done' | 'progress' | 'due' | 'overdue' | 'ok';
 
@@ -49,23 +86,26 @@ export function goalField(fields: readonly FieldDefinition[]): FieldDefinition |
 
 /** The goal in words, for the edit sheet and the detail page: "2,000 kcal a day", "3 times a week". */
 export function describeGoal(
-  trackable: Pick<TrackableDefinition, 'goalType' | 'goalValue'>,
+  trackable: Pick<TrackableDefinition, 'goalType' | 'goalValue' | 'scheduleDays'>,
   fields: readonly FieldDefinition[],
 ): string | null {
   const { goalType: type, goalValue: n } = trackable;
   if (!type) return null;
   if (type === 'avoid') return 'Avoid it';
   if (n == null) return null;
+  const days = trackable.scheduleDays?.length && trackable.scheduleDays.length < 7 ? trackable.scheduleDays : null;
+  const on = days ? ` on ${[...days].sort((a, b) => a - b).map((d) => WEEKDAY_NAMES[d]).join(', ')}` : '';
   if (type === 'dailyTotal') {
     const f = goalField(fields);
-    return `${fmt(n)}${f?.unit ? ` ${f.unit}` : ''} a day${f ? ` (${f.name})` : ''}`;
+    return `${fmt(n)}${f?.unit ? ` ${f.unit}` : ''} a day${on}${f ? ` (${f.name})` : ''}`;
   }
+  if (type === 'perDay') return `${n === 1 ? 'Once' : `${fmt(n)} times`} a day${on}`;
   if (type === 'perWeek') return `${fmt(n)} ${n === 1 ? 'time' : 'times'} a week`;
   return n === 1 ? 'Every day' : `Every ${fmt(n)} days`;
 }
 
 export function goalStatus(
-  trackable: Pick<TrackableDefinition, 'goalType' | 'goalValue'>,
+  trackable: Pick<TrackableDefinition, 'goalType' | 'goalValue'> & Partial<Scheduled>,
   entries: readonly TimestampedValues[],
   fields: readonly FieldDefinition[],
   now: number = Date.now(),
@@ -77,21 +117,46 @@ export function goalStatus(
   const times = entries.map((e) => e.timestamp).sort((a, b) => a - b);
   const last = times.at(-1);
 
-  if (type === 'dailyTotal') {
-    const field = goalField(fields);
-    if (!field) return null;
-    const byDay = computeFieldValuesByDay(entries as TimestampedValues[], field);
-    const total = byDay.get(today) ?? 0;
-    const met = (day: number) => (byDay.get(day) ?? 0) >= goal!;
-    let streak = 0;
-    for (let d = met(today) ? today : addDays(today, -1); met(d); d = addDays(d, -1)) streak += 1;
-    const done = total >= goal!;
+  if (type !== 'avoid' && isPaused(trackable, today)) {
     return {
-      text: `${fmt(total)} / ${fmt(goal!)}${field.unit ? ` ${field.unit}` : ''} today`,
-      state: done ? 'done' : 'progress',
-      progress: Math.min(1, total / goal!),
+      text: `Paused until ${new Date(trackable.pausedUntil!).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`,
+      state: 'ok',
+      urgency: 900,
+    };
+  }
+
+  if (type === 'dailyTotal' || type === 'perDay') {
+    let valueOn: (day: number) => number;
+    let unit = '';
+    if (type === 'dailyTotal') {
+      const field = goalField(fields);
+      if (!field) return null;
+      const byDay = computeFieldValuesByDay(entries as TimestampedValues[], field);
+      valueOn = (day) => byDay.get(day) ?? 0;
+      unit = field.unit ? ` ${field.unit}` : '';
+    } else {
+      const counts = new Map<number, number>();
+      for (const t of times) counts.set(startOfDay(t), (counts.get(startOfDay(t)) ?? 0) + 1);
+      valueOn = (day) => counts.get(day) ?? 0;
+    }
+    const met = (day: number) => valueOn(day) >= goal!;
+    // Days met in a row, back from today (or yesterday while today is still open); days off neither count nor break it.
+    const earliest = times.length ? startOfDay(times[0]) : today;
+    let streak = 0;
+    for (let d = met(today) || offDayReason(trackable, today) ? today : addDays(today, -1); d >= earliest; d = addDays(d, -1)) {
+      if (met(d)) streak += 1;
+      else if (!offDayReason(trackable, d)) break;
+    }
+    const value = valueOn(today);
+    const done = value >= goal!;
+    const off = offDayReason(trackable, today);
+    const progressText = type === 'perDay' ? `${fmt(value)} of ${fmt(goal!)} today` : `${fmt(value)} / ${fmt(goal!)}${unit} today`;
+    return {
+      text: off && !done ? (off === 'rest' ? 'Rest day' : 'Skipped today') : progressText,
+      state: done ? 'done' : off ? 'ok' : 'progress',
+      progress: Math.min(1, value / goal!),
       streak: streak > 0 ? `${streak} ${streak === 1 ? 'day' : 'days'} met` : undefined,
-      urgency: done ? 1000 : 100,
+      urgency: done ? 1000 : off ? 900 : 100,
     };
   }
 
@@ -147,7 +212,7 @@ export function goalStatus(
 
 /** The list card's line when a goal is set: the goal status first, then what the kind adds. */
 export function goalCardLine(status: GoalStatus, type: TrackableGoalType, kindCard: string): string {
-  if (type === 'dailyTotal' || type === 'avoid') return status.streak ? `${status.text} \u00b7 ${status.streak}` : status.text;
+  if (type === 'dailyTotal' || type === 'perDay' || type === 'avoid') return status.streak ? `${status.text} \u00b7 ${status.streak}` : status.text;
   return `${status.text} \u00b7 ${kindCard}`;
 }
 

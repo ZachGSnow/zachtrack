@@ -70,3 +70,12 @@ describe('habit grid month', () => {
     expect(rows.flat().find((d) => d.day === day(9, 1))?.count).toBe(1);
   });
 });
+
+describe('habit grid with a schedule', () => {
+  it('shades times-per-day by count, and draws rest and skipped days as off, not missed', () => {
+    const goal = { ...created, goalType: 'perDay' as const, goalValue: 2, scheduleDays: [0, 1, 2, 3, 4], skipDays: ['2026-10-20'] };
+    const week = habitGridWeeks(goal, logs(oct(19), oct(21), oct(21, 18)), [], 1, oct(25, 20))[0];
+    expect(week.map((d) => d.level)).toEqual([0.5, 0, 1, 0, 0, 0, 0]);
+    expect(week.map((d) => d.off)).toEqual([null, 'skipped', null, null, null, 'rest', 'rest']);
+  });
+});

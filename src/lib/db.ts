@@ -53,8 +53,8 @@ export interface FieldDefinition {
   updatedAt: number;
 }
 
-/** dailyTotal: the first field's total per day; perWeek: days logged per week; everyDays: due every N days; avoid: time since is the streak. */
-export type TrackableGoalType = 'dailyTotal' | 'perWeek' | 'everyDays' | 'avoid';
+/** dailyTotal: the first field's total per day; perDay: entries per day; perWeek: days logged per week; everyDays: due every N days; avoid: time since is the streak. */
+export type TrackableGoalType = 'dailyTotal' | 'perDay' | 'perWeek' | 'everyDays' | 'avoid';
 
 /** How a trackable is summarised; 'occurrences' (or unset) = automatic from its fields. See utils/trackableKinds.ts. */
 export type TrackableDisplayMode = 'occurrences' | 'ages' | 'event' | 'measurement' | 'daily' | 'checkin';
@@ -82,6 +82,12 @@ export interface TrackableDefinition {
   archived?: boolean;
   /** Position in the list's "My order" sort; unset sorts by name after the ordered ones. */
   sortOrder?: number;
+  /** Days a daily goal applies, 0 = Monday ... 6 = Sunday; unset = every day. Other days don't break its streak. */
+  scheduleDays?: number[];
+  /** Single days skipped ("YYYY-MM-DD", local): they neither count nor break a streak. */
+  skipDays?: string[];
+  /** Paused through this day (local start-of-day): treated like skipped days, and nothing is due. */
+  pausedUntil?: number;
   createdAt: number;
   updatedAt: number;
 }

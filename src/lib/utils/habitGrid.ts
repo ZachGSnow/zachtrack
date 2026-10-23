@@ -1,7 +1,9 @@
 import type { FieldDefinition, TrackableDefinition } from '../db';
 import { addDays, startOfDay } from './time';
 import { bucketStart, computeFieldValuesByDay, type TimestampedValues } from './trackableStats';
-import { goalField } from './trackableGoals';
+import { goalField, offDayReason } from './trackableGoals';
+
+type GridTrackable = Pick<TrackableDefinition, 'goalType' | 'goalValue' | 'createdAt' | 'scheduleDays' | 'skipDays' | 'pausedUntil'>;
 
 /**
  * The habit grid (HabitGrid.svelte): one cell per day, whole weeks Monday to
@@ -23,6 +25,8 @@ export interface GridDay {
   future: boolean;
   /** An every-N-days goal fell overdue on this day. */
   missed: boolean;
+  /** Off the schedule, skipped or paused, with nothing logged: not a miss. */
+  off: 'rest' | 'skipped' | 'paused' | null;
 }
 
 /**
@@ -30,7 +34,7 @@ export interface GridDay {
  * of seven days, Monday to Sunday.
  */
 export function habitGridWeeks(
-  trackable: Pick<TrackableDefinition, 'goalType' | 'goalValue' | 'createdAt'>,
+  trackable: GridTrackable,
   entries: readonly TimestampedValues[],
   fields: readonly FieldDefinition[],
   weeks: number,
@@ -47,7 +51,7 @@ export function habitGridWeeks(
 
 /** The weeks (Monday to Sunday) covering one calendar month, as rows: for the Month view. */
 export function habitGridMonth(
-  trackable: Pick<TrackableDefinition, 'goalType' | 'goalValue' | 'createdAt'>,
+  trackable: GridTrackable,
   entries: readonly TimestampedValues[],
   fields: readonly FieldDefinition[],
   monthStart: number,
@@ -68,7 +72,7 @@ export function habitGridMonth(
 }
 
 function gridFor(
-  trackable: Pick<TrackableDefinition, 'goalType' | 'goalValue' | 'createdAt'>,
+  trackable: GridTrackable,
   entries: readonly TimestampedValues[],
   fields: readonly FieldDefinition[],
   start: number,
@@ -96,8 +100,10 @@ function gridFor(
     const outside = d > today || d < since;
     let level = count > 0 ? 1 : 0;
     if (totals && goal) level = Math.max(0, Math.min(1, (totals.get(d) ?? 0) / goal));
+    if (type === 'perDay' && goal) level = Math.min(1, count / goal);
     if (type === 'avoid') level = count > 0 ? 0 : 1;
-    days.push({ day: d, level: outside ? 0 : level, count, isToday: d === today, outside, future: d > today, missed: missed.has(d) });
+    const off = !outside && count === 0 ? offDayReason(trackable, d) : null;
+    days.push({ day: d, level: outside ? 0 : level, count, isToday: d === today, outside, future: d > today, missed: missed.has(d), off });
   }
   return days;
 }

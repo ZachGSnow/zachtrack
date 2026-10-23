@@ -641,6 +641,23 @@ message and a revert action, shared by quick log and uncheck. Overdue days
 of every-N-days goals are tinted rather than outlined, which kept an
 every-day goal's strip readable.
 
+### 3.25 Times per day, schedules, skipped and paused days
+- **perDay goal:** log it N times a day. On a goal card without fields each
+  tap of the check button adds one (the ring shows today's count) until the
+  day is met, then a tap takes the last one back off, with Undo.
+- **Schedule** (`scheduleDays`, 0 = Monday): daily goals (dailyTotal, perDay)
+  can apply on chosen weekdays only. Other days are rest days: "Rest day" on
+  the card, neither counted nor breaking the streak.
+- **Skip a day** (`skipDays`, "YYYY-MM-DD"): from the habit grid's day panel.
+  **Pause** (`pausedUntil`): from the edit sheet, for a holiday; while paused
+  every goal but avoid reads "Paused until ..." and nothing is due.
+- Streaks walk back day by day, counting met days, passing over rest,
+  skipped and paused days, and stopping at the first scheduled day not met.
+- The grid shades times-per-day by count over the goal and draws rest,
+  skipped and paused days without entries hollow, so they don't look missed.
+- Migration `0004_habit_schedules.sql` adds the three columns; `perDay` is a
+  new `goalType` value in the existing column.
+
 ## 4. Issues hit during implementation, and how they were resolved
 
 These are real bugs that shipped and got fixed during this project's build,
