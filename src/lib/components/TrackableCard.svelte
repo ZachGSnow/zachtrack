@@ -3,6 +3,7 @@
   import { link } from 'svelte-spa-router';
   import { db, type FieldDefinition, type TrackableDefinition } from '../db';
   import { resolveKind, summarize } from '../utils/trackableKinds';
+  import { GOAL_STATE_COLORS, goalCardLine, goalStatus } from '../utils/trackableGoals';
   import { daysUntilNextBirthday, formatBirthdayCountdown } from '../utils/age';
 
   let {
@@ -31,12 +32,16 @@
       .sort((a, b) => a.daysUntil - b.daysUntil)[0] ?? null,
   );
 
+  const goal = $derived(kind === 'ages' ? null : goalStatus(trackable, $entries ?? [], attachedFields, now));
+
   const subtitle = $derived(
     kind === 'ages'
       ? nextUp
         ? `\u{1F382} ${nextUp.name}'s birthday ${formatBirthdayCountdown(nextUp.daysUntil)}`
         : 'No one added yet'
-      : summarize(kind, $entries ?? [], attachedFields, now).card,
+      : goal && trackable.goalType
+        ? goalCardLine(goal, trackable.goalType, summarize(kind, $entries ?? [], attachedFields, now).card)
+        : summarize(kind, $entries ?? [], attachedFields, now).card,
   );
 </script>
 
@@ -47,7 +52,9 @@
     </span>
     <div class="overflow-hidden">
       <p class="truncate text-sm font-medium text-text">{trackable.name}</p>
-      <p class="truncate text-xs text-text-muted">{subtitle}</p>
+      <p class="truncate text-xs text-text-muted" style={goal && GOAL_STATE_COLORS[goal.state] ? `color: ${GOAL_STATE_COLORS[goal.state]};` : ''}>
+        {subtitle}
+      </p>
     </div>
   </a>
   <button

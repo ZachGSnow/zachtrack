@@ -32,7 +32,9 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
   Each trackable leads with what matters for its kind, picked automatically
   from its fields and changeable: time since (events), latest value and
   change (readings like Weight), today's total (Calories, Water) or logged
-  today with a streak (check-ins).
+  today with a streak (check-ins). Optional goals: a daily total, N times a
+  week, every N days (with due and overdue) or avoid, each with its own
+  streak. A trackable without fields logs in one tap, with undo.
   A starter set (Body Measurements, Vitals, Nutrition, Sleep, Wellness,
   Activity, Menstrual Cycle, Male Health) is created on a new install and is
   fully editable, including each field's name, unit and rating scale.
