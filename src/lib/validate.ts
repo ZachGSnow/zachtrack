@@ -19,6 +19,28 @@ const MAX_VALUES = 200;
 type Check = (record: Record<string, unknown>) => string | null;
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+
+const isInt = (v: unknown, min: number, max: number) => Number.isInteger(v) && (v as number) >= min && (v as number) <= max;
+
+/** A DateRepeat (db.ts), with no keys beyond its type's. */
+function isDateRepeat(v: unknown): boolean {
+  if (!isObject(v)) return false;
+  const keys = Object.keys(v);
+  const only = (...allowed: string[]) => keys.every((k) => allowed.includes(k));
+  switch (v.type) {
+    case 'yearly':
+    case 'once':
+      return only('type');
+    case 'every':
+      return only('type', 'count', 'unit') && isInt(v.count, 1, 100) && (v.unit === 'months' || v.unit === 'years');
+    case 'nthWeekday':
+      return only('type', 'month', 'weekday', 'nth') && isInt(v.month, 0, 11) && isInt(v.weekday, 0, 6) && (isInt(v.nth, 1, 5) || v.nth === -1);
+    case 'easter':
+      return only('type', 'offsetDays') && (v.offsetDays === undefined || isInt(v.offsetDays, -100, 100));
+    default:
+      return false;
+  }
+}
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 const isText = (v: unknown): v is string => typeof v === 'string' && v.length <= MAX_TEXT;
 const isId = (v: unknown): v is string => typeof v === 'string' && v.length > 0 && v.length <= 200;
@@ -102,6 +124,13 @@ const checks: Record<Exclude<RecordKind, 'tombstones'>, Check> = {
       ),
       optional(r, 'skipDays', (v) => Array.isArray(v) && v.length <= 2000 && v.every((d) => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)), 'a list of YYYY-MM-DD dates'),
       optional(r, 'pausedUntil', isNum, 'a number'),
+      optional(
+        r,
+        'dateKind',
+        (v) => typeof v === 'string' && ['birthday', 'anniversary', 'holiday', 'countdown'].includes(v),
+        "'birthday', 'anniversary', 'holiday' or 'countdown'",
+      ),
+      optional(r, 'dateLeadDays', (v) => Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 365, 'a whole number of days, 0 to 365'),
     ),
   trackableEntries: (r) =>
     all(
@@ -112,6 +141,7 @@ const checks: Record<Exclude<RecordKind, 'tombstones'>, Check> = {
       required(r, 'updatedAt', isNum, 'a number'),
       optional(r, 'note', isText, 'a string'),
       optional(r, 'tags', isStringList(MAX_TAGS), 'a list of strings'),
+      optional(r, 'dateRepeat', isDateRepeat, 'a date repeat rule'),
       optional(
         r,
         'values',

@@ -256,6 +256,24 @@ describe('what a sync sends back', () => {
   });
 });
 
+describe('dates', () => {
+  it('round-trips date kinds, lead days and repeat rules, and refuses malformed rules', async () => {
+    const holidays = { ...trackable, id: 't-holidays', displayMode: 'ages', dateKind: 'holiday', dateLeadDays: 3, fieldIds: [] };
+    const thanksgiving = { ...entry('e-tg', 5, 0), trackableId: 't-holidays', values: undefined, note: 'Thanksgiving', dateRepeat: { type: 'nthWeekday', month: 10, weekday: 3, nth: 4 } };
+    await sync(syncBody(0, { trackableDefinitions: [holidays], trackableEntries: [thanksgiving] }));
+    const other = await pull(0);
+    expect(other.changes.trackableDefinitions[0]).toMatchObject({ dateKind: 'holiday', dateLeadDays: 3 });
+    expect(other.changes.trackableEntries[0].dateRepeat).toEqual({ type: 'nthWeekday', month: 10, weekday: 3, nth: 4 });
+
+    for (const bad of [{ type: 'weekly' }, { type: 'every', count: 0, unit: 'years' }, { type: 'nthWeekday', month: 12, weekday: 0, nth: 1 }, { type: 'yearly', extra: 1 }]) {
+      const res = await sync(syncBody(0, { trackableEntries: [{ ...thanksgiving, id: 'e-bad', dateRepeat: bad }] }));
+      expect(res.body.rejected).toEqual([expect.objectContaining({ uuid: 'e-bad', reason: expect.stringContaining('dateRepeat') })]);
+    }
+    const badKind = await sync(syncBody(0, { trackableDefinitions: [{ ...holidays, id: 't-bad', dateKind: 'wedding' }] }));
+    expect(badKind.body.rejected).toEqual([expect.objectContaining({ uuid: 't-bad', reason: expect.stringContaining('dateKind') })]);
+  });
+});
+
 describe('weekly plan', () => {
   it('rejects a malformed plan in settings', async () => {
     const settings = (fastWeekPlan: unknown) => ({ id: 'app-settings', defaultPresetId: '16:8', notificationsEnabled: false, fastWeekPlan, updatedAt: 5 });

@@ -90,9 +90,32 @@ export interface TrackableDefinition {
   skipDays?: string[];
   /** Paused through this day (local start-of-day): treated like skipped days, and nothing is due. */
   pausedUntil?: number;
+  /** For a dates trackable (displayMode 'ages'): what its dates are; unset = birthdays. See utils/dates.ts. */
+  dateKind?: DateKind;
+  /** For a dates trackable: show a date in Needs attention this many days ahead; unset = the kind's default. */
+  dateLeadDays?: number;
   createdAt: number;
   updatedAt: number;
 }
+
+/** What a dates trackable's entries are (utils/dates.ts). */
+export type DateKind = 'birthday' | 'anniversary' | 'holiday' | 'countdown';
+
+/**
+ * How a date entry comes round again. Unset = the kind's default: yearly on
+ * the entry's month and day, or once for a countdown.
+ * - yearly: every year on the entry's month and day
+ * - once: just the entry's date
+ * - every: every `count` months or years from the entry's date (renewals)
+ * - nthWeekday: the `nth` (1 to 5, or -1 for last) `weekday` (0 = Monday) of `month` (0 = January)
+ * - easter: Easter Sunday (Western), plus `offsetDays`
+ */
+export type DateRepeat =
+  | { type: 'yearly' }
+  | { type: 'once' }
+  | { type: 'every'; count: number; unit: 'months' | 'years' }
+  | { type: 'nthWeekday'; month: number; weekday: number; nth: number }
+  | { type: 'easter'; offsetDays?: number };
 
 /** A single logged occurrence of a Trackable. */
 export interface TrackableEntry {
@@ -103,6 +126,8 @@ export interface TrackableEntry {
   tags?: string[];
   /** fieldId -> value, only for fields attached to this entry's trackable. */
   values?: Record<string, number | boolean>;
+  /** For an entry of a dates trackable: how it repeats (DateRepeat). */
+  dateRepeat?: DateRepeat;
   createdAt: number;
   updatedAt: number;
 }

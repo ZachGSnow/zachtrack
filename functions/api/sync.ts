@@ -472,13 +472,14 @@ function buildTrackableUpsert(db: D1Database, trackable: TrackableDefinition, se
   return db
     .prepare(
       `INSERT INTO trackableDefinitions (id, name, icon, color, fieldIds, displayMode, goalType, goalValue, pinned, archived, sortOrder,
-         scheduleDays, skipDays, pausedUntil, createdAt, updatedAt, deletedAt, serverSeq, updatedBy)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
+         scheduleDays, skipDays, pausedUntil, dateKind, dateLeadDays, createdAt, updatedAt, deletedAt, serverSeq, updatedBy)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          name=excluded.name, icon=excluded.icon, color=excluded.color, fieldIds=excluded.fieldIds,
          displayMode=excluded.displayMode, goalType=excluded.goalType, goalValue=excluded.goalValue,
          pinned=excluded.pinned, archived=excluded.archived, sortOrder=excluded.sortOrder,
          scheduleDays=excluded.scheduleDays, skipDays=excluded.skipDays, pausedUntil=excluded.pausedUntil,
+         dateKind=excluded.dateKind, dateLeadDays=excluded.dateLeadDays,
          createdAt=excluded.createdAt, updatedAt=excluded.updatedAt,
          deletedAt=NULL, serverSeq=excluded.serverSeq, updatedBy=excluded.updatedBy
        WHERE excluded.updatedAt > trackableDefinitions.updatedAt`,
@@ -498,6 +499,8 @@ function buildTrackableUpsert(db: D1Database, trackable: TrackableDefinition, se
       trackable.scheduleDays ? JSON.stringify(trackable.scheduleDays) : null,
       trackable.skipDays ? JSON.stringify(trackable.skipDays) : null,
       trackable.pausedUntil ?? null,
+      trackable.dateKind ?? null,
+      trackable.dateLeadDays ?? null,
       trackable.createdAt,
       trackable.updatedAt,
       serverSeq,
@@ -508,11 +511,11 @@ function buildTrackableUpsert(db: D1Database, trackable: TrackableDefinition, se
 function buildEntryUpsert(db: D1Database, entry: TrackableEntry, serverSeq: number, updatedBy: string | null): D1PreparedStatement {
   return db
     .prepare(
-      `INSERT INTO trackableEntries (id, trackableId, timestamp, note, tags, fieldValues, createdAt, updatedAt, deletedAt, serverSeq, updatedBy)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
+      `INSERT INTO trackableEntries (id, trackableId, timestamp, note, tags, fieldValues, dateRepeat, createdAt, updatedAt, deletedAt, serverSeq, updatedBy)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          trackableId=excluded.trackableId, timestamp=excluded.timestamp, note=excluded.note, tags=excluded.tags,
-         fieldValues=excluded.fieldValues, createdAt=excluded.createdAt, updatedAt=excluded.updatedAt,
+         fieldValues=excluded.fieldValues, dateRepeat=excluded.dateRepeat, createdAt=excluded.createdAt, updatedAt=excluded.updatedAt,
          deletedAt=NULL, serverSeq=excluded.serverSeq, updatedBy=excluded.updatedBy
        WHERE excluded.updatedAt > trackableEntries.updatedAt`,
     )
@@ -523,6 +526,7 @@ function buildEntryUpsert(db: D1Database, entry: TrackableEntry, serverSeq: numb
       entry.note ?? null,
       entry.tags ? JSON.stringify(entry.tags) : null,
       entry.values ? JSON.stringify(entry.values) : null,
+      entry.dateRepeat ? JSON.stringify(entry.dateRepeat) : null,
       entry.createdAt,
       entry.updatedAt,
       serverSeq,
@@ -661,6 +665,8 @@ function mapTrackableRow(row: Record<string, unknown>): WireRow<TrackableDefinit
     scheduleDays: row.scheduleDays ? JSON.parse(row.scheduleDays as string) : undefined,
     skipDays: row.skipDays ? JSON.parse(row.skipDays as string) : undefined,
     pausedUntil: (row.pausedUntil as number) ?? undefined,
+    dateKind: (row.dateKind as TrackableDefinition['dateKind']) ?? undefined,
+    dateLeadDays: (row.dateLeadDays as number) ?? undefined,
     createdAt: row.createdAt as number,
     updatedAt: row.updatedAt as number,
     deletedAt: (row.deletedAt as number) ?? undefined,
@@ -676,6 +682,7 @@ function mapEntryRow(row: Record<string, unknown>): WireRow<TrackableEntry> {
     note: (row.note as string) ?? undefined,
     tags: row.tags ? JSON.parse(row.tags as string) : undefined,
     values: row.fieldValues ? JSON.parse(row.fieldValues as string) : undefined,
+    dateRepeat: row.dateRepeat ? JSON.parse(row.dateRepeat as string) : undefined,
     createdAt: row.createdAt as number,
     updatedAt: row.updatedAt as number,
     deletedAt: (row.deletedAt as number) ?? undefined,
