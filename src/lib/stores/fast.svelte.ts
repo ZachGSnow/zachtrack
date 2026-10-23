@@ -3,11 +3,17 @@ import { addFast, getActiveFast, updateFast, type FastRecord } from '../db';
 import { getZoneForHour, type BioZone } from '../data/zones';
 import type { FastPreset } from '../data/presets';
 import { elapsedHours } from '../utils/time';
-import { scheduleZoneMilestones } from '../utils/notifications';
-import { settingsStore } from './settings.svelte';
+import { latestMilestone, type Milestone } from '../utils/fastProgress';
 
-function maybeScheduleMilestones(fast: Pick<FastRecord, 'startTime' | 'targetHours'>): (() => void) | null {
-  return settingsStore.data.notificationsEnabled ? scheduleZoneMilestones(fast.startTime, fast.targetHours) : null;
+/** The last milestone banner dismissed on this device (utils/fastProgress.ts key). */
+const MILESTONE_SEEN_KEY = 'zachtrack:milestone-seen';
+
+function loadSeenMilestone(): string | null {
+  try {
+    return typeof localStorage === 'undefined' ? null : localStorage.getItem(MILESTONE_SEEN_KEY);
+  } catch {
+    return null;
+  }
 }
 
 class FastTimerStore {
@@ -16,8 +22,9 @@ class FastTimerStore {
   ready = $state(false);
 
   private tickHandle: ReturnType<typeof setInterval> | null = null;
-  private cancelMilestones: (() => void) | null = null;
   private subscription: Subscription | undefined;
+  /** Key of the last milestone banner dismissed here; see `milestone`. */
+  private seenMilestone = $state<string | null>(loadSeenMilestone());
 
   elapsedMs = $derived(this.activeFast ? this.now - this.activeFast.startTime : 0);
   elapsedHrs = $derived(this.activeFast ? elapsedHours(this.activeFast.startTime, this.now) : 0);
@@ -25,6 +32,27 @@ class FastTimerStore {
   progressToTarget = $derived(
     this.activeFast?.targetHours ? Math.min(1, this.elapsedHrs / this.activeFast.targetHours) : null,
   );
+  /**
+   * In-app milestones instead of notifications: the latest zone or goal the
+   * running fast has reached, until it's dismissed. Shown as a banner on the
+   * Fasting tab and a dot on its nav item.
+   */
+  milestone = $derived.by<Milestone | null>(() => {
+    if (!this.activeFast) return null;
+    const m = latestMilestone(this.activeFast, this.now);
+    return m && m.key !== this.seenMilestone ? m : null;
+  });
+
+  dismissMilestone() {
+    const key = this.milestone?.key;
+    if (!key) return;
+    this.seenMilestone = key;
+    try {
+      localStorage.setItem(MILESTONE_SEEN_KEY, key);
+    } catch {
+      // Not persisted: it shows again after a reload, nothing worse.
+    }
+  }
 
   async init() {
     this.apply(await getActiveFast());
@@ -44,21 +72,15 @@ class FastTimerStore {
     this.apply(await getActiveFast());
   }
 
-  /** Shows `existing` as the running fast (or none), restarting ticking and reminders only when the fast itself changed. */
+  /** Shows `existing` as the running fast (or none), restarting the ticking only when the fast itself changed. */
   private apply(existing: FastRecord | undefined) {
     const previous = this.activeFast;
     this.activeFast = existing ?? null;
     if (existing && previous && previous.uuid === existing.uuid && previous.startTime === existing.startTime) {
-      return; // Same fast, e.g. a note or tag edit: keep the timer and reminders as they are.
+      return; // Same fast, e.g. a note or tag edit: keep the timer as it is.
     }
-    this.cancelMilestones?.();
-    this.cancelMilestones = null;
-    if (existing) {
-      this.startTicking();
-      this.cancelMilestones = maybeScheduleMilestones(existing);
-    } else {
-      this.stopTicking();
-    }
+    if (existing) this.startTicking();
+    else this.stopTicking();
   }
 
   async start(preset: FastPreset, startTime: number = Date.now()) {
@@ -73,8 +95,20 @@ class FastTimerStore {
       updatedAt: Date.now(),
     });
     this.activeFast = created;
+    this.now = Date.now();
     this.startTicking();
-    this.cancelMilestones = maybeScheduleMilestones(created);
+  }
+
+  /** Switches the running fast to another method or length; the start time stays. */
+  async changeGoal(preset: FastPreset) {
+    if (!this.activeFast?.id) return;
+    await updateFast(this.activeFast.id, {
+      method: preset.id === 'custom' ? 'custom' : 'preset',
+      presetId: preset.id,
+      presetLabel: preset.label,
+      targetHours: preset.targetHours,
+    });
+    await this.refreshActive();
   }
 
   async stop(details?: { moodRating?: number; energyRating?: number; hungerRating?: number; tags?: string[]; note?: string }) {
@@ -85,8 +119,6 @@ class FastTimerStore {
       ...details,
     });
     this.stopTicking();
-    this.cancelMilestones?.();
-    this.cancelMilestones = null;
     this.activeFast = null;
   }
 

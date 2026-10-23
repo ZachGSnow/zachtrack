@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { FastRecord } from '../src/lib/db';
-import { eatingWindowText, formatCountdown, nextStartReminder, parseScheduleTime, scheduleStatus } from '../src/lib/utils/fastingSchedule';
+import { eatingWindowText, formatCountdown, parseScheduleTime, scheduleStatus } from '../src/lib/utils/fastingSchedule';
 import { computeFastStats } from '../src/lib/utils/stats';
 
 // America/New_York (vitest config).
@@ -46,13 +46,6 @@ describe('schedule status while no fast runs', () => {
   });
 });
 
-describe('start reminder', () => {
-  it("fires at the next start that hasn't happened yet", () => {
-    expect(nextStartReminder('20:00', [], oct(22, 12))).toBe(oct(22, 20));
-    expect(nextStartReminder('20:00', started(oct(22, 19)), oct(22, 19, 30))).toBe(oct(23, 20));
-    expect(nextStartReminder('20:00', [], oct(22, 21))).toBe(oct(23, 20));
-  });
-});
 
 describe('eating window', () => {
   it('opens at start plus target, and says goal reached after it', () => {

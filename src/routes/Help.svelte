@@ -128,7 +128,8 @@
       <h2>Needs attention</h2>
       <p>
         Instead of notifications, reminders show inside the app. Goals that are overdue or due today are listed at the top of
-        Trackables, most urgent first, and the Trackables tab shows how many. A dot on the Fasting tab means your daily fast
+        Trackables, most urgent first, and the Trackables tab shows how many. A dot on the Fasting tab means a new fasting
+        milestone, or that your daily fast
         start has passed and no fast has started yet.
       </p>
     </section>
@@ -154,9 +155,18 @@
       <h2>Fasting</h2>
       <p>
         The ring fills toward your fast's target and the markers are metabolic zones; tap one, or a zone card, to read about
-        it. While fasting, the timer says when your eating window opens. With a daily start time (Settings > Fasting) the
-        Fasting tab counts down to your next fast and says when you're late. Journey has your streaks, how often you hit the
-        target, and charts. One fast per start day.
+        it. Under the timer: when the fast started, when the goal is and how long is left, and the next zone. One fast per
+        start day.
+      </p>
+      <ul>
+        <li><strong>Forgot to start?</strong> Under Started, pick 30m, 1h or 2h ago, or a time, before Start Fast. Tap the timer to correct the start later.</li>
+        <li><strong>Change goal</strong> switches the running fast to another method or length; it keeps its start time.</li>
+        <li><strong>Milestones</strong> show in the app, not as notifications: a banner when you reach a new zone or your goal, and a dot on the Fasting tab until you dismiss it.</li>
+        <li><strong>End Fast</strong> shows how long it was and how it compares with the goal; Add details for how you felt, tags and a note, or just Save & Finish.</li>
+      </ul>
+      <p>
+        With a daily start time (Settings > Fasting) the Fasting tab counts down to your next fast and says when you're late.
+        Journey has your streaks, how often you hit the target, and charts.
       </p>
       <p class="text-text-muted">
         The zone descriptions are general information, not medical advice. Talk to a doctor before extended fasting.

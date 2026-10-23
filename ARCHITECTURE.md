@@ -577,11 +577,29 @@ reload can't start another. The query doesn't match the service worker's
 - **Eating window:** while fasting toward a target, "Eating window opens at
   12:00 PM tomorrow", then "Goal reached at ...".
 - **Hit target** on Journey: completed fasts with a target that reached it.
-- **Notifications** now include "Goal reached" at the target and a reminder at
-  the scheduled start (App.svelte), and say ZachTrack instead of the old
-  SnowFast. They are still foreground-only timers (`notifications.ts`): they
-  fire while the app is open or in the background, not when it's closed. True
-  background reminders need Web Push (section 6).
+- **Notifications** (removed in v1.11.0, 3.34) included "Goal reached" at the
+  target and a reminder at the scheduled start. They were foreground-only
+  timers that fired while the app was open or in the background.
+
+### 3.34 The fasting timer (v1.11.0)
+- **Started:** chips for now, 30m, 1h or 2h ago, or a picked time, so a fast
+  you forgot to start begins at the right time (`startedAgo`); a future time
+  is refused. `fastTimer.start` already took a start time.
+- **Timeline** under the ring (`fastTimeline` in `utils/fastProgress.ts`):
+  started, goal with time left or when it was reached, and the next zone with
+  how long until it.
+- **Change goal** updates the running fast's preset and target
+  (`fastTimer.changeGoal`); the start time and the clock are untouched.
+- **Milestones in the app:** `latestMilestone` is the deepest zone reached
+  after the first, or the goal when it came later; `fastTimer.milestone` shows
+  it as a banner on Fasting and a dot on its tab until dismissed, the
+  dismissal kept per device in `zachtrack:milestone-seen`. This replaces
+  `notifications.ts`, the start reminder in App.svelte and the Settings
+  toggle, all removed. `settings.notificationsEnabled` stays in the schema so
+  older devices still sync, and nothing reads it.
+- **Ending:** End Fast shows the duration, the goal met or how far short, and
+  the deepest zone (`endSummary`); ratings, tags and note fold under Add
+  details. The ratings are one snippet instead of three copies.
 
 ### 3.21 Trackables list: pin, archive, order; tag filters
 - **Sort** (per device, `zachtrack:trackables-view`): Due first (goal
@@ -1141,11 +1159,9 @@ this," not a promise.
   the most powerful of the three tag ideas (fits Charting's whole
   correlation-hunting purpose) but touches the data pipeline that builds
   chart series, not just a rendered list - separate scope from the other two.
-- **Push notifications:** true background Web Push (server-triggered, works
-  with the browser fully closed) was explicitly called out as a natural
-  future pairing with sync, but is out of scope for now. The existing
-  `notifications.ts` only does foreground/backgrounded-tab local
-  notifications.
+- **Notifications of any kind:** not wanted. v1.11.0 removed the local zone
+  and schedule notifications for in-app milestones (3.34); Web Push isn't
+  planned.
 - **Age-tracker extras:** a relationship label (e.g. "Mom", "Friend") per
   person was considered; decided name + age is enough for now.
 - **Direction-aware trend colors in data tables:** a per-field "higher is

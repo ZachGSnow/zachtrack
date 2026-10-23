@@ -219,24 +219,9 @@
       {/if}
     </div>
     <span class="mt-1 block text-xs text-text-muted">
-      The Fasting tab counts down to it and says when you're late. With notifications on, you get a reminder while the app is open.
+      The Fasting tab counts down to it and says when you're late.
     </span>
   </label>
-
-  <button
-    type="button"
-    class="flex w-full items-center justify-between rounded-lg border p-2 text-sm"
-    style="border-color: var(--color-border);"
-    onclick={() => settingsStore.update({ notificationsEnabled: !settingsStore.data.notificationsEnabled })}
-  >
-    <span class="text-text-muted">Zone milestone notifications</span>
-    <span
-      class="rounded-full px-3 py-1 text-xs font-semibold"
-      style={settingsStore.data.notificationsEnabled
-        ? 'background: var(--color-brand); color: #06140c;'
-        : 'background: var(--color-surface-2); color: var(--color-text-muted);'}
-    >{settingsStore.data.notificationsEnabled ? 'On' : 'Off'}</span>
-  </button>
 
   </section>
 

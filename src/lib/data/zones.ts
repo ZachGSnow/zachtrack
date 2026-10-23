@@ -1,5 +1,5 @@
 // The biological-state timeline that drives the timer ring color, the live
-// "what's happening in your body" card, and milestone notifications.
+// "what's happening in your body" card, and the in-app milestone banner.
 //
 // `hourEnd` is exclusive except for the final zone, which uses `Infinity` so
 // extended fasts keep displaying the deepest known zone indefinitely.
@@ -18,7 +18,7 @@ export interface BioZone {
   science: string;
   whatsHappening: string;
   userExperience: string;
-  /** Fired as a local notification the moment the fast crosses into this zone. */
+  /** Shown in the in-app milestone banner once the fast reaches this zone (utils/fastProgress.ts). */
   milestone: string;
 }
 
