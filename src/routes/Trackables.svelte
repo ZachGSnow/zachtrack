@@ -20,6 +20,7 @@
   import { link } from 'svelte-spa-router';
   import { GOAL_STATE_COLORS } from '../lib/utils/trackableGoals';
   import TrackableCard from '../lib/components/TrackableCard.svelte';
+  import ComingUp from '../lib/components/ComingUp.svelte';
   import BottomSheet from '../lib/components/BottomSheet.svelte';
   import EditTrackableSheet from '../lib/components/EditTrackableSheet.svelte';
   import LogTrackableEntrySheet from '../lib/components/LogTrackableEntrySheet.svelte';
@@ -171,7 +172,7 @@
       <section class="rounded-2xl border p-3" style="border-color: #f8717155; background: #f8717110;" aria-label="Needs attention">
         <p class="mb-2 text-xs font-semibold uppercase tracking-wide" style="color: #f87171;">Needs attention</p>
         <ul class="flex flex-col gap-1">
-          {#each attentionStore.items as item (item.id)}
+          {#each attentionStore.items as item (item.key)}
             <li>
               <a href="/trackables/{item.id}" use:link class="flex items-center gap-2 rounded-lg px-1 py-1 text-sm hover:bg-surface-2">
                 <span class="w-6 text-center">{item.icon}</span>
@@ -183,6 +184,7 @@
         </ul>
       </section>
     {/if}
+    <ComingUp trackables={$trackables ?? []} entries={$allEntries ?? []} />
     <div class="flex items-center justify-between gap-2">
       <SegmentedControl options={LIST_SORTS} bind:value={sort} />
       {#if reordering}

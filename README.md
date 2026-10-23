@@ -64,6 +64,9 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
   rules like the 4th Thursday of November, and Easter), and countdowns or
   renewals that repeat every few months or years, each with a countdown. A
   US holidays template adds the federal holidays and common observances.
+  Dates show under Needs attention a few days ahead, the next two weeks
+  under Coming up, and the next year on a Dates page with a list and a
+  month calendar.
 - **Tables first:** the Data tab, Journey and each trackable show rows per
   day, week or month with a 7-day rolling average or change vs the previous
   period, an Avg / Change / Per-week trend footer, and a Copy button that puts

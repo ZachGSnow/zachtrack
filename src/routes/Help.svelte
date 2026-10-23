@@ -83,7 +83,9 @@
           <strong>Dates:</strong> named dates with countdowns, of one kind per trackable (Edit > Dates are): birthdays with
           ages, anniversaries ("12th anniversary"), holidays, or countdowns and renewals. A holiday can follow a rule like the
           4th Thursday of November or Easter; a renewal can repeat every few months or years. The templates include
-          Birthdays, Anniversaries, Countdowns and a ready-made US holidays list.
+          Birthdays, Anniversaries, Countdowns and a ready-made US holidays list. Dates show under Needs attention a few days
+          ahead (Edit sets how many), the next two weeks under Coming up on Trackables, and the next year on the Dates page
+          (See all dates), as a list or a month calendar.
         </li>
       </ul>
       <p>
@@ -133,7 +135,8 @@
       <h2>Needs attention</h2>
       <p>
         Instead of notifications, reminders show inside the app. Goals that are overdue or due today are listed at the top of
-        Trackables, most urgent first, and the Trackables tab shows how many. A dot on the Fasting tab means a new fasting
+        Trackables, most urgent first, along with dates coming up soon (a birthday a week ahead, by default), and the
+        Trackables tab shows how many. A dot on the Fasting tab means a new fasting
         milestone, or that your daily fast
         start has passed and no fast has started yet.
       </p>

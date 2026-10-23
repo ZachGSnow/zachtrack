@@ -84,3 +84,42 @@ test('a renewal repeats every few years, and a one-off date that passed moves to
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByRole('list', { name: 'Past' }).getByRole('button', { name: /Beach trip/ })).toContainText('3 days ago');
 });
+
+test('dates due soon go under Needs attention, the next two weeks under Coming up, and the Dates page lists and calendars them', async ({ page }) => {
+  await newFromTemplate(page, /Birthdays$/);
+  for (const [name, days] of [['Mom', 3], ['Dad', 10]] as const) {
+    await page.getByRole('button', { name: '+ Add person' }).click();
+    await expect(page.getByLabel('Birthdate')).not.toHaveValue('');
+    await page.getByRole('textbox', { name: 'Name' }).fill(name);
+    await page.getByLabel('Birthdate').fill(await dateFromToday(page, days, 60));
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toHaveCount(0);
+  }
+
+  // Birthdays show in Needs attention 7 days ahead: Mom, not Dad. Dad is under Coming up instead.
+  await page.goto('/#/trackables');
+  const attention = page.getByRole('region', { name: 'Needs attention' });
+  await expect(attention.getByRole('link', { name: /Mom/ })).toContainText('Turns 60 in 3 days');
+  await expect(attention.getByRole('link', { name: /Dad/ })).toHaveCount(0);
+  const comingUp = page.getByRole('region', { name: 'Coming up' });
+  await expect(comingUp.getByRole('link', { name: /Dad: Turns 60/ })).toContainText('in 10 days');
+  await expect(comingUp.getByRole('link', { name: /Mom/ })).toHaveCount(0);
+
+  // The Dates page lists both birthdays soonest first (plus 1,000-day milestones later in the year).
+  await comingUp.getByRole('link', { name: 'See all dates' }).click();
+  await expect(page.getByRole('heading', { name: 'Dates', level: 1 })).toBeVisible();
+  const birthdays = await page.getByRole('link', { name: /turns 60/ }).allTextContents();
+  expect(birthdays.map((n) => (n.includes('Mom') ? 'Mom' : 'Dad'))).toEqual(['Mom', 'Dad']);
+  await expect(page.getByRole('link', { name: /22,000 days old/ }).first()).toBeVisible();
+
+  // The calendar marks Dad's day; tapping it lists him.
+  await page.getByRole('button', { name: 'Calendar' }).click();
+  const dadDay = await page.evaluate(() => {
+    const t = new Date();
+    t.setDate(t.getDate() + 10);
+    return { label: t.toLocaleDateString(undefined, { month: 'long', day: 'numeric' }), nextMonth: t.getMonth() !== new Date().getMonth() };
+  });
+  if (dadDay.nextMonth) await page.getByRole('button', { name: 'Next month' }).click();
+  await page.getByRole('button', { name: `${dadDay.label}, 1 date` }).click();
+  await expect(page.getByRole('region', { name: 'Selected day' }).getByRole('link', { name: /Dad/ })).toBeVisible();
+});
