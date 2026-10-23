@@ -561,6 +561,27 @@ reload can't start another. The query doesn't match the service worker's
   fire while the app is open or in the background, not when it's closed. True
   background reminders need Web Push (section 6).
 
+### 3.21 Trackables list: pin, archive, order; tag filters
+- **Sort** (per device, `zachtrack:trackables-view`): Due first (goal
+  urgency from 3.18: overdue, then due, then the rest, then trackables
+  without a goal by name), My order, or A-Z (`utils/trackableList.ts`).
+  **Pinned** trackables come first in every sort.
+- **My order** is set with Reorder's up/down buttons, which number the whole
+  list once so trackables that never had an order get one
+  (`moveInOrder`). Up/down buttons instead of drag-and-drop: they work the
+  same with touch, mouse and keyboard and need no gesture handling.
+- **Archive** hides a trackable from the list (under "Show archived") without
+  deleting it or its entries; Unarchive in its Edit sheet brings it back.
+- `pinned`, `archived` and `sortOrder` are synced trackable columns
+  (migration `0003_trackable_list.sql`), so the list looks the same on every
+  device; the sort choice is per device.
+- The list now loads all entries once and hands each card its own, so it can
+  sort by what is due.
+- **Tags** (the design that was in section 6): fasts show their tags in
+  History and entries in a Tags column; a single-tag filter above each list
+  (`TagFilter.svelte`) narrows only that list, not the stats or charts, and
+  clears itself when the tag disappears.
+
 ## 4. Issues hit during implementation, and how they were resolved
 
 These are real bugs that shipped and got fixed during this project's build,
@@ -870,14 +891,9 @@ are kept out of the repo, in the git-ignored `wrangler.toml` and a local
 Nothing here is committed to - this is a memory aid for "we talked about
 this," not a promise.
 
-- **Tag visibility + filtering (agreed design, not yet built):** tag chips
-  shown on each fast (`History.svelte`) and each trackable entry
-  (`TrackableDetail.svelte`), plus a single-tag filter bar above each list
-  (tap a tag to narrow the list, tap again/"All" to clear). Scoped
-  deliberately small: filters only the raw list, not the charts above it on
-  `TrackableDetail`; no tag rename/management tooling; filter state doesn't
-  persist across navigation. A "tap a tag badge on a row to also filter by
-  it" nice-to-have was floated but not decided on.
+- **Tag extras:** tag visibility and the single-tag filter are built (3.21).
+  Still open: tapping a tag badge on a row to filter by it, and tag
+  rename/management tooling.
 - **Cross-cutting tag browser ("Option B"):** a dedicated view showing every
   fast *and* every trackable entry across the whole app that shares a given
   tag, in one combined timeline - useful for correlation-spotting (e.g. "what

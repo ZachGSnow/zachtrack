@@ -4,8 +4,12 @@
   import { formatDateTime, formatHoursShort } from '../lib/utils/time';
   import BottomSheet from '../lib/components/BottomSheet.svelte';
   import EditFastSheet from '../lib/components/EditFastSheet.svelte';
+  import TagFilter from '../lib/components/TagFilter.svelte';
 
   const fasts = liveQuery(() => db.fasts.orderBy('startTime').reverse().toArray());
+
+  let tagFilter = $state<string | null>(null);
+  const shown = $derived(tagFilter ? ($fasts ?? []).filter((f) => f.tags?.includes(tagFilter!)) : ($fasts ?? []));
 
   let sheetOpen = $state(false);
   let selectedFast = $state<FastRecord | null>(null);
@@ -24,8 +28,9 @@
   {:else if $fasts.length === 0}
     <p class="mt-8 text-center text-sm text-text-muted">No fasts logged yet. Start one from the Timer tab.</p>
   {:else}
+    <TagFilter items={$fasts} bind:selected={tagFilter} />
     <ul class="flex flex-col gap-2">
-      {#each $fasts as fast (fast.id)}
+      {#each shown as fast (fast.id)}
         <li>
           <button
             class="w-full rounded-xl border p-3 text-left"
@@ -45,6 +50,13 @@
                 <span style="color: var(--color-brand);">In progress&hellip;</span>
               {/if}
             </p>
+            {#if fast.tags?.length}
+              <p class="mt-1 flex flex-wrap gap-1">
+                {#each fast.tags as tag (tag)}
+                  <span class="rounded-full px-2 py-0.5 text-[11px] text-text-muted" style="background: var(--color-surface-2);">#{tag}</span>
+                {/each}
+              </p>
+            {/if}
           </button>
         </li>
       {/each}

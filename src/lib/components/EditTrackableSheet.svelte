@@ -66,6 +66,7 @@
   let summaryMode = $state<'auto' | TrackableKind>('auto');
   let goalType = $state<TrackableGoalType | ''>('');
   let goalValueDraft = $state('');
+  let pinned = $state(false);
   let error = $state('');
 
   let showNewField = $state(false);
@@ -84,6 +85,7 @@
     summaryMode = trackable && !resolveKind(trackable, []).auto ? resolveKind(trackable, []).kind : 'auto';
     goalType = trackable?.goalType ?? '';
     goalValueDraft = trackable?.goalValue?.toString() ?? '';
+    pinned = trackable?.pinned ?? false;
     error = '';
     editingFieldId = null;
     showNewField = false;
@@ -222,6 +224,7 @@
       displayMode: summaryMode === 'auto' ? undefined : summaryMode,
       goalType: goalType || undefined,
       goalValue,
+      pinned: pinned || undefined,
     };
     try {
       if (trackable) {
@@ -234,6 +237,17 @@
       open = false;
     } catch (e) {
       error = e instanceof Error ? e.message : 'Could not save this trackable. Please try again.';
+    }
+  }
+
+  /** Archive hides it from the list without deleting anything; saving the rest of the sheet is separate. */
+  async function handleArchive() {
+    if (!trackable) return;
+    try {
+      await updateTrackable(trackable.id, { archived: trackable.archived ? undefined : true });
+      open = false;
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Could not archive this trackable. Please try again.';
     }
   }
 
@@ -338,6 +352,11 @@
       {/if}
     </div>
   {/if}
+
+  <label class="flex items-center gap-2 text-sm text-text">
+    <input type="checkbox" bind:checked={pinned} class="h-4 w-4" style="accent-color: var(--color-brand);" />
+    Pin to the top of the list
+  </label>
 
   <div>
     <p class="mb-1.5 text-sm text-text-muted">Fields</p>
@@ -535,6 +554,11 @@
         style="border-color: #ef444460; color: #f87171;"
         onclick={handleDelete}
       >Delete</button>
+      <button
+        class="flex-1 rounded-xl border py-2.5 text-sm font-medium text-text-muted"
+        style="border-color: var(--color-border);"
+        onclick={handleArchive}
+      >{trackable.archived ? 'Unarchive' : 'Archive'}</button>
     {/if}
     <button
       class="flex-1 rounded-xl py-2.5 text-sm font-semibold"

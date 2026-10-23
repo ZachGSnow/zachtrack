@@ -91,6 +91,9 @@ const checks: Record<Exclude<RecordKind, 'tombstones'>, Check> = {
         "'dailyTotal', 'perWeek', 'everyDays' or 'avoid'",
       ),
       optional(r, 'goalValue', (v) => isNum(v) && v > 0, 'a positive number'),
+      optional(r, 'pinned', (v) => typeof v === 'boolean', 'a boolean'),
+      optional(r, 'archived', (v) => typeof v === 'boolean', 'a boolean'),
+      optional(r, 'sortOrder', isNum, 'a number'),
     ),
   trackableEntries: (r) =>
     all(

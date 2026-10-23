@@ -1,7 +1,20 @@
 <script lang="ts">
   import { liveQuery } from 'dexie';
   import { push } from 'svelte-spa-router';
-  import { addTrackableEntry, db, deleteTrackableEntry, type TrackableDefinition } from '../lib/db';
+  import {
+    addTrackableEntry,
+    db,
+    deleteTrackableEntry,
+    updateTrackable,
+    type FieldDefinition,
+    type TrackableDefinition,
+    type TrackableEntry,
+  } from '../lib/db';
+  import { resolveKind } from '../lib/utils/trackableKinds';
+  import { goalStatus } from '../lib/utils/trackableGoals';
+  import { LIST_SORTS, moveInOrder, orderTrackables, type ListSort } from '../lib/utils/trackableList';
+  import { loadPrefs, oneOf, savePrefs } from '../lib/utils/prefs';
+  import SegmentedControl from '../lib/components/SegmentedControl.svelte';
   import TrackableCard from '../lib/components/TrackableCard.svelte';
   import BottomSheet from '../lib/components/BottomSheet.svelte';
   import EditTrackableSheet from '../lib/components/EditTrackableSheet.svelte';
@@ -10,6 +23,57 @@
 
   const trackables = liveQuery(() => db.trackableDefinitions.orderBy('name').toArray());
   const allFields = liveQuery(() => db.fieldDefinitions.toArray());
+  const allEntries = liveQuery(() => db.trackableEntries.toArray());
+
+  const PREFS_KEY = 'trackables-view';
+  const saved = loadPrefs<{ sort: unknown }>(PREFS_KEY, { sort: 'due' });
+  let sort = $state<ListSort>(oneOf(saved.sort, LIST_SORTS.map((s) => s.id), 'due'));
+  $effect(() => {
+    savePrefs(PREFS_KEY, { sort });
+  });
+
+  let reordering = $state(false);
+  let showArchived = $state(false);
+
+  const entriesByTrackable = $derived.by(() => {
+    const map = new Map<string, TrackableEntry[]>();
+    for (const e of $allEntries ?? []) {
+      const list = map.get(e.trackableId);
+      if (list) list.push(e);
+      else map.set(e.trackableId, [e]);
+    }
+    return map;
+  });
+
+  function attached(t: TrackableDefinition): FieldDefinition[] {
+    return t.fieldIds.map((id) => ($allFields ?? []).find((f) => f.id === id)).filter((f): f is FieldDefinition => f != null);
+  }
+
+  function urgency(t: TrackableDefinition): number | undefined {
+    const fields = attached(t);
+    if (resolveKind(t, fields).kind === 'ages') return undefined;
+    return goalStatus(t, entriesByTrackable.get(t.id) ?? [], fields)?.urgency;
+  }
+
+  const active = $derived(orderTrackables(($trackables ?? []).filter((t) => !t.archived), sort, urgency));
+  const archived = $derived(orderTrackables(($trackables ?? []).filter((t) => t.archived), 'name', () => undefined));
+
+  async function move(t: TrackableDefinition, direction: -1 | 1) {
+    const current = new Map(active.map((a) => [a.id, a.sortOrder]));
+    for (const change of moveInOrder(active.map((a) => a.id), t.id, direction, current)) {
+      await updateTrackable(change.id, { sortOrder: change.sortOrder });
+    }
+  }
+
+  // The up/down buttons only mean something in "My order".
+  $effect(() => {
+    if (sort !== 'manual') reordering = false;
+  });
+
+  function startReordering() {
+    sort = 'manual';
+    reordering = true;
+  }
 
   let editOpen = $state(false);
   let editingTrackable = $state<TrackableDefinition | null>(null);
@@ -83,11 +147,40 @@
   {:else if $trackables.length === 0}
     <p class="mt-8 text-center text-sm text-text-muted">No trackables yet. Tap "+ New" to create your first one.</p>
   {:else}
+    <div class="flex items-center justify-between gap-2">
+      <SegmentedControl options={LIST_SORTS} bind:value={sort} />
+      {#if reordering}
+        <button class="text-sm font-semibold" style="color: var(--color-brand);" onclick={() => (reordering = false)}>Done</button>
+      {:else}
+        <button class="text-sm text-text-muted" onclick={startReordering}>Reorder</button>
+      {/if}
+    </div>
+    {#if reordering}
+      <p class="text-xs text-text-muted">Pinned trackables stay on top; the rest keep this order under "My order".</p>
+    {/if}
     <div class="flex flex-col gap-2">
-      {#each $trackables as t (t.id)}
-        <TrackableCard trackable={t} fields={$allFields ?? []} onQuickLog={() => openQuickLog(t)} />
+      {#each active as t (t.id)}
+        <TrackableCard
+          trackable={t}
+          fields={$allFields ?? []}
+          entries={entriesByTrackable.get(t.id) ?? []}
+          onQuickLog={() => openQuickLog(t)}
+          onMove={reordering ? (direction) => move(t, direction) : undefined}
+        />
       {/each}
     </div>
+    {#if archived.length > 0}
+      <button class="self-start text-sm text-text-muted" onclick={() => (showArchived = !showArchived)} aria-expanded={showArchived}>
+        {showArchived ? 'Hide' : 'Show'} archived ({archived.length})
+      </button>
+      {#if showArchived}
+        <div class="flex flex-col gap-2 opacity-70">
+          {#each archived as t (t.id)}
+            <TrackableCard trackable={t} fields={$allFields ?? []} entries={entriesByTrackable.get(t.id) ?? []} onQuickLog={() => openQuickLog(t)} />
+          {/each}
+        </div>
+      {/if}
+    {/if}
   {/if}
 </div>
 

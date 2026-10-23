@@ -15,6 +15,7 @@
 
   const shown = $derived(entries.slice(0, limit));
   const hasNotes = $derived(entries.some((e) => e.note?.trim()));
+  const hasTags = $derived(entries.some((e) => e.tags?.length));
 
   const nf = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
 
@@ -25,7 +26,7 @@
   }
 
   function toTsv(): string {
-    const header = ['When', ...fields.map((f) => (f.unit ? `${f.name} (${f.unit})` : f.name)), 'Note'];
+    const header = ['When', ...fields.map((f) => (f.unit ? `${f.name} (${f.unit})` : f.name)), 'Note', 'Tags'];
     const lines = [header.join('\t')];
     for (const e of entries) {
       lines.push(
@@ -36,6 +37,7 @@
             return v == null ? '' : typeof v === 'boolean' ? (v ? 'Yes' : 'No') : String(v);
           }),
           (e.note ?? '').replace(/\s+/g, ' ').trim(),
+          (e.tags ?? []).join(', '),
         ].join('\t'),
       );
     }
@@ -72,6 +74,11 @@
                 class="sticky top-0 z-10 bg-surface px-3 py-1.5 text-left align-bottom text-[10px] font-semibold uppercase tracking-wide text-text-muted"
               >Note</th>
             {/if}
+            {#if hasTags}
+              <th
+                class="sticky top-0 z-10 bg-surface px-3 py-1.5 text-left align-bottom text-[10px] font-semibold uppercase tracking-wide text-text-muted"
+              >Tags</th>
+            {/if}
           </tr>
         </thead>
         <tbody>
@@ -92,6 +99,11 @@
               {#if hasNotes}
                 <td class="max-w-[12rem] truncate border-t border-border px-3 py-2 text-left text-xs text-text-muted" title={entry.note ?? ''}>
                   {entry.note ?? ''}
+                </td>
+              {/if}
+              {#if hasTags}
+                <td class="whitespace-nowrap border-t border-border px-3 py-2 text-left text-xs text-text-muted">
+                  {(entry.tags ?? []).map((t) => `#${t}`).join(' ')}
                 </td>
               {/if}
             </tr>
