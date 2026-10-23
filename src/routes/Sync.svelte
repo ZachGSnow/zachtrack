@@ -35,6 +35,22 @@
   let loadingActivity = $state(false);
   let expandedEvent = $state<number | null>(null);
   let deviceError = $state<string | undefined>(undefined);
+  let checking = $state(false);
+  let checkError = $state<string | undefined>(undefined);
+
+  /** Runs Check sync or Full resync, then refreshes the activity. */
+  async function run(action: () => Promise<void>) {
+    checking = true;
+    checkError = undefined;
+    try {
+      await action();
+      await loadActivity();
+    } catch {
+      checkError = syncStore.lastError ?? 'The check could not run. Try again when you are online.';
+    } finally {
+      checking = false;
+    }
+  }
 
   async function loadActivity(older = false) {
     if (syncStore.status === 'local') return;
@@ -111,7 +127,7 @@
   <section class="space-y-2 text-sm" aria-labelledby="sync-status">
     <h2 id="sync-status" class="text-sm font-semibold uppercase tracking-wide text-text-muted">Status</h2>
     <div class="flex items-center justify-between gap-3">
-      <span class="text-text">{STATUS_LABELS[syncStore.status]}{syncStore.lastSyncedAt && syncStore.status !== 'local' ? `, last synced ${ago(syncStore.lastSyncedAt)}` : ''}</span>
+      <span class="text-text">{syncStore.status === 'unauthenticated' && syncStore.signedOut ? 'Signed out' : STATUS_LABELS[syncStore.status]}{syncStore.lastSyncedAt && syncStore.status !== 'local' ? `, last synced ${ago(syncStore.lastSyncedAt)}` : ''}</span>
       {#if syncStore.status === 'unauthenticated'}
         <button class="rounded-lg px-3 py-1.5 text-sm font-semibold" style="background: var(--color-brand); color: #06140c;" onclick={() => syncStore.reauthenticate()}>Log in again</button>
       {:else if syncStore.status !== 'local'}
@@ -216,6 +232,61 @@
       </ul>
       {#if more}
         <button class="text-xs font-semibold" style="color: var(--color-brand);" disabled={loadingActivity} onclick={() => loadActivity(true)}>Show older</button>
+      {/if}
+    </section>
+  {/if}
+
+  {#if syncStore.status !== 'local'}
+    <section class="space-y-2 text-sm" aria-labelledby="sync-check">
+      <h2 id="sync-check" class="text-sm font-semibold uppercase tracking-wide text-text-muted">Check and repair</h2>
+      <p class="text-xs text-text-muted">
+        Check sync sends everything and compares how many records this device and the server have. Full resync also receives
+        everything again from the start; it deletes nothing here first.
+      </p>
+      <div class="flex flex-wrap gap-2">
+        <button
+          class="rounded-lg border px-3 py-1.5 text-sm text-text-muted"
+          style="border-color: var(--color-border);"
+          disabled={checking}
+          onclick={() => run(() => syncStore.checkSync())}>Check sync</button
+        >
+        <button
+          class="rounded-lg border px-3 py-1.5 text-sm text-text-muted"
+          style="border-color: var(--color-border);"
+          disabled={checking}
+          onclick={() => run(() => syncStore.fullResync())}>Full resync</button
+        >
+      </div>
+      {#if checking}
+        <p class="text-xs text-text-muted" role="status">Checking...</p>
+      {:else if checkError}
+        <p class="text-xs" style="color: #f87171;">{checkError}</p>
+      {:else if syncStore.lastCheck}
+        {@const c = syncStore.lastCheck}
+        <div class="rounded-lg border p-2 text-xs" style="border-color: var(--color-border); background: var(--color-surface);" role="status">
+          {#if c.unsupported}
+            <p class="text-text-muted">The server is too old to count records. Update it with npm run deploy.</p>
+          {:else}
+            <p class="font-semibold" style="color: {c.matches ? 'var(--color-brand)' : '#f59e0b'};">
+              {c.matches ? 'In sync: this device and the server have the same records.' : 'This device and the server differ.'}
+            </p>
+            <table class="mt-1 w-full text-left text-text-muted">
+              <thead><tr><th class="font-normal"></th><th class="font-normal">Here</th><th class="font-normal">Server</th></tr></thead>
+              <tbody>
+                {#each c.rows as r (r.label)}
+                  <tr class={r.here !== r.server ? 'text-amber-400' : ''}><td>{r.label}</td><td>{r.here}</td><td>{r.server}</td></tr>
+                {/each}
+              </tbody>
+            </table>
+            {#if !c.matches}
+              <p class="mt-1 text-text-muted">
+                {c.rejected > 0
+                  ? `${c.rejected} ${c.rejected === 1 ? 'record' : 'records'} the server refused stay on this device only (see the history for why). `
+                  : ''}A difference can also be a change another device made in the last moment. Full resync receives everything again.
+              </p>
+            {/if}
+          {/if}
+        </div>
       {/if}
     </section>
   {/if}

@@ -1,11 +1,14 @@
 import 'fake-indexeddb/auto';
+import Dexie from 'dexie';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   addTrackableEntry,
+  countLocalRecords,
   countWaitingChanges,
   createTrackable,
   db,
   deleteTrackableEntry,
+  eraseLocalData,
   getChangedSyncableRecords,
   getPendingTombstones,
   getSyncMeta,
@@ -69,5 +72,16 @@ describe('changed records', () => {
     const before = Date.now();
     await importRecords({ fasts: [], fieldDefinitions: [], trackableDefinitions: [], trackableEntries: [], settings: null });
     expect((await getSyncMeta()).fullSendRequestedAt).toBeGreaterThanOrEqual(before);
+  });
+});
+
+// Last, since it deletes the database the other tests use.
+describe('erase', () => {
+  it('counts what is here, then deletes the whole local database', async () => {
+    const trackable = await createTrackable({ name: 'Water', icon: 'x', color: '#000000', fieldIds: [] });
+    await addTrackableEntry({ trackableId: trackable.id, timestamp: 1 });
+    expect(await countLocalRecords()).toEqual({ fasts: 0, fieldDefinitions: 0, trackableDefinitions: 1, trackableEntries: 1 });
+    await eraseLocalData();
+    expect(await Dexie.exists('snowfast')).toBe(false);
   });
 });

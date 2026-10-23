@@ -74,6 +74,8 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
   A Sync page lists your devices and their app versions, the activity on
   all devices for 90 days (names, never values), and 30 days of this
   device's syncs, including edits another device's newer one replaced.
+  Check sync and Full resync to compare and repair; Sign out (Cloudflare
+  ends the login on every device) and Sign out and erase this device.
 - **Templates** for new trackables (Water, Workout, Weigh-in, ...), and a
   compact list view.
 - **CSV export** for a spreadsheet, one row per value.

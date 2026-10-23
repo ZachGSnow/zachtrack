@@ -10,6 +10,7 @@ interface SentBody {
   cursor: number;
   changes: { fieldDefinitions: unknown[]; trackableDefinitions: unknown[]; trackableEntries: Array<{ id: string }>; settings: unknown };
   device: { id: string; name: string; appVersion: string };
+  check?: boolean;
 }
 
 interface FakeServer {
@@ -20,6 +21,10 @@ interface FakeServer {
   incoming: Array<Record<string, unknown>>;
   /** Devices other than the one syncing. */
   others: Array<Record<string, unknown>>;
+  /** What the server says it holds when a sync asks to check. */
+  counts?: Record<string, number>;
+  /** Answer every sync with this status instead (401: logged out). */
+  status?: number;
 }
 
 /** Answers like the real server: counts what was sent as applied, names it, and sends back only `incoming`. */
@@ -27,6 +32,7 @@ async function fakeServer(page: Page): Promise<FakeServer> {
   const server: FakeServer = { sent: [], down: false, incoming: [], others: [] };
   await page.route('**/api/sync', async (route) => {
     if (server.down) return route.abort('internetdisconnected');
+    if (server.status) return route.fulfill({ status: server.status, body: '' });
     const body = route.request().postDataJSON() as SentBody;
     server.sent.push(body);
     const base = okSync().body as { changes: Record<string, unknown> };
@@ -42,6 +48,7 @@ async function fakeServer(page: Page): Promise<FakeServer> {
         appliedCounts: { trackableEntries: body.changes.trackableEntries.length },
         applied: body.changes.trackableEntries.map((e) => ({ recordType: 'trackableEntries', uuid: e.id })),
         devices: [{ ...body.device, firstSeenAt: 1, lastSeenAt: Date.now() }, ...server.others],
+        ...(body.check ? { counts: server.counts } : {}),
       }),
     });
   });
@@ -186,4 +193,95 @@ test("an edit replaced by another device's newer one is called out in the histor
   await expect(page.getByText(/An edit here was replaced by a newer one/)).toBeVisible({ timeout: 10_000 });
   await page.getByRole('button', { name: /Sent 1 entry/ }).first().click();
   await expect(page.getByText(/^Your edit to an entry: Male Health -- .* was replaced by Laptop's newer one$/)).toBeVisible();
+});
+
+test('Check sync compares counts, and Full resync starts over from the beginning', async ({ page }) => {
+  const server = await fakeServer(page);
+  await waitForStarterSet(page);
+  await expect.poll(() => server.sent.some((b) => b.changes.fieldDefinitions.length > 0)).toBe(true);
+  const starter = await readStarterDefinitions(page);
+  server.counts = { fasts: 0, fieldDefinitions: starter.fields.length, trackableDefinitions: starter.trackables.length, trackableEntries: 3 };
+
+  await page.goto('/#/sync');
+  await page.getByRole('button', { name: 'Check sync' }).click();
+  const result = page.getByRole('region', { name: 'Check and repair' });
+  await expect(result).toContainText('This device and the server differ.');
+  await expect(result.getByRole('row', { name: /Entries/ })).toContainText('03');
+  expect(server.sent[server.sent.length - 1].check).toBe(true);
+
+  server.counts = { ...server.counts, trackableEntries: 0 };
+  await page.getByRole('button', { name: 'Full resync' }).click();
+  await expect(result).toContainText('In sync: this device and the server have the same records.');
+  const resync = server.sent[server.sent.length - 1];
+  expect(resync.cursor).toBe(0);
+  expect(resync.changes.fieldDefinitions).toHaveLength(starter.fields.length);
+});
+
+test('Sign out goes to Cloudflare\'s sign-out page and the pill then says Signed out', async ({ page }) => {
+  const server = await fakeServer(page);
+  await page.route('**/cdn-cgi/access/logout', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<p>Signed out</p>' }));
+  await waitForStarterSet(page);
+  await openSettings(page);
+
+  page.once('dialog', (d) => {
+    expect(d.message()).toContain('every device');
+    void d.accept();
+  });
+  const logout = page.waitForRequest((r) => r.isNavigationRequest() && r.url().endsWith('/cdn-cgi/access/logout'));
+  await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+  await logout;
+
+  // Reopened while signed out: Access answers 401, and the app knows why.
+  server.status = 401;
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: /Signed out/ }).locator('visible=true')).toBeVisible();
+});
+
+test('erasing asks first, says what would be lost, and only then deletes everything here', async ({ page, context }) => {
+  const server = await fakeServer(page);
+  await page.route('**/cdn-cgi/access/logout', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<p>Signed out</p>' }));
+  await waitForStarterSet(page);
+  await expect.poll(() => server.sent.some((b) => b.changes.fieldDefinitions.length > 0)).toBe(true);
+
+  // Load Settings once while online: without the service worker its code isn't cached for offline.
+  await openSettings(page);
+  await page.getByRole('link', { name: /Trackables/ }).locator('visible=true').first().click();
+
+  // A change that can't reach the server: the confirmation says it would be lost, and Cancel keeps everything.
+  server.down = true;
+  await context.setOffline(true);
+  await page.getByRole('button', { name: 'Log Male Health' }).click();
+  await openSettings(page);
+  await page.getByRole('button', { name: 'Sign out and erase this device' }).click();
+  const dialog = page.getByRole('alertdialog', { name: 'Erase this device and sign out?' });
+  await expect(dialog).toContainText("1 change on this device hasn't reached the server and will be lost.");
+  await dialog.getByRole('button', { name: 'Cancel' }).click();
+  await expect(dialog).toHaveCount(0);
+  const entries = () =>
+    page.evaluate(
+      () =>
+        new Promise<number>((resolve) => {
+          const open = indexedDB.open('snowfast');
+          open.onsuccess = () => {
+            const req = open.result.transaction('trackableEntries').objectStore('trackableEntries').count();
+            req.onsuccess = () => {
+              open.result.close();
+              resolve(req.result);
+            };
+          };
+        }),
+    );
+  expect(await entries()).toBe(1);
+
+  // Back online: the change goes up first, so nothing is lost; Erase deletes the local database and signs out.
+  server.down = false;
+  await context.setOffline(false);
+  await page.getByRole('button', { name: 'Sign out and erase this device' }).click();
+  await expect(dialog).toContainText('Every change here is on the server, so nothing is lost');
+  const logout = page.waitForRequest((r) => r.isNavigationRequest() && r.url().endsWith('/cdn-cgi/access/logout'));
+  await dialog.getByRole('button', { name: 'Erase and sign out' }).click();
+  await logout;
+  await expect(page.getByText('Signed out')).toBeVisible();
+  const names = await page.evaluate(async () => (await indexedDB.databases()).map((d) => d.name));
+  expect(names).not.toContain('snowfast');
 });

@@ -791,6 +791,34 @@ guessed from the browser until renamed on the Sync page).
 `server/endpoint.ts` holds what the three Functions share: the Access check
 (`refuseUnlessOwner`), `jsonResponse` and the device list.
 
+### 3.33 Check sync, Full resync, and signing out
+- **Check sync** (Sync page) runs a full send with `check: true`; the server
+  adds `counts` of live records per type, and `syncStore.lastCheck` compares
+  them with this device's. Refused records explain a difference (they stay
+  on the device only); so can another device's change landing mid-check.
+- **Full resync** sets the cursor to 0 and asks for a full send, so the
+  device sends everything and receives everything again. It deletes nothing
+  locally first: a record only this device has goes up instead of away, and
+  deletes come back from the server as tombstones.
+- **Sign out** sends what's waiting, sets `SyncMeta.signedOutAt` (so the pill
+  says Signed out, not Login expired, until the next good sync), and
+  navigates to `/cdn-cgi/access/logout`. That's Cloudflare Access's own
+  sign-out, and it ends the user's Access session, which signs out **every
+  device**, not just this one: Access has no per-device or per-app sign-out
+  a user can trigger. The app says so before it happens. The PWA still opens
+  offline afterwards with the data on the device; only syncing stops.
+- **Sign out and erase this device** first syncs, then shows an in-app
+  confirmation with what's stored here and how many changes haven't reached
+  the server (`prepareErase`). Only the explicit "Erase and sign out" button
+  removes this device from the list, deletes the whole IndexedDB database and
+  the `zachtrack:` localStorage keys (`eraseLocalData`), and signs out. The
+  next start is a fresh install: its first sync fails until a new login, so
+  it creates no starter set, and the login's first sync brings everything
+  back.
+- **Lost device:** Zero Trust > Access > Applications > Revoke existing
+  tokens stops it syncing (Help > Sync and privacy). Its local copy is
+  protected only by the device's lock.
+
 ## 4. Issues hit during implementation, and how they were resolved
 
 These are real bugs that shipped and got fixed during this project's build,
