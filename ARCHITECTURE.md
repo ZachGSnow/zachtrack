@@ -655,6 +655,24 @@ up). Zone ids and hour boundaries are unchanged, so milestones, colors and
 the zone-hours chart are unaffected. Preset descriptions dropped the same
 claims.
 
+### 3.38 Dates trackables (v1.12.0)
+The Ages kind (3.9) grows into dates of four kinds, set per trackable in
+`dateKind` (unset = birthday, so existing birthday trackables keep working):
+birthdays, anniversaries, holidays, and countdowns or renewals. An entry is
+still a named date (`note` = name, `timestamp` = date), and `dateRepeat` says
+how it comes round: yearly on its month and day (the default, except
+countdowns), once (the countdown default), every N months or years from the
+date (renewals), the nth or last weekday of a month (Thanksgiving, Mother's
+Day), or Easter plus an offset. `dateLeadDays` sets how far ahead a date
+shows in Needs attention (defaults 7, 7, 3 and 30 days).
+
+`utils/dates.ts` turns that into the next occurrence (`nextOccurrence`, with
+Feb 29 on Feb 28 and month ends clamped), the words for it (`describeDate`:
+"Turns 61", "12th anniversary", "Every 10 years", "in 12 days"), and the
+upcoming list across trackables (`upcomingDates`, with 1,000-day milestones
+for birthdays and anniversaries). Migration `0008_dates.sql` adds the three
+columns; `validate.ts` checks each rule's exact shape.
+
 ### 3.21 Trackables list: pin, archive, order; tag filters
 - **Sort** (per device, `zachtrack:trackables-view`): Due first (goal
   urgency from 3.18: overdue, then due, then the rest, then trackables
