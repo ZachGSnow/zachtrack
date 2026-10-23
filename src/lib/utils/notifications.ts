@@ -26,9 +26,16 @@ function notify(title: string, body: string) {
  * background - true background push requires a server + the Push API
  * (planned for a later phase alongside cloud sync).
  */
-export function scheduleZoneMilestones(startTime: number): () => void {
+export function scheduleZoneMilestones(startTime: number, targetHours?: number): () => void {
   const timers: ReturnType<typeof setTimeout>[] = [];
   const now = Date.now();
+
+  if (targetHours) {
+    const delay = startTime + targetHours * 60 * 60 * 1000 - now;
+    if (delay > 0) {
+      timers.push(setTimeout(() => notify('ZachTrack', `Goal reached: ${targetHours}h fast. End it whenever you're ready.`), delay));
+    }
+  }
 
   for (const zone of ZONES) {
     if (zone.hourStart === 0) continue; // "fed" milestone fires immediately at start; skip the noise
@@ -37,9 +44,17 @@ export function scheduleZoneMilestones(startTime: number): () => void {
     if (delay <= 0) continue;
     // setTimeout is capped at ~24.8 days (2^31 - 1 ms); our longest zone
     // boundary (48h) is well within range.
-    const timer = setTimeout(() => notify('SnowFast', zone.milestone), delay);
+    const timer = setTimeout(() => notify('ZachTrack', zone.milestone), delay);
     timers.push(timer);
   }
 
   return () => timers.forEach(clearTimeout);
+}
+
+/** A reminder at the daily schedule's start time (utils/fastingSchedule.ts); same foreground-only limits as above. */
+export function scheduleFastStartReminder(at: number): () => void {
+  const delay = at - Date.now();
+  if (delay <= 0) return () => {};
+  const timer = setTimeout(() => notify('ZachTrack', 'Time to start your fast.'), delay);
+  return () => clearTimeout(timer);
 }

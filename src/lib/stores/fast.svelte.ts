@@ -6,8 +6,8 @@ import { elapsedHours } from '../utils/time';
 import { scheduleZoneMilestones } from '../utils/notifications';
 import { settingsStore } from './settings.svelte';
 
-function maybeScheduleMilestones(startTime: number): (() => void) | null {
-  return settingsStore.data.notificationsEnabled ? scheduleZoneMilestones(startTime) : null;
+function maybeScheduleMilestones(fast: Pick<FastRecord, 'startTime' | 'targetHours'>): (() => void) | null {
+  return settingsStore.data.notificationsEnabled ? scheduleZoneMilestones(fast.startTime, fast.targetHours) : null;
 }
 
 class FastTimerStore {
@@ -55,7 +55,7 @@ class FastTimerStore {
     this.cancelMilestones = null;
     if (existing) {
       this.startTicking();
-      this.cancelMilestones = maybeScheduleMilestones(existing.startTime);
+      this.cancelMilestones = maybeScheduleMilestones(existing);
     } else {
       this.stopTicking();
     }
@@ -74,7 +74,7 @@ class FastTimerStore {
     });
     this.activeFast = created;
     this.startTicking();
-    this.cancelMilestones = maybeScheduleMilestones(startTime);
+    this.cancelMilestones = maybeScheduleMilestones(created);
   }
 
   async stop(details?: { moodRating?: number; energyRating?: number; hungerRating?: number; tags?: string[]; note?: string }) {

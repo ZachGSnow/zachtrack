@@ -12,6 +12,20 @@
   import BottomSheet from '../lib/components/BottomSheet.svelte';
   import EditFastSheet from '../lib/components/EditFastSheet.svelte';
   import { takeShortcut } from '../lib/utils/shortcuts';
+  import { liveQuery } from 'dexie';
+  import { db } from '../lib/db';
+  import { addDays, startOfDay } from '../lib/utils/time';
+  import { eatingWindowText, scheduleStatus } from '../lib/utils/fastingSchedule';
+
+  // The schedule countdown and eating-window line change with the clock, also while no fast runs.
+  let now = $state(Date.now());
+  $effect(() => {
+    const timer = setInterval(() => (now = Date.now()), 30_000);
+    return () => clearInterval(timer);
+  });
+  const recentFasts = liveQuery(() => db.fasts.where('startDay').aboveOrEqual(addDays(startOfDay(Date.now()), -1)).toArray());
+  const schedule = $derived(fastTimer.activeFast ? null : scheduleStatus(settingsStore.data.fastScheduleTime, $recentFasts ?? [], now));
+  const eatingWindow = $derived(fastTimer.activeFast ? eatingWindowText(fastTimer.activeFast, now) : null);
 
   let selectedPresetId = $state(DEFAULT_PRESET_ID);
   let presetInitialized = false;
@@ -95,6 +109,9 @@
 
     {#if fastTimer.activeFast.presetLabel}
       <p class="-mt-4 text-sm text-text-muted">Fasting method: {fastTimer.activeFast.presetLabel}</p>
+    {/if}
+    {#if eatingWindow}
+      <p class="-mt-4 text-sm text-text-muted">{eatingWindow}</p>
     {/if}
 
     <ZoneCard zone={fastTimer.zone} />
@@ -184,6 +201,9 @@
       <span class="text-5xl">&#x2744;&#xFE0F;</span>
       <h1 class="text-2xl font-semibold text-text">Ready when you are</h1>
       <p class="text-sm text-text-muted">Pick a method and start your fast.</p>
+      {#if schedule}
+        <p class="text-sm font-medium" style="color: {schedule.late ? '#fbbf24' : 'var(--color-text-muted)'};">{schedule.text}</p>
+      {/if}
     </div>
 
     <MethodPicker bind:selectedId={selectedPresetId} />

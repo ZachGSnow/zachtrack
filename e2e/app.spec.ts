@@ -262,3 +262,22 @@ test('the home-screen shortcuts are in the manifest, and Start fast starts the d
   await expect(page.getByRole('button', { name: 'End Fast' })).toBeVisible();
   expect(problems).toEqual([]);
 });
+
+test('a daily fast start time shows a countdown, and Journey shows how often fasts hit their target', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await mockSync(page, noServer);
+  await waitForStarterSet(page);
+  await page.goto('/#/trackables');
+  await page.getByRole('button', { name: 'Profile' }).click();
+  await page.getByLabel(/^Daily fast start/).fill('20:00');
+  await page.getByLabel(/^Daily fast start/).blur();
+  await page.getByRole('button', { name: 'Done' }).click();
+  await page.goto('/#/');
+  await expect(page.getByText(/^(Next fast starts in .+|Your fast was due at .+ ago)$/)).toBeVisible();
+
+  await importSampleData(page);
+  await page.goto('/#/journey');
+  await expect(page.getByText('Hit target')).toBeVisible();
+  await expect(page.locator('main')).toContainText(/Hit target\s*\d+%\s*\d+ of \d+/);
+  expect(problems).toEqual([]);
+});

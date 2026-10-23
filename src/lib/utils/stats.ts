@@ -8,6 +8,9 @@ export interface FastStats {
   longestHours: number;
   currentStreak: number;
   longestStreak: number;
+  /** Completed fasts that had a target, and how many of them reached it. */
+  withTarget: number;
+  hitTarget: number;
 }
 
 /** A fast with no end time that started in the past (the one the timer shows). */
@@ -49,7 +52,10 @@ export function computeFastStats(fasts: FastRecord[]): FastStats {
     }
   }
 
-  return { totalFasts, averageHours, longestHours, currentStreak, longestStreak };
+  const targeted = completed.filter((f) => f.targetHours != null && f.targetHours > 0);
+  const hitTarget = targeted.filter((f) => (f.endTime - f.startTime) / 3600000 >= f.targetHours!).length;
+
+  return { totalFasts, averageHours, longestHours, currentStreak, longestStreak, withTarget: targeted.length, hitTarget };
 }
 
 export type ChartRange = '7' | '30' | '90' | 'all';
