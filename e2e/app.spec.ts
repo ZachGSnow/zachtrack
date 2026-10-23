@@ -518,7 +518,7 @@ test('a fast length of your own can be saved, started and removed', async ({ pag
   await page.getByRole('button', { name: '15:9', exact: true }).click();
   await page.getByRole('button', { name: 'Start Fast' }).click();
   await expect(page.getByText('of 15h goal')).toBeVisible();
-  await expect(page.getByText('Fasting method: 15:9')).toBeVisible();
+  await expect(page.locator('p', { hasText: 'Change goal' })).toContainText('15:9');
   expect(problems).toEqual([]);
 });
 

@@ -110,6 +110,7 @@ export interface TrackableEntry {
 export interface SettingsRecord {
   id: 'app-settings';
   defaultPresetId: string;
+  /** Unused since v1.11.0 (in-app milestones replaced notifications); kept so older devices still sync. */
   notificationsEnabled: boolean;
   /** Inches; used to compute BMI from the weight field's logged values. */
   heightInches?: number;

@@ -61,22 +61,6 @@ export function scheduleStatus(
   return { text: `Your fast was due at ${formatClockTime(todays)}, ${formatCountdown(now - todays)} ago`, late: true, at: todays };
 }
 
-/** When the next reminder to start should fire: the next scheduled start after `now`, unless a fast already started that day. */
-export function nextStartReminder(
-  scheduleTime: string | undefined,
-  fasts: readonly Pick<FastRecord, 'startTime'>[],
-  now: number = Date.now(),
-): number | null {
-  const time = parseScheduleTime(scheduleTime);
-  if (!time) return null;
-  for (let i = 0; i < 2; i++) {
-    const day = addDays(startOfDay(now), i);
-    const at = scheduledOn(day, time);
-    if (at > now && !fasts.some((f) => startOfDay(f.startTime) === day)) return at;
-  }
-  return scheduledOn(addDays(startOfDay(now), 2), time);
-}
-
 /** "Eating window opens at 12:00 PM tomorrow" while fasting toward a target; "Goal reached at ..." after it. */
 export function eatingWindowText(fast: Pick<FastRecord, 'startTime' | 'targetHours'>, now: number = Date.now()): string | null {
   if (!fast.targetHours) return null;

@@ -27,9 +27,11 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
 - **Fasting timer** with preset methods (16:8, 18:6, OMAD and more) or count-up,
   a gauge ring with tappable metabolic-zone markers, and one fast per start day.
   Save fast lengths of your own (15:9, 36 hours...) next to the presets.
-  An optional daily start time counts down to your next fast, the timer says
-  when your eating window opens, and Journey shows how often you hit the
-  target.
+  Start a fast you forgot to start (30m, 1h, 2h ago or a time), see the start,
+  goal and next zone under the timer, change the goal mid-fast, and end with a
+  summary of how it went against the goal. Milestones show in the app, never as
+  notifications. An optional daily start time counts down to your next fast,
+  and Journey shows how often you hit the target.
 - **Trackables:** define anything to track, with number (optional unit),
   rating (custom scale) or yes/no fields. Each field chooses how several
   entries on one day combine (`sum` for Water, `last` for Weight, `average`).

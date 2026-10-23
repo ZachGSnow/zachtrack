@@ -2,6 +2,7 @@
   import { link } from 'svelte-spa-router';
   import active from 'svelte-spa-router/active';
   import { attentionStore } from '../stores/attention.svelte';
+  import { fastTimer } from '../stores/fast.svelte';
   import SyncStatus from './SyncStatus.svelte';
 
   // 'bottom': the phone tab bar (hidden on wide screens); 'side': the sidebar
@@ -12,13 +13,15 @@
   // A '/trackables/*' pattern missed the page itself, so no tab lit up there.
   const activePath = (href: string) => (href === '/' ? '/' : new RegExp(`^${href}(/.*)?$`));
 
-  // In-app reminders: how many trackables are due or overdue, and a dot while a scheduled fast is late.
+  // In-app reminders: how many trackables are due or overdue, and a dot on Fasting while a scheduled
+  // fast is late or a running fast has reached a milestone you have not seen.
   const badge = (href: string): { text: string; label: string } | null => {
     if (href === '/trackables' && attentionStore.items.length > 0) {
       const n = attentionStore.items.length;
       return { text: String(n), label: `${n} need${n === 1 ? 's' : ''} attention` };
     }
     if (href === '/' && attentionStore.fastingLate) return { text: '', label: 'fast is late' };
+    if (href === '/' && fastTimer.milestone) return { text: '', label: 'new fasting milestone' };
     return null;
   };
 
