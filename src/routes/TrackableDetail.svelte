@@ -167,7 +167,7 @@
     <a href="/trackables" use:link class="text-sm font-medium" style="color: var(--color-brand);">Back to Trackables</a>
   </div>
 {:else}
-  <div class="flex flex-1 flex-col gap-5 px-5 py-6">
+  <div class="mx-auto flex w-full flex-1 lg:max-w-3xl flex-col gap-5 px-5 py-6">
     <div class="flex items-center justify-between">
       <div class="flex items-center gap-2">
         <span class="text-2xl">{$trackable.icon}</span>

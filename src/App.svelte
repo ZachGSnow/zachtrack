@@ -56,14 +56,19 @@
   });
 </script>
 
-<div class="mx-auto flex w-full max-w-md flex-1 flex-col">
-  <div class="flex justify-end px-3 pt-2">
-    <SyncStatus />
+<!-- Phone: one column at phone width with tabs at the bottom. From lg (1024px) up:
+     a sidebar and content that uses the width, up to 1400px. -->
+<div class="flex flex-1 flex-col lg:flex-row">
+  <BottomNav variant="side" />
+  <div class="mx-auto flex w-full max-w-md flex-1 flex-col lg:max-w-[1400px] lg:px-6">
+    <div class="flex justify-end px-3 pt-2">
+      <SyncStatus />
+    </div>
+    <main class="flex flex-1 flex-col">
+      <Router {routes} />
+    </main>
+    <BottomNav />
   </div>
-  <main class="flex flex-1 flex-col">
-    <Router {routes} />
-  </main>
-  <BottomNav />
 </div>
 
 <ZoneInfoSheet />
