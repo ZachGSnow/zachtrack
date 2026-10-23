@@ -557,9 +557,10 @@ test('overdue goals are listed under Needs attention and counted on the Trackabl
   const problems = watchForProblems(page);
   await mockSync(page, noServer);
   await importSampleData(page);
-  // Wellness Check-in was last logged yesterday or earlier: every day makes it due or overdue.
+  // Male Health has no sample entries, so an every-day goal is due whatever the time of day. (Wellness
+  // Check-in was used before, but the sample logs it at 9 PM today, so after 9 PM it wasn't due.)
   await page.goto('/#/trackables');
-  await page.getByRole('link', { name: /Wellness Check-in/ }).click();
+  await page.getByRole('link', { name: /Male Health/ }).click();
   await page.getByRole('button', { name: 'Edit', exact: true }).click();
   await page.getByRole('combobox', { name: /^Goal/ }).selectOption('everyDays');
   await page.getByRole('textbox', { name: /Every how many days/ }).fill('1');
@@ -567,13 +568,13 @@ test('overdue goals are listed under Needs attention and counted on the Trackabl
 
   await page.goto('/#/trackables');
   const panel = page.getByRole('region', { name: 'Needs attention' });
-  await expect(panel).toContainText('Wellness Check-in');
-  await expect(panel).toContainText(/Due today|Overdue by \dd/);
+  await expect(panel).toContainText('Male Health');
+  await expect(panel).toContainText(/Due now|Due today|Overdue by \dd/);
   const tab = page.getByRole('navigation', { name: 'Main' }).locator('a:visible', { hasText: 'Trackables' });
   await expect(tab.getByLabel(/needs? attention/)).toHaveText(/^[1-9]\d*$/);
 
   // Logging it clears the reminder.
-  await panel.getByRole('link', { name: /Wellness Check-in/ }).click();
+  await panel.getByRole('link', { name: /Male Health/ }).click();
   await page.getByRole('button', { name: 'Log Entry' }).click();
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await page.goto('/#/trackables');
