@@ -28,6 +28,8 @@ wrangler.toml
 *.sql
 !d1/schema.sql
 !d1/scrub-deleted.sql
+# Schema migrations are code, not data exports.
+!d1/migrations/*.sql
 
 # Editor / OS
 .vscode/

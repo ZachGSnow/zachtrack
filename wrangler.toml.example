@@ -8,6 +8,8 @@ compatibility_date = "2026-10-01"
 binding = "DB"
 database_name = "zachtrack-db"
 database_id = "00000000-0000-0000-0000-000000000000"
+# Schema changes after v1.5.0 (applied by `npm run deploy`, see d1/migrations/README.md).
+migrations_dir = "d1/migrations"
 
 [vars]
 # The only email the sync endpoint accepts. Must match your Access policy.

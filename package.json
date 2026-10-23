@@ -11,7 +11,8 @@
     "icons": "node scripts/generate-icons.mjs",
     "test": "vitest run",
     "e2e": "playwright test --project=chromium",
-    "screenshots": "playwright test --project=screenshots"
+    "screenshots": "playwright test --project=screenshots",
+    "deploy": "node scripts/deploy.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261021.1",
