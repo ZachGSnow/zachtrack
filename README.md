@@ -26,6 +26,7 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
 
 - **Fasting timer** with preset methods (16:8, 18:6, OMAD and more) or count-up,
   a gauge ring with tappable metabolic-zone markers, and one fast per start day.
+  Save fast lengths of your own (15:9, 36 hours...) next to the presets.
   An optional daily start time counts down to your next fast, the timer says
   when your eating window opens, and Journey shows how often you hit the
   target.

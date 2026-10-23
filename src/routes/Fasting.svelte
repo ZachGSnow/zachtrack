@@ -1,7 +1,7 @@
 <script lang="ts">
   import { fastTimer } from '../lib/stores/fast.svelte';
   import { settingsStore } from '../lib/stores/settings.svelte';
-  import { PRESETS, DEFAULT_PRESET_ID } from '../lib/data/presets';
+  import { allPresets, DEFAULT_PRESET_ID } from '../lib/data/presets';
   import TimerRing from '../lib/components/TimerRing.svelte';
   import ZoneCard from '../lib/components/ZoneCard.svelte';
   import MethodPicker from '../lib/components/MethodPicker.svelte';
@@ -48,7 +48,8 @@
 
   async function handleStart() {
     startError = '';
-    const preset = PRESETS.find((p) => p.id === selectedPresetId) ?? PRESETS[0];
+    const presets = allPresets(settingsStore.data.customFastPresets);
+    const preset = presets.find((p) => p.id === selectedPresetId) ?? presets[0];
     if (settingsStore.data.notificationsEnabled) {
       await requestNotificationPermission();
     }

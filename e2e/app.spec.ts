@@ -490,3 +490,33 @@ test('times-per-day counts taps on the card, and a day can be skipped from the g
   await expect(page.getByRole('button', { name: 'Skip this day' })).toBeVisible();
   expect(problems).toEqual([]);
 });
+
+test('a fast length of your own can be saved, started and removed', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await mockSync(page, noServer);
+  await waitForStarterSet(page);
+  await page.goto('/#/');
+  await page.getByRole('button', { name: '+ Your own' }).click();
+  await page.getByRole('textbox', { name: 'Hours' }).fill('15');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.getByRole('button', { name: '15:9', exact: true })).toBeVisible();
+  await expect(page.getByText('Your own 15-hour fast')).toBeVisible();
+  await page.getByRole('button', { name: '+ Your own' }).click();
+  await page.getByRole('textbox', { name: 'Hours' }).fill('19');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await page.getByRole('button', { name: 'Remove 19:5' }).click();
+  await expect(page.getByRole('button', { name: '19:5', exact: true })).toHaveCount(0);
+
+  // It's offered as the default method in Profile too.
+  await page.goto('/#/trackables');
+  await page.getByRole('button', { name: 'Profile' }).click();
+  await expect(page.getByLabel('Default fasting method').locator('option', { hasText: '15:9' })).toHaveCount(1);
+  await page.keyboard.press('Escape');
+
+  await page.goto('/#/');
+  await page.getByRole('button', { name: '15:9', exact: true }).click();
+  await page.getByRole('button', { name: 'Start Fast' }).click();
+  await expect(page.getByText('of 15h goal')).toBeVisible();
+  await expect(page.getByText('Fasting method: 15:9')).toBeVisible();
+  expect(problems).toEqual([]);
+});

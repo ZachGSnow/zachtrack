@@ -1,5 +1,6 @@
 import Dexie, { type EntityTable } from 'dexie';
 import { startOfDay } from './utils/time';
+import type { CustomFastPreset } from './data/presets';
 import { BODY_FIELD_ROLES, BODY_FIELD_SETTING, resolveBodyField, type BodyFatSex } from './utils/health';
 
 export interface FastRecord {
@@ -123,6 +124,8 @@ export interface SettingsRecord {
   bodyFatSex?: BodyFatSex;
   /** Daily planned fast start, "HH:MM" local time (utils/fastingSchedule.ts). Unset = no schedule. */
   fastScheduleTime?: string;
+  /** Fast lengths you saved yourself, shown with the built-in methods (data/presets.ts). */
+  customFastPresets?: CustomFastPreset[];
   updatedAt: number;
 }
 

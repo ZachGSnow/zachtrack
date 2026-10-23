@@ -56,7 +56,7 @@ describe('default settings on a new device', () => {
         fieldDefinitions: [],
         trackableDefinitions: [],
         trackableEntries: [],
-        settings: { id: 'app-settings', defaultPresetId: '18:6', notificationsEnabled: true, heightInches: 70, goalWeightLb: 175, weightFieldId: 'f-scale', neckFieldId: 'f-neck', bodyFatSex: 'male', fastScheduleTime: '20:00', updatedAt: NOW - 86400000 },
+        settings: { id: 'app-settings', defaultPresetId: '18:6', notificationsEnabled: true, heightInches: 70, goalWeightLb: 175, weightFieldId: 'f-scale', neckFieldId: 'f-neck', bodyFatSex: 'male', fastScheduleTime: '20:00', customFastPresets: [{ id: 'custom-a', label: '15:9', targetHours: 15 }], updatedAt: NOW - 86400000 },
       },
       tombstones: [],
     });
@@ -67,7 +67,7 @@ describe('default settings on a new device', () => {
     const local = await getAllSyncableRecords();
     const res = await push({ cursor: 0, changes: local, tombstones: [] });
 
-    expect(res.changes.settings).toMatchObject({ heightInches: 70, goalWeightLb: 175, weightFieldId: 'f-scale', neckFieldId: 'f-neck', bodyFatSex: 'male', fastScheduleTime: '20:00', defaultPresetId: '18:6' });
+    expect(res.changes.settings).toMatchObject({ heightInches: 70, goalWeightLb: 175, weightFieldId: 'f-scale', neckFieldId: 'f-neck', bodyFatSex: 'male', fastScheduleTime: '20:00', customFastPresets: [{ id: 'custom-a', label: '15:9', targetHours: 15 }], defaultPresetId: '18:6' });
     const server = await proxy.env.DB.prepare('SELECT heightInches, goalWeightLb, weightFieldId, neckFieldId, bodyFatSex FROM settings').first();
     expect(server).toEqual({ heightInches: 70, goalWeightLb: 175, weightFieldId: 'f-scale', neckFieldId: 'f-neck', bodyFatSex: 'male' });
   });

@@ -135,6 +135,15 @@ const checks: Record<Exclude<RecordKind, 'tombstones'>, Check> = {
       optional(r, 'neckFieldId', isId, 'a non-empty string'),
       optional(r, 'hipFieldId', isId, 'a non-empty string'),
       optional(r, 'bodyFatSex', (v) => v === 'male' || v === 'female', "'male' or 'female'"),
+      optional(
+        r,
+        'customFastPresets',
+        (v) =>
+          Array.isArray(v) &&
+          v.length <= 20 &&
+          v.every((p) => isObject(p) && isId(p.id) && typeof p.label === 'string' && p.label.length <= 40 && isNum(p.targetHours) && p.targetHours > 0 && p.targetHours <= 240),
+        'a list of { id, label, targetHours }',
+      ),
       optional(r, 'fastScheduleTime', (v) => typeof v === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(v), "a time like '20:00'"),
     ),
 };
