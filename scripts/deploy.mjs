@@ -129,5 +129,5 @@ for (const url of [`https://${project}.pages.dev/`, `https://${project}.pages.de
   console.log(`${url} -> Access login`);
 }
 
-console.log(`\nDeployed ${tag}. Reopen the app on each device until Profile shows ${tag}.`);
+console.log(`\nDeployed ${tag}. Reopen the app on each device until Settings > About shows ${tag}.`);
 console.log(`The backup is health data; delete it once the release looks right: ${backupFile}`);
