@@ -19,3 +19,23 @@ export const PRESETS: FastPreset[] = [
 ];
 
 export const DEFAULT_PRESET_ID = '16:8';
+
+/** A fast length you saved yourself (settings.customFastPresets), shown with the built-in ones. */
+export interface CustomFastPreset {
+  id: string;
+  label: string;
+  targetHours: number;
+}
+
+/** "15:9" for a fast under a day (fasting:eating hours), "36 Hours" from a day up. */
+export function customPresetLabel(hours: number): string {
+  if (hours < 24 && Number.isInteger(hours)) return `${hours}:${24 - hours}`;
+  return `${hours} Hours`;
+}
+
+/** The built-in presets with your own inserted before the open-ended Count-Up. */
+export function allPresets(custom: readonly CustomFastPreset[] | undefined): FastPreset[] {
+  const mine: FastPreset[] = (custom ?? []).map((c) => ({ ...c, description: `Your own ${c.targetHours}-hour fast` }));
+  const countUp = PRESETS.findIndex((p) => p.id === 'custom');
+  return [...PRESETS.slice(0, countUp), ...mine, ...PRESETS.slice(countUp)];
+}

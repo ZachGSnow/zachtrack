@@ -658,6 +658,18 @@ every-day goal's strip readable.
 - Migration `0004_habit_schedules.sql` adds the three columns; `perDay` is a
   new `goalType` value in the existing column.
 
+### 3.26 Fast lengths of your own
+"+ Your own" in the method picker saves a fast length (1 to 240 hours) to
+`settings.customFastPresets` (migration `0005_custom_fast_presets.sql`), so
+it syncs and can be the default method or the Start a fast shortcut's.
+`allPresets()` (data/presets.ts) lists them after the built-in fasts and
+before Count-Up, labelled like the built-ins ("15:9", or "36 Hours" from a
+day up); a length you already have selects that one instead of a duplicate.
+The browser test for this caught the 4.4 trap again: the saved list comes
+from the settings store's `$state`, whose proxies IndexedDB can't clone, so
+saving a second preset silently failed. The picker now writes plain copies
+and shows an error if a save fails.
+
 ## 4. Issues hit during implementation, and how they were resolved
 
 These are real bugs that shipped and got fixed during this project's build,

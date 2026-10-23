@@ -3,7 +3,7 @@
   import { db } from '../db';
   import { settingsStore } from '../stores/settings.svelte';
   import { BODY_FIELD_SETTING, resolveBodyFieldIds, type BodyFatSex } from '../utils/health';
-  import { PRESETS } from '../data/presets';
+  import { allPresets } from '../data/presets';
   import DataFileSection from './DataFileSection.svelte';
 
   let { open = $bindable(false) }: { open: boolean } = $props();
@@ -152,7 +152,7 @@
       class="w-full rounded-lg border bg-transparent p-2 text-text"
       style="border-color: var(--color-border);"
     >
-      {#each PRESETS as preset (preset.id)}
+      {#each allPresets(settingsStore.data.customFastPresets) as preset (preset.id)}
         <option value={preset.id}>{preset.label}</option>
       {/each}
     </select>
