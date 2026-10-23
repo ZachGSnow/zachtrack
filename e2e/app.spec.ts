@@ -209,3 +209,40 @@ test('each trackable leads with what matters for its kind, and the kind can be c
   await expect(card('Wellness Check-in')).toContainText(/ago/);
   expect(problems).toEqual([]);
 });
+
+test('a goal shows progress and due dates, and a trackable without fields logs in one tap with undo', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await mockSync(page, noServer);
+  await importSampleData(page);
+  await page.goto('/#/trackables');
+  const card = (name: string) => page.getByRole('link', { name: new RegExp(name) });
+
+  // A weigh-in every 7 days: the sample data weighs in most mornings, so it isn't due yet.
+  await card('Body Measurements').click();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.getByRole('combobox', { name: /^Goal/ }).selectOption('everyDays');
+  await page.getByRole('textbox', { name: /Every how many days/ }).fill('7');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.getByText('Goal: Every 7 days')).toBeVisible();
+  await expect(page.getByText(/^Due (in \dd|tomorrow)$/)).toBeVisible();
+
+  // A daily water total with a progress bar.
+  await page.goto('/#/trackables');
+  await card('Nutrition').click();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.getByRole('combobox', { name: /^Goal/ }).selectOption('dailyTotal');
+  await page.getByRole('textbox', { name: /per day/ }).fill('3000');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.getByRole('progressbar', { name: 'Goal progress' })).toBeVisible();
+  await page.goto('/#/trackables');
+  await expect(card('Nutrition')).toContainText(/\/ 3,000 kcal today/);
+
+  // One tap on a trackable with no fields logs it; Undo takes it back.
+  await expect(card('Male Health')).toContainText('No entries yet');
+  await page.getByRole('button', { name: 'Log Male Health' }).click();
+  await expect(page.getByRole('status')).toContainText('Logged Male Health');
+  await expect(card('Male Health')).toContainText(/^.*0m ago/);
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(card('Male Health')).toContainText('No entries yet');
+  expect(problems).toEqual([]);
+});

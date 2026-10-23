@@ -1,7 +1,7 @@
 <script lang="ts">
   import { liveQuery } from 'dexie';
   import { push } from 'svelte-spa-router';
-  import { db, type TrackableDefinition } from '../lib/db';
+  import { addTrackableEntry, db, deleteTrackableEntry, type TrackableDefinition } from '../lib/db';
   import TrackableCard from '../lib/components/TrackableCard.svelte';
   import BottomSheet from '../lib/components/BottomSheet.svelte';
   import EditTrackableSheet from '../lib/components/EditTrackableSheet.svelte';
@@ -24,9 +24,35 @@
     editOpen = true;
   }
 
-  function openQuickLog(t: TrackableDefinition) {
-    loggingTrackable = t;
-    logOpen = true;
+  // A trackable with no fields has nothing to fill in, so "+" logs it right
+  // away (the "I just did it" of a days-since app) with a few seconds to undo.
+  let undo = $state<{ entryId: string; name: string } | null>(null);
+  let undoTimer: ReturnType<typeof setTimeout> | undefined;
+  let quickLogError = $state('');
+
+  async function openQuickLog(t: TrackableDefinition) {
+    if (t.fieldIds.length > 0 || t.displayMode === 'ages') {
+      loggingTrackable = t;
+      logOpen = true;
+      return;
+    }
+    quickLogError = '';
+    try {
+      const entry = await addTrackableEntry({ trackableId: t.id, timestamp: Date.now() });
+      clearTimeout(undoTimer);
+      undo = { entryId: entry.id, name: t.name };
+      undoTimer = setTimeout(() => (undo = null), 6000);
+    } catch (e) {
+      quickLogError = e instanceof Error ? e.message : 'Could not log it. Please try again.';
+    }
+  }
+
+  async function undoQuickLog() {
+    if (!undo) return;
+    const { entryId } = undo;
+    undo = null;
+    clearTimeout(undoTimer);
+    await deleteTrackableEntry(entryId);
   }
 
   function handleCreated(id: string) {
@@ -64,6 +90,20 @@
     </div>
   {/if}
 </div>
+
+{#if undo}
+  <div
+    class="fixed inset-x-0 bottom-20 z-30 mx-auto flex w-[calc(100%-2.5rem)] max-w-md items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm shadow-lg"
+    style="border-color: var(--color-border); background: var(--color-surface);"
+    role="status"
+  >
+    <span class="truncate text-text">Logged {undo.name}</span>
+    <button class="shrink-0 font-semibold" style="color: var(--color-brand);" onclick={undoQuickLog}>Undo</button>
+  </div>
+{/if}
+{#if quickLogError}
+  <p class="px-5 text-sm" style="color: #f87171;">{quickLogError}</p>
+{/if}
 
 <BottomSheet bind:open={editOpen}>
   <EditTrackableSheet bind:open={editOpen} trackable={editingTrackable} onSaved={handleCreated} />

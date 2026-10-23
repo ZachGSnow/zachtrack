@@ -53,6 +53,9 @@ export interface FieldDefinition {
   updatedAt: number;
 }
 
+/** dailyTotal: the first field's total per day; perWeek: days logged per week; everyDays: due every N days; avoid: time since is the streak. */
+export type TrackableGoalType = 'dailyTotal' | 'perWeek' | 'everyDays' | 'avoid';
+
 /** How a trackable is summarised; 'occurrences' (or unset) = automatic from its fields. See utils/trackableKinds.ts. */
 export type TrackableDisplayMode = 'occurrences' | 'ages' | 'event' | 'measurement' | 'daily' | 'checkin';
 
@@ -65,13 +68,14 @@ export interface TrackableDefinition {
   /** Ordered list of FieldDefinition ids attached to this trackable. */
   fieldIds: string[];
   /**
-   * How this trackable's entries should be displayed. Omitted/undefined
-   * behaves as 'occurrences' (today's default: habit/event analytics --
-   * streaks, intervals, heatmaps). 'ages' is for tracking people by
-   * birthdate (entry.timestamp = birthdate, entry.note = name) with a
-   * live age + upcoming-birthday countdown instead of occurrence stats.
+   * Which kind it is shown as (utils/trackableKinds.ts). Omitted or
+   * 'occurrences' = automatic from its fields. 'ages' is for tracking people
+   * by birthdate (entry.timestamp = birthdate, entry.note = name).
    */
   displayMode?: TrackableDisplayMode;
+  /** Optional goal (utils/trackableGoals.ts); `goalValue` is its number (amount, times or days). */
+  goalType?: TrackableGoalType;
+  goalValue?: number;
   createdAt: number;
   updatedAt: number;
 }

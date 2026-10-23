@@ -84,6 +84,13 @@ const checks: Record<Exclude<RecordKind, 'tombstones'>, Check> = {
         (v) => typeof v === 'string' && ['occurrences', 'ages', 'event', 'measurement', 'daily', 'checkin'].includes(v),
         "'occurrences', 'ages', 'event', 'measurement', 'daily' or 'checkin'",
       ),
+      optional(
+        r,
+        'goalType',
+        (v) => typeof v === 'string' && ['dailyTotal', 'perWeek', 'everyDays', 'avoid'].includes(v),
+        "'dailyTotal', 'perWeek', 'everyDays' or 'avoid'",
+      ),
+      optional(r, 'goalValue', (v) => isNum(v) && v > 0, 'a positive number'),
     ),
   trackableEntries: (r) =>
     all(

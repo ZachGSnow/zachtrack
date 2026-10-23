@@ -509,6 +509,31 @@ which charts appear:
 - The starter Menstrual Cycle trackable is set to event: it is logged with a
   Flow rating, but the timing between cycles is what matters.
 
+### 3.18 Goals, due dates and one-tap logging
+Kinds (3.17) decide what a trackable leads with; an optional goal decides
+whether it is on track. `utils/trackableGoals.ts`, stored as `goalType` and
+`goalValue` on the trackable (migration `0001_trackable_goals.sql`, the first
+under 3.16):
+
+| Goal | Status | Streak |
+|---|---|---|
+| dailyTotal: an amount of the first number field per day | "1,450 / 2,000 kcal today" with a progress bar; done at the goal | days met in a row |
+| perWeek: N days a week, Monday to Sunday | "2 of 3 this week"; due when every remaining day is needed, overdue when it can't be reached | weeks in a row |
+| everyDays: every N days | "Due in 3d", "Due today", "Overdue by 2d" | repeats on time |
+| avoid | "12d since last" | best run |
+
+- Days are calendar days (`addDays`), so due dates and streaks don't shift
+  at a DST change; tested across 2026-11-01.
+- `perWeek` counts days logged, not entries, which is what "3 times a week"
+  means for a habit.
+- Each status has an `urgency` (overdue first, then due) for sorting the list.
+- The card leads with the goal status, coloured amber when due and red when
+  overdue; the detail page shows the goal, its status, a progress bar and the
+  streak.
+- **One-tap logging:** "+" on a trackable without fields logs it at once and
+  offers Undo for six seconds (Undo deletes the entry like any delete, so the
+  tombstone syncs). Trackables with fields still open the log sheet.
+
 ## 4. Issues hit during implementation, and how they were resolved
 
 These are real bugs that shipped and got fixed during this project's build,

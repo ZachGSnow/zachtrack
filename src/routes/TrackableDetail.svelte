@@ -5,6 +5,7 @@
   import { computeFieldTodayTotal } from '../lib/utils/trackableStats';
   import { formatShortDate } from '../lib/utils/time';
   import { kindStats, resolveKind, summarize } from '../lib/utils/trackableKinds';
+  import { describeGoal, GOAL_STATE_COLORS, goalStatus } from '../lib/utils/trackableGoals';
   import { formatPreciseAge, daysUntilNextBirthday, ageTurningOn, formatBirthdayCountdown } from '../lib/utils/age';
   import { rangeStartFor, type ChartRange } from '../lib/utils/stats';
   import {
@@ -117,6 +118,8 @@
 
   const summary = $derived(summarize(kind, $entries ?? [], attachedFields, now));
   const stats = $derived(kindStats(kind, $entries ?? [], attachedFields, now));
+  const goal = $derived($trackable && !isAges ? goalStatus($trackable, $entries ?? [], attachedFields, now) : null);
+  const goalText = $derived($trackable ? describeGoal($trackable, attachedFields) : null);
 
   /**
    * Today's combined total for each 'sum'-aggregated attached field (e.g. Water,
@@ -211,6 +214,23 @@
           <p class="mt-1 text-xs text-text-muted">{line}</p>
         {/each}
       </div>
+
+      {#if goal && goalText}
+        <div class="rounded-xl border p-3" style="border-color: var(--color-border); background: var(--color-surface);">
+          <div class="flex items-baseline justify-between gap-2">
+            <p class="text-xs text-text-muted">Goal: {goalText}</p>
+            {#if goal.streak}
+              <p class="text-xs text-text-muted">{goal.streak}</p>
+            {/if}
+          </div>
+          <p class="mt-1 text-base font-semibold" style="color: {GOAL_STATE_COLORS[goal.state] ?? 'var(--color-text)'};">{goal.text}</p>
+          {#if goal.progress != null}
+            <div class="mt-2 h-1.5 overflow-hidden rounded-full" style="background: var(--color-border);" role="progressbar" aria-label="Goal progress" aria-valuenow={Math.round(goal.progress * 100)} aria-valuemin="0" aria-valuemax="100">
+              <div class="h-full rounded-full" style="width: {goal.progress * 100}%; background: {GOAL_STATE_COLORS[goal.state] ?? $trackable.color};"></div>
+            </div>
+          {/if}
+        </div>
+      {/if}
 
       <button
         class="w-full rounded-xl py-3 text-base font-semibold"

@@ -306,11 +306,12 @@ function buildFieldUpsert(db: D1Database, field: FieldDefinition, serverSeq: num
 function buildTrackableUpsert(db: D1Database, trackable: TrackableDefinition, serverSeq: number): D1PreparedStatement {
   return db
     .prepare(
-      `INSERT INTO trackableDefinitions (id, name, icon, color, fieldIds, displayMode, createdAt, updatedAt, deletedAt, serverSeq)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
+      `INSERT INTO trackableDefinitions (id, name, icon, color, fieldIds, displayMode, goalType, goalValue, createdAt, updatedAt, deletedAt, serverSeq)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
        ON CONFLICT(id) DO UPDATE SET
          name=excluded.name, icon=excluded.icon, color=excluded.color, fieldIds=excluded.fieldIds,
-         displayMode=excluded.displayMode, createdAt=excluded.createdAt, updatedAt=excluded.updatedAt,
+         displayMode=excluded.displayMode, goalType=excluded.goalType, goalValue=excluded.goalValue,
+         createdAt=excluded.createdAt, updatedAt=excluded.updatedAt,
          deletedAt=NULL, serverSeq=excluded.serverSeq
        WHERE excluded.updatedAt > trackableDefinitions.updatedAt`,
     )
@@ -321,6 +322,8 @@ function buildTrackableUpsert(db: D1Database, trackable: TrackableDefinition, se
       trackable.color,
       JSON.stringify(trackable.fieldIds ?? []),
       trackable.displayMode ?? null,
+      trackable.goalType ?? null,
+      trackable.goalValue ?? null,
       trackable.createdAt,
       trackable.updatedAt,
       serverSeq,
@@ -461,6 +464,8 @@ function mapTrackableRow(row: Record<string, unknown>): WireRow<TrackableDefinit
     color: row.color as string,
     fieldIds: row.fieldIds ? JSON.parse(row.fieldIds as string) : [],
     displayMode: (row.displayMode as TrackableDefinition['displayMode']) ?? undefined,
+    goalType: (row.goalType as TrackableDefinition['goalType']) ?? undefined,
+    goalValue: (row.goalValue as number) ?? undefined,
     createdAt: row.createdAt as number,
     updatedAt: row.updatedAt as number,
     deletedAt: (row.deletedAt as number) ?? undefined,
