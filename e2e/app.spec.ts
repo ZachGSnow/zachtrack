@@ -180,3 +180,32 @@ test('Body Measurements shows a Navy body-fat estimate right after BMI', async (
   await expect(page.getByRole('combobox', { name: /^Neck field/ }).locator('option:checked')).toHaveText('Neck (Body Measurements)');
   expect(problems).toEqual([]);
 });
+
+test('each trackable leads with what matters for its kind, and the kind can be changed', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await mockSync(page, noServer);
+  await importSampleData(page);
+  await page.goto('/#/trackables');
+
+  // The link's name starts with the trackable's icon.
+  const card = (name: string) => page.getByRole('link', { name: new RegExp(name) });
+  // Weight is a reading, Calories add up per day, ratings are a daily check-in, no fields is time since.
+  await expect(card('Body Measurements')).toContainText(/\d+(\.\d)? lb \u00b7 /);
+  await expect(card('Nutrition')).toContainText(/kcal today/);
+  await expect(card('Wellness Check-in')).toContainText(/today|streak/);
+  await expect(card('Male Health')).toContainText('No entries yet');
+
+  await card('Wellness Check-in').click();
+  await expect(page.getByText('Current streak', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  const summary = page.getByRole('combobox', { name: /^Summary/ });
+  await expect(summary.locator('option:checked')).toHaveText('Auto: Check-in');
+  await summary.selectOption('event');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.getByText('Time since last', { exact: true })).toBeVisible();
+  await expect(page.getByText('Usual gap', { exact: true })).toBeVisible();
+
+  await page.goto('/#/trackables');
+  await expect(card('Wellness Check-in')).toContainText(/ago/);
+  expect(problems).toEqual([]);
+});

@@ -2,8 +2,9 @@
   import { liveQuery } from 'dexie';
   import { push, link } from 'svelte-spa-router';
   import { db, type TrackableEntry, type FieldDefinition } from '../lib/db';
-  import { computeOccurrenceStats, computeFieldTodayTotal, formatTimeSinceAdaptive } from '../lib/utils/trackableStats';
-  import { formatDateTime, formatShortDate } from '../lib/utils/time';
+  import { computeFieldTodayTotal } from '../lib/utils/trackableStats';
+  import { formatShortDate } from '../lib/utils/time';
+  import { kindStats, resolveKind, summarize } from '../lib/utils/trackableKinds';
   import { formatPreciseAge, daysUntilNextBirthday, ageTurningOn, formatBirthdayCountdown } from '../lib/utils/age';
   import { rangeStartFor, type ChartRange } from '../lib/utils/stats';
   import {
@@ -82,7 +83,8 @@
   // Resolved across all fields, not just this trackable's, so only one field is ever "the" weight (or waist...).
   const bodyFieldIds = $derived(resolveBodyFieldIds($allFields ?? [], settingsStore.data));
 
-  const isAges = $derived($trackable?.displayMode === 'ages');
+  const kind = $derived($trackable ? resolveKind($trackable, attachedFields).kind : 'event');
+  const isAges = $derived(kind === 'ages');
   const showTrendsTable = $derived(attachedFields.length === 0 || trendsView === 'table');
 
   /** Entries-per-period column, one column per attached field, plus BMI right after Weight when height is set. */
@@ -106,14 +108,24 @@
 
   const rangeStart = $derived(rangeStartFor(range, ($entries ?? []).map((e) => e.timestamp)));
 
-  const stats = $derived(computeOccurrenceStats($entries ?? []));
-  const lastEntry = $derived(($entries ?? [])[0] ?? null);
-  const timeSince = $derived(lastEntry ? formatTimeSinceAdaptive(Date.now() - lastEntry.timestamp) : null);
+  // Re-render "2h ago" as time passes, not only when entries change.
+  let now = $state(Date.now());
+  $effect(() => {
+    const timer = setInterval(() => (now = Date.now()), 60_000);
+    return () => clearInterval(timer);
+  });
 
-  /** Today's combined total for each 'sum'-aggregated attached field (e.g. Water, Calories). */
+  const summary = $derived(summarize(kind, $entries ?? [], attachedFields, now));
+  const stats = $derived(kindStats(kind, $entries ?? [], attachedFields, now));
+
+  /**
+   * Today's combined total for each 'sum'-aggregated attached field (e.g. Water,
+   * Calories), less the one a daily trackable's header already shows.
+   */
   const todayTotals = $derived(
     attachedFields
       .filter((f) => f.aggregation === 'sum')
+      .filter((f, i) => !(kind === 'daily' && i === 0 && f.kind === 'number'))
       .map((f) => ({ field: f, total: computeFieldTodayTotal($entries ?? [], f) }))
       .filter((t): t is { field: typeof t.field; total: number } => t.total != null),
   );
@@ -193,11 +205,11 @@
         class="rounded-2xl border p-4 text-center"
         style="border-color: {$trackable.color}40; background: linear-gradient(180deg, {$trackable.color}14, transparent);"
       >
-        <p class="text-xs uppercase tracking-wide" style="color: {$trackable.color};">Time since last</p>
-        <p class="mt-1 text-3xl font-semibold text-text">{timeSince ?? '\u2014'}</p>
-        {#if lastEntry}
-          <p class="mt-1 text-xs text-text-muted">{formatDateTime(lastEntry.timestamp)}</p>
-        {/if}
+        <p class="text-xs uppercase tracking-wide" style="color: {$trackable.color};">{summary.label}</p>
+        <p class="mt-1 text-3xl font-semibold text-text">{summary.value}</p>
+        {#each summary.sub as line, i (i)}
+          <p class="mt-1 text-xs text-text-muted">{line}</p>
+        {/each}
       </div>
 
       <button
@@ -223,26 +235,12 @@
       {/if}
 
       <div class="grid grid-cols-2 gap-2">
-        <div class="rounded-xl border p-3" style="border-color: var(--color-border); background: var(--color-surface);">
-          <p class="text-xs text-text-muted">Total</p>
-          <p class="mt-1 text-lg font-semibold text-text">{stats.total}</p>
-        </div>
-        <div class="rounded-xl border p-3" style="border-color: var(--color-border); background: var(--color-surface);">
-          <p class="text-xs text-text-muted">Current streak</p>
-          <p class="mt-1 text-lg font-semibold text-text">{stats.currentStreakDays} <span class="text-sm font-normal text-text-muted">days</span></p>
-        </div>
-        <div class="rounded-xl border p-3" style="border-color: var(--color-border); background: var(--color-surface);">
-          <p class="text-xs text-text-muted">Avg interval</p>
-          <p class="mt-1 text-lg font-semibold text-text">
-            {stats.avgIntervalHours != null ? formatTimeSinceAdaptive(stats.avgIntervalHours * 3600000) : '\u2014'}
-          </p>
-        </div>
-        <div class="rounded-xl border p-3" style="border-color: var(--color-border); background: var(--color-surface);">
-          <p class="text-xs text-text-muted">Longest gap</p>
-          <p class="mt-1 text-lg font-semibold text-text">
-            {stats.longestGapHours != null ? formatTimeSinceAdaptive(stats.longestGapHours * 3600000) : '\u2014'}
-          </p>
-        </div>
+        {#each stats as stat (stat.label)}
+          <div class="rounded-xl border p-3" style="border-color: var(--color-border); background: var(--color-surface);">
+            <p class="text-xs text-text-muted">{stat.label}</p>
+            <p class="mt-1 text-lg font-semibold text-text">{stat.value}</p>
+          </div>
+        {/each}
       </div>
 
       <div class="flex flex-col gap-2">
@@ -267,9 +265,14 @@
         {/if}
       </div>
 
-      <OccurrenceBucketChart entries={$entries ?? []} {range} color={$trackable.color} />
-      <TrackableHeatmapChart entries={$entries ?? []} {range} color={$trackable.color} />
-      <IntervalTrendChart entries={$entries ?? []} color={$trackable.color} />
+      <!-- Charts that suit the kind: when it happens matters for events, which days for check-ins. -->
+      {#if kind === 'event'}
+        <OccurrenceBucketChart entries={$entries ?? []} {range} color={$trackable.color} />
+        <TrackableHeatmapChart entries={$entries ?? []} {range} color={$trackable.color} />
+        <IntervalTrendChart entries={$entries ?? []} color={$trackable.color} />
+      {:else if kind === 'checkin'}
+        <TrackableHeatmapChart entries={$entries ?? []} {range} color={$trackable.color} />
+      {/if}
 
       <EntriesTable entries={$entries ?? []} fields={attachedFields} onSelect={openLogEdit} />
     {/if}

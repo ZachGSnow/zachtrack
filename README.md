@@ -29,6 +29,10 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
 - **Trackables:** define anything to track, with number (optional unit),
   rating (custom scale) or yes/no fields. Each field chooses how several
   entries on one day combine (`sum` for Water, `last` for Weight, `average`).
+  Each trackable leads with what matters for its kind, picked automatically
+  from its fields and changeable: time since (events), latest value and
+  change (readings like Weight), today's total (Calories, Water) or logged
+  today with a streak (check-ins).
   A starter set (Body Measurements, Vitals, Nutrition, Sleep, Wellness,
   Activity, Menstrual Cycle, Male Health) is created on a new install and is
   fully editable, including each field's name, unit and rating scale.

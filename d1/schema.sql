@@ -56,7 +56,7 @@ CREATE TABLE trackableDefinitions (
   icon TEXT NOT NULL,
   color TEXT NOT NULL,
   fieldIds TEXT NOT NULL, -- JSON array of FieldDefinition ids, ordered
-  displayMode TEXT, -- 'occurrences' (default/NULL) | 'ages'
+  displayMode TEXT, -- NULL/'occurrences' = automatic | 'event' | 'measurement' | 'daily' | 'checkin' | 'ages'
   createdAt INTEGER NOT NULL,
   updatedAt INTEGER NOT NULL,
   deletedAt INTEGER,

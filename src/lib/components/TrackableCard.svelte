@@ -1,24 +1,29 @@
 <script lang="ts">
   import { liveQuery } from 'dexie';
   import { link } from 'svelte-spa-router';
-  import { db, type TrackableDefinition } from '../db';
-  import { formatTimeSinceAdaptive } from '../utils/trackableStats';
+  import { db, type FieldDefinition, type TrackableDefinition } from '../db';
+  import { resolveKind, summarize } from '../utils/trackableKinds';
   import { daysUntilNextBirthday, formatBirthdayCountdown } from '../utils/age';
 
-  let { trackable, onQuickLog }: { trackable: TrackableDefinition; onQuickLog: () => void } = $props();
-
-  const isAges = $derived(trackable.displayMode === 'ages');
+  let {
+    trackable,
+    fields,
+    onQuickLog,
+  }: { trackable: TrackableDefinition; fields: FieldDefinition[]; onQuickLog: () => void } = $props();
 
   const entries = liveQuery(() => db.trackableEntries.where('trackableId').equals(trackable.id).toArray());
 
-  const lastEntry = $derived(
-    ($entries ?? []).reduce<{ timestamp: number } | null>(
-      (latest, e) => (!latest || e.timestamp > latest.timestamp ? e : latest),
-      null,
-    ),
+  const attachedFields = $derived(
+    trackable.fieldIds.map((id) => fields.find((f) => f.id === id)).filter((f): f is FieldDefinition => f != null),
   );
+  const kind = $derived(resolveKind(trackable, attachedFields).kind);
 
-  const timeSince = $derived(lastEntry ? formatTimeSinceAdaptive(Date.now() - lastEntry.timestamp) : null);
+  // Re-render "2h ago" as time passes, not only when entries change.
+  let now = $state(Date.now());
+  $effect(() => {
+    const timer = setInterval(() => (now = Date.now()), 60_000);
+    return () => clearInterval(timer);
+  });
 
   const nextUp = $derived(
     ($entries ?? [])
@@ -27,13 +32,11 @@
   );
 
   const subtitle = $derived(
-    isAges
+    kind === 'ages'
       ? nextUp
         ? `\u{1F382} ${nextUp.name}'s birthday ${formatBirthdayCountdown(nextUp.daysUntil)}`
         : 'No one added yet'
-      : timeSince
-        ? `${timeSince} ago`
-        : 'No entries yet',
+      : summarize(kind, $entries ?? [], attachedFields, now).card,
   );
 </script>
 
