@@ -76,6 +76,12 @@ export interface TrackableDefinition {
   /** Optional goal (utils/trackableGoals.ts); `goalValue` is its number (amount, times or days). */
   goalType?: TrackableGoalType;
   goalValue?: number;
+  /** Shown above the others on the Trackables list, whatever the sort. */
+  pinned?: boolean;
+  /** Hidden from the list (under Archived) but kept with all its entries. */
+  archived?: boolean;
+  /** Position in the list's "My order" sort; unset sorts by name after the ordered ones. */
+  sortOrder?: number;
   createdAt: number;
   updatedAt: number;
 }

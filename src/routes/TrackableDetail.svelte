@@ -22,6 +22,7 @@
   import BottomSheet from '../lib/components/BottomSheet.svelte';
   import DataTable from '../lib/components/DataTable.svelte';
   import EntriesTable from '../lib/components/EntriesTable.svelte';
+  import TagFilter from '../lib/components/TagFilter.svelte';
   import SegmentedControl from '../lib/components/SegmentedControl.svelte';
   import EditTrackableSheet from '../lib/components/EditTrackableSheet.svelte';
   import LogTrackableEntrySheet from '../lib/components/LogTrackableEntrySheet.svelte';
@@ -70,6 +71,10 @@
   $effect(() => {
     savePrefs(PREFS_KEY, { range, granularity, trendsView });
   });
+
+  // Filters only the entries list below, not the stats or charts (ARCHITECTURE.md 3.21).
+  let tagFilter = $state<string | null>(null);
+  const listedEntries = $derived(tagFilter ? ($entries ?? []).filter((e) => e.tags?.includes(tagFilter!)) : ($entries ?? []));
 
   let editOpen = $state(false);
   let logOpen = $state(false);
@@ -294,7 +299,8 @@
         <TrackableHeatmapChart entries={$entries ?? []} {range} color={$trackable.color} />
       {/if}
 
-      <EntriesTable entries={$entries ?? []} fields={attachedFields} onSelect={openLogEdit} />
+      <TagFilter items={$entries ?? []} bind:selected={tagFilter} />
+      <EntriesTable entries={listedEntries} fields={attachedFields} onSelect={openLogEdit} />
     {/if}
   </div>
 {/if}

@@ -88,7 +88,7 @@ const fast = (uuid: string, startDay: number, updatedAt: number, extra: Record<s
   ...extra,
 });
 const field = { id: 'f-water', name: 'Water', kind: 'number', unit: 'oz', aggregation: 'sum', createdAt: 1, updatedAt: 1 };
-const trackable = { id: 't-nutrition', name: 'Nutrition', icon: 'x', color: '#f97316', fieldIds: ['f-water'], goalType: 'dailyTotal', goalValue: 64, createdAt: 1, updatedAt: 1 };
+const trackable = { id: 't-nutrition', name: 'Nutrition', icon: 'x', color: '#f97316', fieldIds: ['f-water'], goalType: 'dailyTotal', goalValue: 64, pinned: true, archived: false, sortOrder: 2, createdAt: 1, updatedAt: 1 };
 const entry = (id: string, updatedAt: number, oz: number) => ({
   id,
   trackableId: 't-nutrition',
@@ -142,7 +142,7 @@ describe('sync', () => {
     expect(push.body.changes.fasts[0]).toMatchObject({ uuid: 'a', tags: ['test'] });
     expect(push.body.changes.trackableEntries[0].values).toEqual({ 'f-water': 12 });
     expect(push.body.changes.trackableDefinitions[0].fieldIds).toEqual(['f-water']);
-    expect(push.body.changes.trackableDefinitions[0]).toMatchObject({ goalType: 'dailyTotal', goalValue: 64 });
+    expect(push.body.changes.trackableDefinitions[0]).toMatchObject({ goalType: 'dailyTotal', goalValue: 64, pinned: true, archived: false, sortOrder: 2 });
     expect(push.body.changes.settings).toMatchObject({ notificationsEnabled: true, heightInches: 70 });
 
     const again = await sync(syncBody(push.body.cursor));

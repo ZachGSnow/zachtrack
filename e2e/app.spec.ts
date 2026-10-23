@@ -281,3 +281,55 @@ test('a daily fast start time shows a countdown, and Journey shows how often fas
   await expect(page.locator('main')).toContainText(/Hit target\s*\d+%\s*\d+ of \d+/);
   expect(problems).toEqual([]);
 });
+
+test('trackables can be pinned, archived and reordered, and lists filter by tag', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await mockSync(page, noServer);
+  await importSampleData(page);
+  await page.goto('/#/trackables');
+  const cards = page.locator('a[href^="#/trackables/"]');
+  const card = (name: string) => page.getByRole('link', { name: new RegExp(name) });
+
+  // Pin Vitals: it moves to the top whatever the sort.
+  await card('Vitals').click();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.getByLabel('Pin to the top of the list').check();
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await page.goto('/#/trackables');
+  await expect(cards.first()).toContainText('Vitals');
+  await page.getByRole('button', { name: 'A-Z' }).click();
+  await expect(cards.first()).toContainText('Vitals');
+
+  // Reorder: move Sleep up one place in "My order".
+  await page.getByRole('button', { name: 'Reorder' }).click();
+  await expect(page.getByRole('button', { name: 'My order' })).toBeVisible();
+  const before = await cards.allTextContents();
+  const sleepAt = before.findIndex((text) => text.includes('Sleep'));
+  await page.getByRole('button', { name: 'Move Sleep up' }).click();
+  await expect.poll(async () => (await cards.allTextContents()).findIndex((text) => text.includes('Sleep'))).toBe(sleepAt - 1);
+  await page.getByRole('button', { name: 'Done' }).click();
+
+  // Archive Male Health: gone from the list, listed under archived, and restorable.
+  await card('Male Health').click();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.getByRole('button', { name: 'Archive' }).click();
+  await page.goto('/#/trackables');
+  await expect(card('Male Health')).toHaveCount(0);
+  await page.getByRole('button', { name: /Show archived \(1\)/ }).click();
+  await expect(card('Male Health')).toBeVisible();
+
+  // Tag filters: Activity entries and History fasts.
+  await card('Activity').click();
+  await page.getByRole('button', { name: /^#gym/ }).click();
+  const rows = page.getByRole('table').last().locator('tbody tr');
+  await expect(rows.first()).toContainText('#gym');
+  for (const text of await rows.allTextContents()) expect(text).toContain('#gym');
+  await page.goto('/#/history');
+  await page.getByRole('button', { name: /^#weekend/ }).click();
+  const fastItems = page.locator('main li');
+  await expect(fastItems.first()).toContainText('#weekend');
+  for (const text of await fastItems.allTextContents()) expect(text).toContain('#weekend');
+  await page.getByRole('button', { name: 'All', exact: true }).click();
+  expect(await fastItems.count()).toBeGreaterThan(await page.locator('main li', { hasText: '#weekend' }).count());
+  expect(problems).toEqual([]);
+});

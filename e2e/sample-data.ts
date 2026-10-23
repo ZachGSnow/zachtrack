@@ -49,7 +49,7 @@ export function buildSampleExport(starter: StarterDefinitions, now: Date) {
 
   const entries: Array<Record<string, unknown>> = [];
   let n = 0;
-  const entry = (trackableName: string, timestamp: number, values: Record<string, number | boolean>, note?: string) => {
+  const entry = (trackableName: string, timestamp: number, values: Record<string, number | boolean>, note?: string, tags?: string[]) => {
     if (timestamp > now.getTime()) return;
     entries.push({
       id: `sample-entry-${++n}`,
@@ -57,6 +57,7 @@ export function buildSampleExport(starter: StarterDefinitions, now: Date) {
       timestamp,
       values,
       ...(note ? { note } : {}),
+      ...(tags ? { tags } : {}),
       createdAt: timestamp,
       updatedAt: timestamp,
     });
@@ -81,7 +82,12 @@ export function buildSampleExport(starter: StarterDefinitions, now: Date) {
 
     entry('Sleep', at(d, 6, 45), { [field('Sleep Hours')]: round1(between(6.2, 8.1)), [field('Sleep Quality')]: int(3, 5) });
     if (d % 2 === 0) entry('Wellness Check-in', at(d, 21), { [field('Overall Mood')]: int(3, 5), [field('Stress')]: int(1, 4), [field('Focus')]: int(2, 5) });
-    if (d % 3 === 0) entry('Activity', at(d, 18), { [field('Duration')]: int(25, 50), [field('Steps')]: int(6000, 11000) }, d === 0 ? 'Evening walk' : undefined);
+    // Tagged by kind of workout, for the tag filter.
+    if (d % 3 === 0) {
+      entry('Activity', at(d, 18), { [field('Duration')]: int(25, 50), [field('Steps')]: int(6000, 11000) }, d === 0 ? 'Evening walk' : undefined, [
+        d % 2 === 0 ? 'walk' : 'gym',
+      ]);
+    }
 
     // A 16:8 fast most evenings; the one that started last night is still running.
     if (d >= 1 && d % 7 !== 5) {
@@ -97,6 +103,8 @@ export function buildSampleExport(starter: StarterDefinitions, now: Date) {
         presetLabel: '16:8',
         targetHours: 16,
         ...(hours ? { moodRating: int(3, 5), energyRating: int(3, 5), hungerRating: int(1, 4) } : {}),
+        // Weekend fasts are tagged, for the tag filter on History.
+        ...([0, 6].includes(new Date(start).getDay()) ? { tags: ['weekend'] } : {}),
         createdAt: start,
         updatedAt: start,
       });
