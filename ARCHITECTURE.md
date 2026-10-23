@@ -618,6 +618,22 @@ day, and couldn't be tapped. It is replaced by our own grid:
   one to edit) and offers to add an entry for that date (midday, or now for
   today) through the log sheet's new `defaultTimestamp`.
 
+### 3.24 Goal cards: a grid strip and a check button
+On the Trackables list, a trackable with a goal (other than avoid, where
+logging one means you slipped) gets a habit-tracker card: a strip of its
+habit grid (3.23, as many whole weeks as fit at about 14px a cell, measured
+from the card's width) and a check button for today instead of "+":
+- **No fields:** the button checks today (logs it now) and, once checked,
+  unchecks it (deletes today's latest entry). Both offer Undo; undoing an
+  uncheck adds the entry back with its time, note, tags and values.
+- **Daily total:** the button is a ring filling toward today's goal, and
+  opens the log sheet.
+- **Other fields:** filled when today is logged; opens the log sheet.
+Trackables without a goal keep the plain card with "+". The undo bar takes a
+message and a revert action, shared by quick log and uncheck. Overdue days
+of every-N-days goals are tinted rather than outlined, which kept an
+every-day goal's strip readable.
+
 ## 4. Issues hit during implementation, and how they were resolved
 
 These are real bugs that shipped and got fixed during this project's build,
