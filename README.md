@@ -60,8 +60,10 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
   A starter set (Body Measurements, Vitals, Nutrition, Sleep, Wellness,
   Activity, Menstrual Cycle, Male Health) is created on a new install and is
   fully editable, including each field's name, unit and rating scale.
-- **People and birthdays:** an "ages" display mode shows live ages and
-  birthday countdowns instead of occurrence stats.
+- **Dates:** birthdays with live ages, anniversaries, holidays (including
+  rules like the 4th Thursday of November, and Easter), and countdowns or
+  renewals that repeat every few months or years, each with a countdown. A
+  US holidays template adds the federal holidays and common observances.
 - **Tables first:** the Data tab, Journey and each trackable show rows per
   day, week or month with a 7-day rolling average or change vs the previous
   period, an Avg / Change / Per-week trend footer, and a Copy button that puts

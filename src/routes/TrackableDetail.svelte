@@ -4,11 +4,10 @@
   import { push, link } from 'svelte-spa-router';
   import { db, type TrackableEntry, type FieldDefinition } from '../lib/db';
   import { computeFieldTodayTotal } from '../lib/utils/trackableStats';
-  import { formatShortDate } from '../lib/utils/time';
   import { kindStats, resolveKind, summarize } from '../lib/utils/trackableKinds';
   import { describeGoal, GOAL_STATE_COLORS, goalStatus } from '../lib/utils/trackableGoals';
   import { trackableInsights } from '../lib/utils/insights';
-  import { formatPreciseAge, daysUntilNextBirthday, ageTurningOn, formatBirthdayCountdown } from '../lib/utils/age';
+  import { DATE_KIND_ITEM, DATE_KIND_LABELS, dateKindOf, describeDate } from '../lib/utils/dates';
   import { rangeStartFor, type ChartRange } from '../lib/utils/stats';
   import {
     buildBmiMetric,
@@ -156,17 +155,19 @@
       .filter((t): t is { field: typeof t.field; total: number } => t.total != null),
   );
 
-  const people = $derived(
-    ($entries ?? [])
-      .map((e) => ({
-        entry: e,
-        name: e.note?.trim() || 'Someone',
-        age: formatPreciseAge(e.timestamp),
-        daysUntil: daysUntilNextBirthday(e.timestamp),
-        turning: ageTurningOn(e.timestamp),
-      }))
-      .sort((a, b) => a.daysUntil - b.daysUntil),
+  // A dates trackable (kind 'ages', utils/dates.ts): each entry as its next occurrence,
+  // soonest first; one-off dates that have passed go under Past, most recent first.
+  const dateKind = $derived($trackable ? dateKindOf($trackable) : 'birthday');
+  const dateItems = $derived(
+    $trackable && isAges ? ($entries ?? []).map((e) => ({ entry: e, item: describeDate($trackable!, e, now) })) : [],
   );
+  const upcomingItems = $derived(dateItems.filter((d) => d.item.daysUntil >= 0).sort((a, b) => a.item.daysUntil - b.item.daysUntil));
+  const pastItems = $derived(dateItems.filter((d) => d.item.daysUntil < 0).sort((a, b) => b.item.daysUntil - a.item.daysUntil));
+
+  function whenText(at: number): string {
+    const sameYear = new Date(at).getFullYear() === new Date(now).getFullYear();
+    return new Date(at).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', ...(sameYear ? {} : { year: 'numeric' }) });
+  }
 
   let logTimestamp = $state<number | undefined>(undefined);
 
@@ -214,35 +215,48 @@
     </div>
 
     {#if isAges}
+      <p class="-mt-3 text-xs text-text-muted">{DATE_KIND_LABELS[dateKind]}</p>
       <button
         class="w-full rounded-xl py-3 text-base font-semibold"
         style="background: var(--color-brand); color: #06140c;"
         onclick={() => openLogNew()}
-      >+ Add Person</button>
+      >+ {DATE_KIND_ITEM[dateKind].add}</button>
 
-      <div>
-        {#if people.length === 0}
-          <p class="text-sm text-text-muted">No one added yet.</p>
+      {#snippet dateRow(d: (typeof dateItems)[number])}
+        <li>
+          <button
+            class="w-full rounded-xl border p-3 text-left"
+            style="border-color: var(--color-border); background: var(--color-surface);"
+            onclick={() => openLogEdit(d.entry)}
+          >
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-sm font-semibold text-text">{d.item.name}</span>
+              <span class="shrink-0 text-xs font-medium" style="color: {d.item.daysUntil <= 7 && d.item.daysUntil >= 0 ? $trackable!.color : 'var(--color-text-muted)'};">
+                {d.item.countdown}
+              </span>
+            </div>
+            <p class="mt-1 text-xs text-text-muted">
+              {whenText(d.item.at)}{d.item.detail ? `, ${d.item.detail.charAt(0).toLowerCase()}${d.item.detail.slice(1)}` : ''}{d.item.since ? ` \u00b7 ${d.item.since}` : ''}
+            </p>
+          </button>
+        </li>
+      {/snippet}
+
+      <div class="flex flex-col gap-4">
+        {#if dateItems.length === 0}
+          <p class="text-sm text-text-muted">Nothing added yet.</p>
         {:else}
-          <ul class="flex flex-col gap-2">
-            {#each people as p (p.entry.id)}
-              <li>
-                <button
-                  class="w-full rounded-xl border p-3 text-left"
-                  style="border-color: var(--color-border); background: var(--color-surface);"
-                  onclick={() => openLogEdit(p.entry)}
-                >
-                  <div class="flex items-center justify-between gap-2">
-                    <span class="text-sm font-semibold text-text">{p.name}</span>
-                    <span class="shrink-0 text-xs font-medium" style="color: {$trackable.color};">
-                      {formatBirthdayCountdown(p.daysUntil)} (turns {p.turning})
-                    </span>
-                  </div>
-                  <p class="mt-1 text-xs text-text-muted">{p.age} old &middot; born {formatShortDate(p.entry.timestamp)}</p>
-                </button>
-              </li>
-            {/each}
+          <ul class="flex flex-col gap-2" aria-label="Upcoming">
+            {#each upcomingItems as d (d.entry.id)}{@render dateRow(d)}{/each}
           </ul>
+          {#if pastItems.length}
+            <div>
+              <p class="mb-1.5 text-xs font-semibold uppercase tracking-wide text-text-muted">Past</p>
+              <ul class="flex flex-col gap-2" aria-label="Past">
+                {#each pastItems as d (d.entry.id)}{@render dateRow(d)}{/each}
+              </ul>
+            </div>
+          {/if}
         {/if}
       </div>
     {:else}
