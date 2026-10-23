@@ -697,6 +697,20 @@ built to resist over-reading small personal datasets:
   A threshold based on the range let a 0.3 lb wobble in a drifting weight
   through on the sample data; a test now holds that case.
 
+### 3.29 Compact list, templates, CSV export
+- **Compact** (Trackables, per device): goal cards without their grid strips,
+  check buttons kept.
+- **Templates** (`data/templates.ts`) in the New trackable sheet: name, icon,
+  colour, fields and a goal that usually fit (Water, Workout, Weigh-in,
+  Meditation, Reading, Vitamins, Journal, Mood, No alcohol). A template's
+  fields match existing ones by name and kind, else are created.
+- A times-per-day goal of 1 is a plain check on its card; the counting ring
+  starts at 2. (The Vitamins template's first version showed "0 of 1".)
+- **CSV export** (Profile > Your data, `buildCsv` in `dataFile.ts`): every
+  entry and completed fast, one row per value (Date, Time, Trackable, Field,
+  Value, Unit, Note, Tags), local time, CRLF and a byte-order mark for Excel.
+  The JSON export stays the one to restore from (3.13).
+
 ## 4. Issues hit during implementation, and how they were resolved
 
 These are real bugs that shipped and got fixed during this project's build,
