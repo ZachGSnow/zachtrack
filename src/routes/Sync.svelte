@@ -122,7 +122,7 @@
   <div class="flex items-center gap-2">
     <a href="/settings" use:link class="text-sm text-text-muted" aria-label="Back to Settings">&larr; Settings</a>
   </div>
-  <h1 class="flex items-center gap-2 text-xl font-semibold text-text"><span>Sync</span> <HelpLink topic="sync" label="Sync and privacy" /></h1>
+  <h1 class="flex items-center gap-2 text-xl font-semibold text-text"><span>Sync</span> <HelpLink topic="sync-page" label="the Sync page" /></h1>
 
   <section class="space-y-2 text-sm" aria-labelledby="sync-status">
     <h2 id="sync-status" class="text-sm font-semibold uppercase tracking-wide text-text-muted">Status</h2>

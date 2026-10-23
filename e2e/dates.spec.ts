@@ -123,3 +123,15 @@ test('dates due soon go under Needs attention, the next two weeks under Coming u
   await page.getByRole('button', { name: `${dadDay.label}, 1 date` }).click();
   await expect(page.getByRole('region', { name: 'Selected day' }).getByRole('link', { name: /Dad/ })).toBeVisible();
 });
+
+test('the ? on the Dates and Sync pages opens their Help topics', async ({ page }) => {
+  await page.goto('/#/dates');
+  await page.getByRole('link', { name: 'Help: dates' }).click();
+  await expect(page).toHaveURL(/#\/help\/dates$/);
+  await expect(page.getByRole('heading', { name: 'Dates: birthdays, holidays and countdowns', level: 2 })).toBeInViewport();
+
+  await page.goto('/#/sync');
+  await page.getByRole('link', { name: 'Help: the Sync page' }).click();
+  await expect(page).toHaveURL(/#\/help\/sync-page$/);
+  await expect(page.getByRole('heading', { name: 'Your devices, checking sync and signing out', level: 2 })).toBeInViewport();
+});

@@ -486,7 +486,7 @@
   {:else}
     <div class="space-y-2">
       <label class="block text-sm">
-        <span class="mb-1 block text-text-muted">Dates are</span>
+        <span class="mb-1 flex items-center gap-1.5 text-text-muted">Dates are <HelpLink topic="dates" label="dates" /></span>
         <select bind:value={dateKind} class="w-full rounded-lg border bg-transparent p-2 text-text" style="border-color: var(--color-border);">
           {#each DATE_KINDS as k (k)}
             <option value={k}>{DATE_KIND_LABELS[k]}</option>

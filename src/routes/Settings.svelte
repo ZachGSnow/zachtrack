@@ -6,6 +6,7 @@
   import { allPresets } from '../lib/data/presets';
   import DataFileSection from '../lib/components/DataFileSection.svelte';
   import { link } from 'svelte-spa-router';
+  import HelpLink from '../lib/components/HelpLink.svelte';
   import SyncHistory from '../lib/components/SyncHistory.svelte';
   import SignOutSection from '../lib/components/SignOutSection.svelte';
   import WeekPlanEditor from '../lib/components/WeekPlanEditor.svelte';
@@ -233,7 +234,7 @@
   </section>
 
   <section class="space-y-3" aria-labelledby="settings-sync">
-    <h2 id="settings-sync" class="text-sm font-semibold uppercase tracking-wide text-text-muted">Sync</h2>
+    <h2 id="settings-sync" class="flex items-center gap-1.5 text-sm font-semibold uppercase tracking-wide text-text-muted"><span>Sync</span> <HelpLink topic="sync-page" label="devices, checking sync and signing out" /></h2>
     <div class="flex items-center justify-between gap-3 text-sm">
       <span class="text-text">{syncStore.status === 'unauthenticated' && syncStore.signedOut ? 'Signed out' : SYNC_LABELS[syncStore.status]}</span>
       {#if syncStore.status === 'unauthenticated'}

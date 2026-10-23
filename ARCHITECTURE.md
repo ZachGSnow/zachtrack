@@ -888,7 +888,9 @@ double-tap shows) and About (version, health note).
 works offline: Getting started (install, a first fast, a first trackable, a
 goal, sync or local-only), then short topics on trackables and kinds, goals,
 streaks with rest/skip/pause, the habit grid, Needs attention, insights,
-fasting (with the health note), tables and files, and sync and privacy.
+fasting (with the health note), tables and files, and sync and privacy;
+v1.14.0 added Dates and the Sync page (devices, Check sync, signing out),
+each with a "?" from its page.
 `/help/<topic>` opens at that topic. It's reached from a "?" in the phone
 header and Help in the sidebar, and `HelpLink.svelte` puts small "?" links
 where questions come up: Summary and Goal in the Edit sheet, the habit grid's

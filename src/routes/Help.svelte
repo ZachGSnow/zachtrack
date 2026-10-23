@@ -10,6 +10,7 @@
   const TOPICS = [
     { id: 'getting-started', title: 'Getting started' },
     { id: 'trackables', title: 'Trackables and what they show' },
+    { id: 'dates', title: 'Dates: birthdays, holidays and countdowns' },
     { id: 'goals', title: 'Goals' },
     { id: 'streaks', title: 'Streaks, rest days, skipping and pausing' },
     { id: 'grid', title: 'The habit grid' },
@@ -18,6 +19,7 @@
     { id: 'fasting', title: 'Fasting' },
     { id: 'data', title: 'Tables, comparing and your files' },
     { id: 'sync', title: 'Sync and privacy' },
+    { id: 'sync-page', title: 'Your devices, checking sync and signing out' },
   ];
 
   $effect(() => {
@@ -85,12 +87,8 @@
         <li><strong>Daily total:</strong> a field that adds up, like Calories or Water. Shows today's total and your daily average.</li>
         <li><strong>Check-in:</strong> a rating or yes/no. Shows whether you logged today and your streak.</li>
         <li>
-          <strong>Dates:</strong> named dates with countdowns, of one kind per trackable (Edit > Dates are): birthdays with
-          ages, anniversaries ("12th anniversary"), holidays, or countdowns and renewals. A holiday can follow a rule like the
-          4th Thursday of November or Easter; a renewal can repeat every few months or years. The templates include
-          Birthdays, Anniversaries, Countdowns and a ready-made US holidays list. Dates show under Needs attention a few days
-          ahead (Edit sets how many), the next two weeks under Coming up on Trackables, and the next year on the Dates page
-          (See all dates), as a list or a month calendar.
+          <strong>Dates:</strong> named dates with countdowns: birthdays, anniversaries, holidays, or countdowns and
+          renewals. See <a href="/help/dates" use:link class="underline">Dates</a>.
         </li>
       </ul>
       <p>
@@ -98,6 +96,41 @@
         label: changing it doesn't convert numbers already logged. "+" logs an entry; a trackable without fields logs in one
         tap, with a few seconds to undo.
       </p>
+    </section>
+
+    <section id="help-dates">
+      <h2>Dates: birthdays, holidays and countdowns</h2>
+      <p>
+        A dates trackable holds named dates and counts down to each. Pick a template under Trackables > "+ New", or set an
+        existing trackable's Summary to Dates. Edit > Dates are sets which kind it holds:
+      </p>
+      <ul>
+        <li><strong>Birthdays:</strong> a name and a birthdate. Shows the age they turn and their age now.</li>
+        <li><strong>Anniversaries:</strong> what it is and the date it started. Shows which anniversary ("12th") and how long since.</li>
+        <li>
+          <strong>Holidays:</strong> the same date every year, a weekday of a month (the 4th Thursday of November, the last
+          Monday of May), or Easter and days from it (-2 is Good Friday). The US holidays template adds 18 of them; edit or
+          delete any.
+        </li>
+        <li>
+          <strong>Countdowns and renewals:</strong> a date that happens once (a trip), or repeats every few months or years
+          (a passport every 10 years: enter when it's next due, or when it was last done). A one-off date that has passed moves
+          under Past.
+        </li>
+      </ul>
+      <p>Where they show:</p>
+      <ul>
+        <li>
+          <strong>Needs attention</strong>, a few days ahead: a week for birthdays and anniversaries, 3 days for holidays,
+          30 for countdowns. Change it in Edit > Show in Needs attention this many days ahead.
+        </li>
+        <li><strong>Coming up</strong> on Trackables: the next two weeks, apart from what Needs attention already shows.</li>
+        <li>
+          <strong>Dates</strong> (Trackables > Dates): the next year from every dates trackable, as a list by week and month or
+          as a month calendar; tap a day to see its dates. Birthdays and anniversaries add every 1,000 days ("10,000 days old").
+        </li>
+        <li>Each trackable's own page lists its dates, and its card the next three.</li>
+      </ul>
     </section>
 
     <section id="help-goals">
@@ -239,18 +272,41 @@
           <strong>Two devices, one record:</strong> edits are resolved record by record and the newer one wins. When that
           replaces an edit you made here, the history says so in amber.
         </li>
+      </ul>
+      <p>
+        Devices, the activity on all of them, checking sync and signing out are on the Sync page: see
+        <a href="/help/sync-page" use:link class="underline">Your devices, checking sync and signing out</a>.
+      </p>
+    </section>
+
+    <section id="help-sync-page">
+      <h2>Your devices, checking sync and signing out</h2>
+      <p>The Sync page (Settings > Sync, or the sync pill's history) has:</p>
+      <ul>
         <li>
-          <strong>The Sync page</strong> (Settings > Sync): this device's name, your devices with their app version (an older
-          one is flagged: reopen the app on it to update), the activity on all devices for 90 days, and 30 days of this
-          device's syncs. The activity lists what kind of record changed and its name, never values or notes.
+          <strong>This device:</strong> its name in the device list and activity (rename it there) and its app version. When
+          another device runs a newer version, it says to reopen the app here to update.
         </li>
         <li>
-          <strong>Check sync</strong> compares how many records this device and the server have; <strong>Full resync</strong>
-          sends and receives everything again, without deleting anything here first.
+          <strong>Your devices:</strong> every device that synced in the last 90 days, with its version and last sync. An older
+          version is flagged: reopen the app on it, since an older version can clear settings a newer one added. Remove only
+          tidies the list; it doesn't sign anything out.
         </li>
         <li>
-          <strong>Sign out</strong> (Settings > Sync) ends the Cloudflare login on <em>every</em> device, not just this one:
-          Cloudflare signs you out everywhere at once. Your data stays on each device and syncs again after you log in.
+          <strong>Activity on all devices:</strong> each sync that changed something, from any device, for 90 days: what kind
+          of record and its name, never values or notes. Tap a row for the names.
+        </li>
+        <li>
+          <strong>Check sync</strong> compares how many records this device and the server have. <strong>Full resync</strong>
+          sends and receives everything again, without deleting anything here first; use it when Check sync finds a difference.
+        </li>
+        <li><strong>This device's syncs:</strong> 30 days of what each sync sent and received, and how long it took.</li>
+      </ul>
+      <p>Signing out, in Settings > Sync:</p>
+      <ul>
+        <li>
+          <strong>Sign out</strong> ends the Cloudflare login on <em>every</em> device, not just this one: Cloudflare signs
+          you out everywhere at once. Your data stays on each device and syncs again after you log in.
         </li>
         <li>
           <strong>Sign out and erase this device</strong> also deletes everything stored here, after a confirmation that says
