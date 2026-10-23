@@ -158,6 +158,30 @@
     </select>
   </label>
 
+  <label class="block text-sm">
+    <span class="mb-1 block text-text-muted">Daily fast start (optional)</span>
+    <div class="flex gap-2">
+      <input
+        type="time"
+        value={settingsStore.data.fastScheduleTime ?? ''}
+        onchange={(e) => settingsStore.update({ fastScheduleTime: (e.target as HTMLInputElement).value || undefined })}
+        class="flex-1 rounded-lg border bg-transparent p-2 text-text"
+        style="border-color: var(--color-border); color-scheme: dark;"
+      />
+      {#if settingsStore.data.fastScheduleTime}
+        <button
+          type="button"
+          class="rounded-lg border px-3 text-sm text-text-muted"
+          style="border-color: var(--color-border);"
+          onclick={() => settingsStore.update({ fastScheduleTime: undefined })}
+        >Clear</button>
+      {/if}
+    </div>
+    <span class="mt-1 block text-xs text-text-muted">
+      The Fasting tab counts down to it and says when you're late. With notifications on, you get a reminder while the app is open.
+    </span>
+  </label>
+
   <button
     type="button"
     class="flex w-full items-center justify-between rounded-lg border p-2 text-sm"

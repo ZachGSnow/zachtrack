@@ -109,6 +109,8 @@ export interface SettingsRecord {
   hipFieldId?: string;
   /** Picks the Navy formula; no body-fat estimate until it's set. */
   bodyFatSex?: BodyFatSex;
+  /** Daily planned fast start, "HH:MM" local time (utils/fastingSchedule.ts). Unset = no schedule. */
+  fastScheduleTime?: string;
   updatedAt: number;
 }
 

@@ -71,6 +71,17 @@
         <p class="text-xs text-text-muted">Longest fast</p>
         <p class="mt-1 text-lg font-semibold text-text">{formatHoursShort(stats.longestHours)}</p>
       </div>
+      <div class="rounded-xl border p-3" style="border-color: var(--color-border); background: var(--color-surface);">
+        <p class="text-xs text-text-muted">Hit target</p>
+        <p class="mt-1 text-lg font-semibold text-text">
+          {#if stats.withTarget > 0}
+            {Math.round((stats.hitTarget / stats.withTarget) * 100)}%
+            <span class="text-sm font-normal text-text-muted">{stats.hitTarget} of {stats.withTarget}</span>
+          {:else}
+            &mdash;
+          {/if}
+        </p>
+      </div>
     </div>
 
     <div class="flex flex-col gap-2">

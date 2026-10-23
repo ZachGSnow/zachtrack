@@ -358,13 +358,13 @@ function buildSettingsUpsert(db: D1Database, settings: SettingsRecord, serverSeq
   return db
     .prepare(
       `INSERT INTO settings (id, defaultPresetId, notificationsEnabled, heightInches, goalWeightLb, weightFieldId,
-         waistFieldId, neckFieldId, hipFieldId, bodyFatSex, updatedAt, serverSeq)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         waistFieldId, neckFieldId, hipFieldId, bodyFatSex, fastScheduleTime, updatedAt, serverSeq)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          defaultPresetId=excluded.defaultPresetId, notificationsEnabled=excluded.notificationsEnabled,
          heightInches=excluded.heightInches, goalWeightLb=excluded.goalWeightLb, weightFieldId=excluded.weightFieldId,
          waistFieldId=excluded.waistFieldId, neckFieldId=excluded.neckFieldId, hipFieldId=excluded.hipFieldId,
-         bodyFatSex=excluded.bodyFatSex,
+         bodyFatSex=excluded.bodyFatSex, fastScheduleTime=excluded.fastScheduleTime,
          updatedAt=excluded.updatedAt, serverSeq=excluded.serverSeq
        WHERE excluded.updatedAt > settings.updatedAt`,
     )
@@ -379,6 +379,7 @@ function buildSettingsUpsert(db: D1Database, settings: SettingsRecord, serverSeq
       settings.neckFieldId ?? null,
       settings.hipFieldId ?? null,
       settings.bodyFatSex ?? null,
+      settings.fastScheduleTime ?? null,
       settings.updatedAt,
       serverSeq,
     );
@@ -498,6 +499,7 @@ function mapSettingsRow(row: Record<string, unknown>): WireRow<SettingsRecord> {
     neckFieldId: (row.neckFieldId as string) ?? undefined,
     hipFieldId: (row.hipFieldId as string) ?? undefined,
     bodyFatSex: (row.bodyFatSex as SettingsRecord['bodyFatSex']) ?? undefined,
+    fastScheduleTime: (row.fastScheduleTime as string) ?? undefined,
     updatedAt: row.updatedAt as number,
     deletedAt: (row.deletedAt as number) ?? undefined,
   };

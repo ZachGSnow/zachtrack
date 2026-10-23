@@ -26,6 +26,9 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
 
 - **Fasting timer** with preset methods (16:8, 18:6, OMAD and more) or count-up,
   a gauge ring with tappable metabolic-zone markers, and one fast per start day.
+  An optional daily start time counts down to your next fast, the timer says
+  when your eating window opens, and Journey shows how often you hit the
+  target.
 - **Trackables:** define anything to track, with number (optional unit),
   rating (custom scale) or yes/no fields. Each field chooses how several
   entries on one day combine (`sum` for Water, `last` for Weight, `average`).

@@ -545,6 +545,22 @@ running, and `utils/shortcuts.ts` removes the marker from the address so a
 reload can't start another. The query doesn't match the service worker's
 `navigateFallbackDenylist`, so the shortcut opens offline like the app itself.
 
+### 3.20 Fasting schedule, eating window and hit rate
+- **Daily schedule** (Profile > Daily fast start, `settings.fastScheduleTime`
+  "HH:MM", migration `0002_fast_schedule.sql`): with no fast running, the
+  Fasting tab counts down to the next start, or says in amber how late you
+  are once today's time has passed and no fast has started today
+  (`utils/fastingSchedule.ts`). Today's start counts as done once any fast
+  started today, so an early start doesn't read as late.
+- **Eating window:** while fasting toward a target, "Eating window opens at
+  12:00 PM tomorrow", then "Goal reached at ...".
+- **Hit target** on Journey: completed fasts with a target that reached it.
+- **Notifications** now include "Goal reached" at the target and a reminder at
+  the scheduled start (App.svelte), and say ZachTrack instead of the old
+  SnowFast. They are still foreground-only timers (`notifications.ts`): they
+  fire while the app is open or in the background, not when it's closed. True
+  background reminders need Web Push (section 6).
+
 ## 4. Issues hit during implementation, and how they were resolved
 
 These are real bugs that shipped and got fixed during this project's build,
