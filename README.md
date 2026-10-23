@@ -185,10 +185,14 @@ of synced folders, and delete it when done.
 - **Local-first:** every read and write goes through Dexie (IndexedDB). The UI
   never waits on the network.
 - **Sync:** `POST /api/sync` is a Pages Function (`functions/api/sync.ts`) over
-  D1. The client pushes its full dataset; the server upserts each record only
-  if its `updatedAt` is newer, in a few batched queries per request (under the
-  free plan's 50-subrequest limit). Pulls use a server-assigned sequence
-  number as the cursor, so device clocks don't affect what gets pulled.
+  D1. The client sends what changed since its last sync (everything on the
+  first sync, after an import, and once a day); the server upserts each
+  record only if its `updatedAt` is newer, in a few batched queries per
+  request (under the free plan's 50-subrequest limit), and says what it
+  stored. Pulls use a server-assigned sequence number as the cursor, so
+  device clocks don't affect what gets pulled, and leave out what the
+  request itself wrote. The app also syncs when it comes back into view or
+  online, and every few minutes while open.
 - **Auth:** Cloudflare Access does the login. The Function also verifies the
   Access JWT (RS256 signature against the team's published keys, issuer,
   expiry, audience, email), because `*.pages.dev` hostnames can reach it

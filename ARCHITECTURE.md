@@ -167,21 +167,38 @@ project: a direct-upload Pages project can't be switched to git integration
 later, and deploying by hand at release time keeps production on tagged
 versions only.
 
-### 3.4 Full-dataset push, not delta sync
-The original plan called for the client tracking "what changed locally
-since last push" and sending only that delta. In practice this added real
-complexity (a second local cursor, clock-skew risk between two devices'
-system clocks) for no real benefit at this app's realistic personal-use
-scale (well under a few thousand records, ever). What actually got built:
-**the client just pushes its entire current local dataset on every sync**,
-and the server's per-record "upsert only if incoming `updatedAt` is newer"
-logic naturally no-ops anything that hasn't changed. Simpler client code, one
-fewer thing that can drift out of sync with reality.
+### 3.4 Send what changed, with a daily full send
+Until v1.10.0 the client sent its entire local dataset on every sync and let
+the server's "upsert only if incoming `updatedAt` is newer" logic no-op the
+unchanged records. That was simple, but every sync grew with the data, and
+the history could only say what came *down*, since "sent" was always
+everything.
 
-The direct consequence of this choice: a single sync call can carry the
-*entire* dataset (all 29 seeded field definitions, all trackables, etc.),
-which is what caused the subrequest-limit bug in Section 4.1 - the fix there
-(batching) is what makes full-dataset push viable at all.
+Now `SyncMeta.sentThrough` holds the local time the last successful sync
+started, and a sync sends only records with `updatedAt` at or after it
+(`getChangedSyncableRecords` in `db.ts`). Both sides of that comparison are
+this device's own clock, so another device's clock doesn't matter. Edits made
+while a sync is in flight have an `updatedAt` after its start, so the next
+sync picks them up. Three things keep it honest:
+
+- **Retry:** records the server refused are kept in `SyncMeta.retry` and sent
+  again every sync, so they keep showing as "not synced" until fixed.
+- **Import:** imported records keep their own, usually older, `updatedAt`, so
+  an import sets `fullSendRequestedAt` and the next sync sends everything.
+- **Daily full send:** the first sync on a device, and any sync more than 24
+  hours after the last full send, sends everything (`FULL_SEND_EVERY_MS`), as
+  a safety net for anything that slipped past: a clock set back, a server
+  restored from a backup.
+
+A full send is still one request, which is why the batching from Section 4.1
+matters. The server reports what it actually stored (`appliedCounts`, and
+the first 50 as `applied`), using D1's `meta.changes` per statement, so a
+copy the server already had isn't counted as sent.
+
+The pull leaves out the rows the request itself wrote (the `serverSeq` block
+reserved for it, `ownSeq`), so "received" means changes from other devices.
+A row another device changed after this request wrote it has a newer
+`serverSeq` and still comes through.
 
 ### 3.5 Server-assigned sequence cursor, not a timestamp cursor
 The *pull* side ("what changed on the server since I last looked") uses a
@@ -249,25 +266,29 @@ is hardcoded.
 ### 3.10 Sync history on the status pill is per-device, not server-synced
 
 Double-clicking/double-tapping the sync-status pill (`SyncStatus.svelte`)
-shows the last 5 sync attempts on *that device* - timestamp, what was pulled
-from the server (or the error), and any rejected records - read from
+shows the last 5 sync attempts on *that device* - timestamp, what was sent
+and received (or the error), how long it took, and any rejected records -
+read from
 `syncStore.history`, which is persisted to that browser's `localStorage`
 (key `zachtrack:sync-history`) so it survives reloads.
 
 This is deliberately per-device rather than a shared, cross-device log: a
-sync event ("pulled 2 entries at 3:04pm") describes that device's own
-conversation with the server at that moment, and since the client always
-pushes its full local dataset rather than a delta (see 3.4), there's no
-meaningful "records pushed" count to log either - only what came back in
-`pullChangesSince`'s response is worth summarizing. A true unified history
+sync event ("sent 1 entry; received 2 entries at 3:04pm") describes that
+device's own conversation with the server at that moment. Since v1.10.0 the
+client sends only what changed (3.4) and the server says what it stored, so
+the summary covers both directions (`summarizeSync` in
+`utils/syncHistory.ts`). Identical syncs in a row with nothing to show ("No
+changes", "Offline") are kept as one entry with a count and a time range
+(`addToHistory`), so a quiet day doesn't push everything else out. A true unified history
 visible identically on every device would require a new server-side concept
 (a logged/synced audit table), which is a bigger, separate feature - see
 Section 6.
 
-Each history entry with pulled changes is also expandable (tap the row) into
-a plain-text, human-readable line per changed record - e.g. `Water: 12 oz --
-Jul 30, 3:15 PM` for a trackable entry, or `Fast -- Jul 29, 11:00 PM to 7:15
-AM` - built by `describePulledChanges()` in `sync.svelte.ts`, capped at 20
+Each history entry with changes is also expandable (tap the row) into
+a plain-text, human-readable line per changed record, under Sent and
+Received - e.g. `Water: 12 oz -- Jul 30, 3:15 PM` for a trackable entry, or
+`Fast -- Jul 29, 11:00 PM to 7:15 AM` - built by `describeSent()` and
+`describeReceived()` in `sync.svelte.ts`, capped at 20
 lines per sync with a "+N more" fallback. This is a *what changed to*
 listing, not a before/after diff: computing an actual old-value -> new-value
 diff would require `applyRemoteChanges()` in `db.ts` to capture each local
@@ -956,7 +977,7 @@ found no data exposure, and these hardening gaps, fixed together:
 
 ### 4.13 A new device reset everyone's settings
 `getSettings()` created the default settings on first launch with
-`updatedAt: Date.now()`. Because the client pushes its full dataset (3.4) and
+`updatedAt: Date.now()`. Because the client's first sync sends its full dataset (3.4) and
 the server keeps the newer `updatedAt`, a fresh install's first sync made
 those defaults win and replaced the height, goal weight, default method and
 notification setting every other device had synced. Defaults are now created

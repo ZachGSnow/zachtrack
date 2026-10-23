@@ -1,5 +1,6 @@
 <script lang="ts">
   import { syncStore } from '../stores/sync.svelte';
+  import type { SyncHistoryEntry } from '../utils/syncHistory';
 
   // The last few syncs on this device (ARCHITECTURE.md 3.10): shown from a double-tap on the
   // sync pill and on the Settings page.
@@ -11,6 +12,17 @@
     const isToday = date.toDateString() === today.toDateString();
     const time = date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
     return isToday ? time : `${date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}, ${time}`;
+  }
+
+  /** "9:02 AM", or "9:02 AM to 1:40 PM (14 syncs)" for identical syncs kept as one entry. */
+  function formatWhen(entry: SyncHistoryEntry): string {
+    if (!entry.repeat || !entry.firstAt) return formatEntryTime(entry.completedAt);
+    return `${formatEntryTime(entry.firstAt)} to ${formatEntryTime(entry.completedAt)} (${entry.repeat} syncs)`;
+  }
+
+  function formatDuration(ms: number | undefined): string {
+    if (ms == null) return '';
+    return ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(1)} s`;
   }
 
   function dotColor(outcome: 'success' | 'error' | 'offline' | 'local'): string {
@@ -33,7 +45,7 @@
 {:else}
   <ul class="flex flex-col gap-1">
     {#each syncStore.history as entry (entry.completedAt)}
-      {@const hasDetails = !!entry.details?.length || !!entry.rejectedDetails?.length}
+      {@const hasDetails = !!entry.details?.length || !!entry.sentDetails?.length || !!entry.rejectedDetails?.length}
       <li class="overflow-hidden rounded" style="background: var(--color-surface);">
         <button
           type="button"
@@ -45,7 +57,10 @@
           <span class="flex items-center gap-1.5">
             <span class="h-1.5 w-1.5 shrink-0 rounded-full" style="background: {dotColor(entry.outcome)};"
             ></span>
-            <span class="font-medium" style="color: var(--color-text);">{formatEntryTime(entry.completedAt)}</span>
+            <span class="font-medium" style="color: var(--color-text);">{formatWhen(entry)}</span>
+            {#if entry.durationMs != null && !entry.repeat}
+              <span class="opacity-60" style="color: var(--color-text-muted);">{formatDuration(entry.durationMs)}{entry.full ? ', full check' : ''}</span>
+            {/if}
             {#if hasDetails}
               <span class="ml-auto shrink-0 opacity-60" style="color: var(--color-text-muted);"
                 >{expandedEntryAt === entry.completedAt ? '\u25be' : '\u25b8'}</span
@@ -74,13 +89,27 @@
                 +{entry.rejectedCount - entry.rejectedDetails.length} more not synced
               </li>
             {/if}
-            {#each entry.details ?? [] as line (line)}
-              <li class="break-words opacity-80" style="color: var(--color-text-muted);">{line}</li>
-            {/each}
-            {#if entry.moreDetailsCount}
-              <li class="italic opacity-60" style="color: var(--color-text-muted);">
-                +{entry.moreDetailsCount} more
-              </li>
+            {#if entry.sentDetails?.length}
+              <li class="font-semibold opacity-70" style="color: var(--color-text-muted);">Sent</li>
+              {#each entry.sentDetails as line, i (i)}
+                <li class="break-words opacity-80" style="color: var(--color-text-muted);">{line}</li>
+              {/each}
+              {#if entry.moreSentCount}
+                <li class="italic opacity-60" style="color: var(--color-text-muted);">+{entry.moreSentCount} more</li>
+              {/if}
+            {/if}
+            {#if entry.details?.length}
+              {#if entry.sentDetails?.length}
+                <li class="font-semibold opacity-70" style="color: var(--color-text-muted);">Received</li>
+              {/if}
+              {#each entry.details as line, i (i)}
+                <li class="break-words opacity-80" style="color: var(--color-text-muted);">{line}</li>
+              {/each}
+              {#if entry.moreDetailsCount}
+                <li class="italic opacity-60" style="color: var(--color-text-muted);">
+                  +{entry.moreDetailsCount} more
+                </li>
+              {/if}
             {/if}
           </ul>
         {/if}

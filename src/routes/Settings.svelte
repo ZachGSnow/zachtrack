@@ -255,6 +255,13 @@
     {#if syncStore.lastError}
       <p class="text-xs" style="color: #f87171;">{syncStore.lastError}</p>
     {/if}
+    {#if syncStore.status !== 'local'}
+      <p class="text-xs text-text-muted">
+        {syncStore.waiting === 0
+          ? 'Nothing waiting: the server has every change from this device.'
+          : `${syncStore.waiting} ${syncStore.waiting === 1 ? 'change' : 'changes'} on this device waiting to sync.`}
+      </p>
+    {/if}
     <div class="rounded-lg border p-1.5" style="border-color: var(--color-border); background: var(--color-surface-2);">
       <SyncHistory />
     </div>

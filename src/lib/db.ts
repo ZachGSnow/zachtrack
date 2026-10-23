@@ -144,6 +144,14 @@ export interface SyncTombstone {
   recordType: SyncRecordType;
   uuid: string;
   deletedAt: number;
+  /** What was deleted, for this device's sync history (e.g. the trackable's name). Never sent. */
+  label?: string;
+}
+
+/** A record the server refused last time, sent again with every sync until it's accepted or gone. */
+export interface SyncRetryKey {
+  recordType: SyncRecordType | 'settings';
+  uuid: string;
 }
 
 /** Singleton row (id fixed to 'sync') tracking this device's sync progress. */
@@ -152,6 +160,18 @@ export interface SyncMeta {
   /** Last server-assigned `serverSeq` this device has seen; the pull cursor. */
   cursor: number;
   lastSyncedAt?: number;
+  /**
+   * Local time the last successful sync started. Records with `updatedAt` at or
+   * after it haven't reached the server yet, so the next sync sends only those.
+   * Unset until the first successful sync, which sends everything.
+   */
+  sentThrough?: number;
+  /** When this device last sent its whole dataset; a full send runs once a day as a safety net. */
+  lastFullSendAt?: number;
+  /** When a full send was asked for (an import, whose records keep their own older `updatedAt`, or Full resync); cleared by the next full send that starts after it. */
+  fullSendRequestedAt?: number;
+  /** Records the server refused last time; see SyncRetryKey. */
+  retry?: SyncRetryKey[];
 }
 
 /** Thrown when a fast would be saved with a start date that's already taken by another fast. */
@@ -382,7 +402,10 @@ export async function updateFast(id: number, patch: Partial<FastRecord>): Promis
 export async function deleteFast(id: number): Promise<void> {
   const existing = await db.fasts.get(id);
   await db.fasts.delete(id);
-  if (existing?.uuid) await addTombstone('fasts', existing.uuid);
+  if (existing?.uuid) {
+    const day = new Date(existing.startTime).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    await addTombstone('fasts', existing.uuid, `Fast from ${day}`);
+  }
   notifyMutation();
 }
 
@@ -419,8 +442,9 @@ export async function updateFieldDefinition(
 }
 
 export async function deleteFieldDefinition(id: string): Promise<void> {
+  const existing = await db.fieldDefinitions.get(id);
   await db.fieldDefinitions.delete(id);
-  await addTombstone('fieldDefinitions', id);
+  await addTombstone('fieldDefinitions', id, existing?.name);
   // Detach from any trackables that referenced it.
   const affected = await db.trackableDefinitions.filter((t) => t.fieldIds.includes(id)).toArray();
   for (const t of affected) {
@@ -452,11 +476,12 @@ export async function updateTrackable(id: string, patch: Partial<TrackableDefini
 }
 
 export async function deleteTrackable(id: string): Promise<void> {
+  const trackable = await db.trackableDefinitions.get(id);
   const entries = await db.trackableEntries.where('trackableId').equals(id).toArray();
   await db.trackableEntries.where('trackableId').equals(id).delete();
-  for (const entry of entries) await addTombstone('trackableEntries', entry.id);
+  for (const entry of entries) await addTombstone('trackableEntries', entry.id, trackable?.name);
   await db.trackableDefinitions.delete(id);
-  await addTombstone('trackableDefinitions', id);
+  await addTombstone('trackableDefinitions', id, trackable?.name);
   notifyMutation();
 }
 
@@ -480,8 +505,10 @@ export async function updateTrackableEntry(id: string, patch: Partial<TrackableE
 }
 
 export async function deleteTrackableEntry(id: string): Promise<void> {
+  const entry = await db.trackableEntries.get(id);
+  const trackable = entry ? await db.trackableDefinitions.get(entry.trackableId) : undefined;
   await db.trackableEntries.delete(id);
-  await addTombstone('trackableEntries', id);
+  await addTombstone('trackableEntries', id, trackable?.name);
   notifyMutation();
 }
 
@@ -489,18 +516,20 @@ export async function deleteTrackableEntry(id: string): Promise<void> {
 // Sync support helpers
 // ---------------------------------------------------------------------------
 
-async function addTombstone(recordType: SyncRecordType, recordUuid: string): Promise<void> {
-  await db.syncTombstones.add({ recordType, uuid: recordUuid, deletedAt: Date.now() });
+async function addTombstone(recordType: SyncRecordType, recordUuid: string, label?: string): Promise<void> {
+  await db.syncTombstones.add({ recordType, uuid: recordUuid, deletedAt: Date.now(), ...(label ? { label } : {}) });
 }
 
-/** Full local snapshot of every syncable table, sent to the server on each sync (cheap at this app's scale; server dedupes via `updatedAt`). */
-export async function getAllSyncableRecords(): Promise<{
+export interface SyncableRecords {
   fasts: FastRecord[];
   fieldDefinitions: FieldDefinition[];
   trackableDefinitions: TrackableDefinition[];
   trackableEntries: TrackableEntry[];
   settings: SettingsRecord;
-}> {
+}
+
+/** Full local snapshot of every syncable table: exports, imports, and a sync's full send. */
+export async function getAllSyncableRecords(): Promise<SyncableRecords> {
   const [fasts, fieldDefinitions, trackableDefinitions, trackableEntries, settings] = await Promise.all([
     db.fasts.toArray(),
     db.fieldDefinitions.toArray(),
@@ -509,6 +538,44 @@ export async function getAllSyncableRecords(): Promise<{
     getSettings(),
   ]);
   return { fasts, fieldDefinitions, trackableDefinitions, trackableEntries, settings };
+}
+
+/**
+ * The records a sync sends when it isn't a full send: everything changed at or
+ * after `since` (SyncMeta.sentThrough), plus any the server refused last time.
+ * `settings` is null when it hasn't changed.
+ */
+export async function getChangedSyncableRecords(
+  since: number,
+  retry: SyncRetryKey[] = [],
+): Promise<Omit<SyncableRecords, 'settings'> & { settings: SettingsRecord | null }> {
+  const again = new Set(retry.map((r) => `${r.recordType}:${r.uuid}`));
+  const changed = (type: SyncRecordType, key: string, updatedAt: number) => updatedAt >= since || again.has(`${type}:${key}`);
+  const [fasts, fieldDefinitions, trackableDefinitions, trackableEntries, settings] = await Promise.all([
+    db.fasts.filter((f) => changed('fasts', f.uuid, f.updatedAt)).toArray(),
+    db.fieldDefinitions.filter((f) => changed('fieldDefinitions', f.id, f.updatedAt)).toArray(),
+    db.trackableDefinitions.filter((t) => changed('trackableDefinitions', t.id, t.updatedAt)).toArray(),
+    db.trackableEntries.filter((e) => changed('trackableEntries', e.id, e.updatedAt)).toArray(),
+    getSettings(),
+  ]);
+  const settingsChanged = settings.updatedAt >= since || again.has(`settings:${settings.id}`);
+  return { fasts, fieldDefinitions, trackableDefinitions, trackableEntries, settings: settingsChanged ? settings : null };
+}
+
+/** How many local changes the server hasn't got yet: what the next sync would send, deletes included. */
+export async function countWaitingChanges(): Promise<number> {
+  const meta = await getSyncMeta();
+  const tombstones = await db.syncTombstones.count();
+  if (meta.sentThrough == null) return tombstones; // never synced: nothing to compare against
+  const changes = await getChangedSyncableRecords(meta.sentThrough);
+  return (
+    tombstones +
+    changes.fasts.length +
+    changes.fieldDefinitions.length +
+    changes.trackableDefinitions.length +
+    changes.trackableEntries.length +
+    (changes.settings ? 1 : 0)
+  );
 }
 
 /** All tombstones not yet acknowledged by the sync server. */
@@ -609,10 +676,13 @@ export async function applyRemoteChanges(changes: RemoteSyncChanges): Promise<vo
 /**
  * Writes the records of a confirmed import (see `planImport` in dataFile.ts,
  * which has already kept only new or newer records and never includes
- * deletes), then notifies listeners so sync pushes them like any local edit.
+ * deletes), then notifies listeners so the next sync sends them.
  */
 export async function importRecords(changes: RemoteSyncChanges): Promise<void> {
   await applyRemoteChanges(changes);
+  // Imported records keep their own updatedAt, usually older than the last
+  // sync, so only a full send is sure to include them.
+  await setSyncMeta({ fullSendRequestedAt: Date.now() });
   notifyMutation();
 }
 
