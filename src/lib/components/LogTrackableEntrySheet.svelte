@@ -16,10 +16,13 @@
     open = $bindable(false),
     trackable,
     entry = null,
+    defaultTimestamp,
   }: {
     open: boolean;
     trackable: TrackableDefinition | null;
     entry?: TrackableEntry | null;
+    /** When a new entry starts out (e.g. a day picked in the habit grid); default now. */
+    defaultTimestamp?: number;
   } = $props();
 
   const allFields = liveQuery(() => db.fieldDefinitions.toArray());
@@ -46,7 +49,7 @@
 
   $effect(() => {
     if (!open || !trackable) return;
-    const key = `${trackable.id}|${entry?.id ?? 'new'}`;
+    const key = `${trackable.id}|${entry?.id ?? `new@${defaultTimestamp ?? ''}`}`;
     if (key !== initKey) {
       initKey = key;
       initialized = false;
@@ -57,7 +60,8 @@
 
     const fields = attachedFields;
     const ages = isAges;
-    dateLocal = ages ? toDateInputValue(entry?.timestamp ?? Date.now()) : toDatetimeLocal(entry?.timestamp ?? Date.now());
+    const when = entry?.timestamp ?? defaultTimestamp ?? Date.now();
+    dateLocal = ages ? toDateInputValue(when) : toDatetimeLocal(when);
     note = entry?.note ?? '';
     tags = entry?.tags ?? [];
     const inputs: Record<string, string | number | boolean> = {};

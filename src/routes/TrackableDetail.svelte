@@ -28,7 +28,7 @@
   import LogTrackableEntrySheet from '../lib/components/LogTrackableEntrySheet.svelte';
   import OccurrenceBucketChart from '../lib/components/charts/OccurrenceBucketChart.svelte';
   import IntervalTrendChart from '../lib/components/charts/IntervalTrendChart.svelte';
-  import TrackableHeatmapChart from '../lib/components/charts/TrackableHeatmapChart.svelte';
+  import HabitHistory from '../lib/components/HabitHistory.svelte';
   import TrackableFieldsChart from '../lib/components/charts/TrackableFieldsChart.svelte';
 
   let { params }: { params: { id: string } } = $props();
@@ -150,10 +150,17 @@
       .sort((a, b) => a.daysUntil - b.daysUntil),
   );
 
-  function openLogNew() {
+  let logTimestamp = $state<number | undefined>(undefined);
+
+  function openLogNew(timestamp?: number) {
     editingEntry = null;
+    logTimestamp = timestamp;
     logOpen = true;
   }
+
+  // The habit grid is the main history view for trackables with a goal, and
+  // for events and check-ins, where which days you logged is the point.
+  const showHabitHistory = $derived(!!$trackable?.goalType || kind === 'event' || kind === 'checkin');
 
   function openLogEdit(e: TrackableEntry) {
     editingEntry = e;
@@ -180,7 +187,7 @@
       <button
         class="w-full rounded-xl py-3 text-base font-semibold"
         style="background: var(--color-brand); color: #06140c;"
-        onclick={openLogNew}
+        onclick={() => openLogNew()}
       >+ Add Person</button>
 
       <div>
@@ -240,8 +247,18 @@
       <button
         class="w-full rounded-xl py-3 text-base font-semibold"
         style="background: var(--color-brand); color: #06140c;"
-        onclick={openLogNew}
+        onclick={() => openLogNew()}
       >Log Entry</button>
+
+      {#if showHabitHistory}
+        <HabitHistory
+          trackable={$trackable}
+          entries={$entries ?? []}
+          fields={attachedFields}
+          onAddForDay={(timestamp) => openLogNew(timestamp)}
+          onEditEntry={openLogEdit}
+        />
+      {/if}
 
       {#if todayTotals.length > 0}
         <div class="grid grid-cols-2 gap-2">
@@ -293,10 +310,7 @@
       <!-- Charts that suit the kind: when it happens matters for events, which days for check-ins. -->
       {#if kind === 'event'}
         <OccurrenceBucketChart entries={$entries ?? []} {range} color={$trackable.color} />
-        <TrackableHeatmapChart entries={$entries ?? []} {range} color={$trackable.color} />
         <IntervalTrendChart entries={$entries ?? []} color={$trackable.color} />
-      {:else if kind === 'checkin'}
-        <TrackableHeatmapChart entries={$entries ?? []} {range} color={$trackable.color} />
       {/if}
 
       <TagFilter items={$entries ?? []} bind:selected={tagFilter} />
@@ -310,5 +324,5 @@
 </BottomSheet>
 
 <BottomSheet bind:open={logOpen}>
-  <LogTrackableEntrySheet bind:open={logOpen} trackable={$trackable ?? null} entry={editingEntry} />
+  <LogTrackableEntrySheet bind:open={logOpen} trackable={$trackable ?? null} entry={editingEntry} defaultTimestamp={logTimestamp} />
 </BottomSheet>
