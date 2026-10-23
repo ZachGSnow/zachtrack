@@ -1,6 +1,7 @@
 import Dexie, { type EntityTable } from 'dexie';
 import { startOfDay } from './utils/time';
 import type { CustomFastPreset } from './data/presets';
+import type { SyncHistoryEntry } from './utils/syncHistory';
 import { BODY_FIELD_ROLES, BODY_FIELD_SETTING, resolveBodyField, type BodyFatSex } from './utils/health';
 
 export interface FastRecord {
@@ -172,7 +173,14 @@ export interface SyncMeta {
   fullSendRequestedAt?: number;
   /** Records the server refused last time; see SyncRetryKey. */
   retry?: SyncRetryKey[];
+  /** This device's id in the server's device list; made on first use, new again after an erase. */
+  deviceId?: string;
+  /** What this device is called in the device list and activity, e.g. "Phone". */
+  deviceName?: string;
 }
+
+/** A row of this device's own sync history (see utils/syncHistory.ts), kept 30 days. */
+export type SyncLogRow = SyncHistoryEntry & { id?: number };
 
 /** Thrown when a fast would be saved with a start date that's already taken by another fast. */
 export class DuplicateStartDayError extends Error {
@@ -194,6 +202,7 @@ export class ZachTrackDB extends Dexie {
   trackableEntries!: EntityTable<TrackableEntry, 'id'>;
   syncTombstones!: EntityTable<SyncTombstone, 'id'>;
   syncMeta!: EntityTable<SyncMeta, 'id'>;
+  syncLog!: EntityTable<SyncLogRow, 'id'>;
 
   constructor() {
     super('snowfast');
@@ -297,6 +306,18 @@ export class ZachTrackDB extends Dexie {
             }
           });
       });
+    // v6: this device's sync history moves from localStorage (last 5) to its
+    // own table (30 days); stores/sync.svelte.ts copies the old entries over.
+    this.version(6).stores({
+      fasts: '++id, startTime, endTime, startDay, uuid',
+      settings: 'id',
+      fieldDefinitions: 'id, name',
+      trackableDefinitions: 'id, name',
+      trackableEntries: 'id, trackableId, timestamp',
+      syncTombstones: '++id, recordType, uuid, deletedAt',
+      syncMeta: 'id',
+      syncLog: '++id, completedAt',
+    });
   }
 }
 
@@ -602,8 +623,36 @@ export async function setSyncMeta(patch: Partial<Omit<SyncMeta, 'id'>>): Promise
   await db.syncMeta.put({ ...current, ...patch });
 }
 
-/** A record as returned by the sync server: same shape as local, plus `deletedAt` for tombstoned rows. */
-type Synced<T> = T & { deletedAt?: number | null };
+/** A starting name for this device from its browser, until it's renamed on the Sync page. */
+export function guessDeviceName(userAgent: string): string {
+  if (/iPhone/.test(userAgent)) return 'iPhone';
+  if (/iPad/.test(userAgent)) return 'iPad';
+  if (/Android/.test(userAgent)) return /Mobile/.test(userAgent) ? 'Android phone' : 'Android tablet';
+  if (/Windows/.test(userAgent)) return 'Windows PC';
+  if (/Macintosh|Mac OS X/.test(userAgent)) return 'Mac';
+  if (/CrOS/.test(userAgent)) return 'Chromebook';
+  if (/Linux/.test(userAgent)) return 'Linux PC';
+  return 'This device';
+}
+
+/** This device's id and name, made the first time they're needed. */
+export async function getDevice(): Promise<{ id: string; name: string }> {
+  const meta = await getSyncMeta();
+  if (meta.deviceId && meta.deviceName) return { id: meta.deviceId, name: meta.deviceName };
+  const device = {
+    id: meta.deviceId ?? uuid(),
+    name: meta.deviceName ?? guessDeviceName(typeof navigator === 'undefined' ? '' : navigator.userAgent),
+  };
+  await setSyncMeta({ deviceId: device.id, deviceName: device.name });
+  return device;
+}
+
+/**
+ * A record as returned by the sync server: same shape as local, plus
+ * `deletedAt` for tombstoned rows and `updatedBy`, the device id that last
+ * changed it. Neither is stored locally.
+ */
+type Synced<T> = T & { deletedAt?: number | null; updatedBy?: string | null };
 
 export interface RemoteSyncChanges {
   fasts: Synced<FastRecord>[];
@@ -628,7 +677,7 @@ export async function applyRemoteChanges(changes: RemoteSyncChanges): Promise<vo
     [db.fasts, db.fieldDefinitions, db.trackableDefinitions, db.trackableEntries, db.settings],
     async () => {
       for (const remote of changes.fasts) {
-        const { deletedAt, ...rest } = remote;
+        const { deletedAt, updatedBy: _by, ...rest } = remote;
         const local = await db.fasts.where('uuid').equals(remote.uuid).first();
         if (deletedAt) {
           if (local?.id != null) await db.fasts.delete(local.id);
@@ -641,7 +690,7 @@ export async function applyRemoteChanges(changes: RemoteSyncChanges): Promise<vo
         }
       }
       for (const remote of changes.fieldDefinitions) {
-        const { deletedAt, ...rest } = remote;
+        const { deletedAt, updatedBy: _by, ...rest } = remote;
         if (deletedAt) {
           await db.fieldDefinitions.delete(remote.id);
           continue;
@@ -649,7 +698,7 @@ export async function applyRemoteChanges(changes: RemoteSyncChanges): Promise<vo
         await db.fieldDefinitions.put(rest);
       }
       for (const remote of changes.trackableDefinitions) {
-        const { deletedAt, ...rest } = remote;
+        const { deletedAt, updatedBy: _by, ...rest } = remote;
         if (deletedAt) {
           await db.trackableDefinitions.delete(remote.id);
           await db.trackableEntries.where('trackableId').equals(remote.id).delete();
@@ -658,7 +707,7 @@ export async function applyRemoteChanges(changes: RemoteSyncChanges): Promise<vo
         await db.trackableDefinitions.put(rest);
       }
       for (const remote of changes.trackableEntries) {
-        const { deletedAt, ...rest } = remote;
+        const { deletedAt, updatedBy: _by, ...rest } = remote;
         if (deletedAt) {
           await db.trackableEntries.delete(remote.id);
           continue;
@@ -666,7 +715,7 @@ export async function applyRemoteChanges(changes: RemoteSyncChanges): Promise<vo
         await db.trackableEntries.put(rest);
       }
       if (changes.settings) {
-        const { deletedAt, ...rest } = changes.settings;
+        const { deletedAt, updatedBy: _by, ...rest } = changes.settings;
         if (!deletedAt) await db.settings.put(rest);
       }
     },

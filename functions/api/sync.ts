@@ -6,18 +6,24 @@ import type {
   SettingsRecord,
   SyncRecordType,
 } from '../../src/lib/db';
-import { UNAVAILABLE_REASONS, verifyAccessJwt, type AccessDeps } from '../../server/access';
+import type { AccessDeps } from '../../server/access';
+import { jsonResponse, listDevices, refuseUnlessOwner, type DeviceInfo, type Env } from '../../server/endpoint';
 import { invalidReason, recordKey, type RecordKind } from '../../src/lib/validate';
 
-export interface Env {
-  DB: D1Database;
-  /** The only email allowed to sync. Required: the endpoint refuses every request without it. */
-  OWNER_EMAIL?: string;
-  /** Zero Trust team domain (`your-team.cloudflareaccess.com`). Required. */
-  ACCESS_TEAM_DOMAIN?: string;
-  /** The Access application's AUD tag. Optional, checked when set. */
-  ACCESS_AUD?: string;
+export type { Env } from '../../server/endpoint';
+
+/** The device sending a sync, from the app since v1.10.0. Older apps send none. */
+export interface SyncDevice {
+  id: string;
+  name: string;
+  appVersion?: string;
 }
+
+/** Sync activity and devices not seen for this long are removed. */
+export const ACTIVITY_DAYS = 90;
+const DAY_MS = 24 * 3600_000;
+/** At most this many record names are kept per activity row. */
+export const EVENT_DETAILS_LIMIT = 20;
 
 interface Tombstone {
   recordType: SyncRecordType;
@@ -35,6 +41,7 @@ interface SyncRequestBody {
     settings: SettingsRecord | null;
   };
   tombstones: Tombstone[];
+  device?: unknown;
 }
 
 interface RejectedRecord {
@@ -43,7 +50,8 @@ interface RejectedRecord {
   reason: string;
 }
 
-type WireRow<T> = T & { deletedAt?: number };
+/** `updatedBy`: the device id that last changed the row, when known. */
+type WireRow<T> = T & { deletedAt?: number; updatedBy?: string };
 
 /** A record the server stored from this request: new, newer than its copy, or a delete it applied. */
 export interface AppliedRecord {
@@ -70,6 +78,8 @@ interface SyncResponseBody {
   appliedCounts: Record<Exclude<RecordKind, 'tombstones'> | 'deletes', number>;
   /** The first APPLIED_RECORDS_LIMIT of them, for the device's sync history. */
   applied: AppliedRecord[];
+  /** Every device that has synced in the last ACTIVITY_DAYS, most recent first. */
+  devices: DeviceInfo[];
 }
 
 /**
@@ -93,27 +103,8 @@ export const onRequestPost: PagesFunction<Env> = (context) => handleSync(context
 
 /** The sync handler, separate from the Pages export so tests can inject Access key fetching and time. */
 export async function handleSync(request: Request, env: Env, deps: AccessDeps = {}): Promise<Response> {
-  // Cloudflare Access gates the custom domain before this Function runs, but
-  // `<project>.pages.dev` and per-deployment aliases can reach it without
-  // Access. So the Access JWT is verified here, and a missing owner or team
-  // domain fails closed instead of skipping the check.
-  if (!env.OWNER_EMAIL || !env.ACCESS_TEAM_DOMAIN) {
-    console.error('sync: OWNER_EMAIL and ACCESS_TEAM_DOMAIN must both be set');
-    return jsonResponse({ error: 'Sync is not configured on the server' }, 503);
-  }
-  const access = await verifyAccessJwt(
-    request.headers.get('Cf-Access-Jwt-Assertion'),
-    { teamDomain: env.ACCESS_TEAM_DOMAIN, aud: env.ACCESS_AUD, ownerEmail: env.OWNER_EMAIL },
-    deps,
-  );
-  if (!access.ok) {
-    if (UNAVAILABLE_REASONS.has(access.reason)) {
-      console.error(`sync: could not check the Access token (${access.reason})`);
-      return jsonResponse({ error: 'Sync is temporarily unavailable' }, 503);
-    }
-    console.warn(`sync: rejected request (${access.reason})`);
-    return jsonResponse({ error: 'Forbidden' }, 403);
-  }
+  const refused = await refuseUnlessOwner(request, env, deps, 'sync');
+  if (refused) return refused;
 
   let body: SyncRequestBody;
   try {
@@ -126,9 +117,12 @@ export async function handleSync(request: Request, env: Env, deps: AccessDeps = 
   }
 
   const db = env.DB;
+  const device = readDevice(body.device);
+  const now = (deps.now ?? Date.now)();
 
   try {
-    const { rejected, applied, ownSeq } = await applyIncomingChanges(db, body);
+    const { rejected, applied, ownSeq } = await applyIncomingChanges(db, body, device?.id ?? null);
+    await recordActivity(db, device, applied, rejected.length, now);
     const changes = await pullChangesSince(db, body.cursor, ownSeq);
     const cursor = await currentSeq(db);
 
@@ -148,6 +142,7 @@ export async function handleSync(request: Request, env: Env, deps: AccessDeps = 
       rejected,
       appliedCounts,
       applied: applied.slice(0, APPLIED_RECORDS_LIMIT),
+      devices: await listDevices(db),
     };
     return jsonResponse(responseBody);
   } catch (err) {
@@ -158,11 +153,98 @@ export async function handleSync(request: Request, env: Env, deps: AccessDeps = 
   }
 }
 
-function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    // Health data: never cached by the browser or anything in between.
-    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' },
+/** The request's device, or null when it's missing or malformed (an app before v1.10.0). */
+export function readDevice(raw: unknown): SyncDevice | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const d = raw as Record<string, unknown>;
+  if (typeof d.id !== 'string' || !/^[A-Za-z0-9-]{1,64}$/.test(d.id)) return null;
+  const name = typeof d.name === 'string' ? d.name.trim().slice(0, 40) : '';
+  const appVersion = typeof d.appVersion === 'string' && /^[0-9A-Za-z.+-]{1,20}$/.test(d.appVersion) ? d.appVersion : undefined;
+  return { id: d.id, name: name || 'Unnamed device', ...(appVersion ? { appVersion } : {}) };
+}
+
+// ---------------------------------------------------------------------------
+// Devices and the shared activity log (d1/migrations/0006). A sync that
+// changed something gets one syncEvents row with counts and up to 20 record
+// names, never values; rows and devices older than ACTIVITY_DAYS go.
+// ---------------------------------------------------------------------------
+
+async function recordActivity(
+  db: D1Database,
+  device: SyncDevice | null,
+  applied: AppliedRecord[],
+  rejectedCount: number,
+  now: number,
+): Promise<void> {
+  const statements: D1PreparedStatement[] = [];
+  if (device) {
+    statements.push(
+      db
+        .prepare(
+          `INSERT INTO devices (id, name, appVersion, firstSeenAt, lastSeenAt) VALUES (?, ?, ?, ?, ?)
+           ON CONFLICT(id) DO UPDATE SET name=excluded.name, appVersion=excluded.appVersion, lastSeenAt=excluded.lastSeenAt`,
+        )
+        .bind(device.id, device.name, device.appVersion ?? null, now, now),
+    );
+  }
+  if (applied.length > 0 || rejectedCount > 0) {
+    const counts: Record<string, number> = {};
+    for (const a of applied) {
+      const key = a.deleted ? 'deletes' : a.recordType;
+      counts[key] = (counts[key] ?? 0) + 1;
+    }
+    const details = await nameApplied(db, applied.slice(0, EVENT_DETAILS_LIMIT));
+    statements.push(
+      db
+        .prepare('INSERT INTO syncEvents (deviceId, at, counts, details, rejectedCount) VALUES (?, ?, ?, ?, ?)')
+        .bind(device?.id ?? 'unknown', now, JSON.stringify(counts), JSON.stringify(details), rejectedCount),
+    );
+  }
+  const cutoff = now - ACTIVITY_DAYS * DAY_MS;
+  statements.push(db.prepare('DELETE FROM syncEvents WHERE at < ?').bind(cutoff));
+  statements.push(db.prepare('DELETE FROM devices WHERE lastSeenAt < ?').bind(cutoff));
+  await db.batch(statements);
+}
+
+const KIND_LABEL: Record<AppliedRecord['recordType'], string> = {
+  fasts: 'Fast',
+  fieldDefinitions: 'Field',
+  trackableDefinitions: 'Trackable',
+  trackableEntries: 'Entry',
+  settings: 'Settings',
+};
+
+/** "Entry -- Water", "Trackable deleted -- Reading", "Fast": the kind and a name, never a value. */
+async function nameApplied(db: D1Database, applied: AppliedRecord[]): Promise<string[]> {
+  const idsOf = (type: AppliedRecord['recordType']) => applied.filter((a) => a.recordType === type).map((a) => a.uuid);
+  const marks = (n: number) => Array(n).fill('?').join(', ');
+  const lookups: Array<{ type: AppliedRecord['recordType']; statement: D1PreparedStatement }> = [];
+  const entryIds = idsOf('trackableEntries');
+  if (entryIds.length) {
+    lookups.push({
+      type: 'trackableEntries',
+      statement: db
+        .prepare(
+          `SELECT e.id AS id, t.name AS name FROM trackableEntries e LEFT JOIN trackableDefinitions t ON t.id = e.trackableId WHERE e.id IN (${marks(entryIds.length)})`,
+        )
+        .bind(...entryIds),
+    });
+  }
+  for (const type of ['fieldDefinitions', 'trackableDefinitions'] as const) {
+    const ids = idsOf(type);
+    if (ids.length) lookups.push({ type, statement: db.prepare(`SELECT id, name FROM ${type} WHERE id IN (${marks(ids.length)})`).bind(...ids) });
+  }
+  const names = new Map<string, string>();
+  if (lookups.length) {
+    const results = await db.batch<{ id: string; name: string | null }>(lookups.map((l) => l.statement));
+    results.forEach((r, i) => {
+      for (const row of r.results ?? []) if (row.name) names.set(`${lookups[i].type}:${row.id}`, row.name);
+    });
+  }
+  return applied.map((a) => {
+    const head = a.deleted ? `${KIND_LABEL[a.recordType]} deleted` : KIND_LABEL[a.recordType];
+    const name = names.get(`${a.recordType}:${a.uuid}`);
+    return name ? `${head} -- ${name}` : head;
   });
 }
 
@@ -200,7 +282,7 @@ async function runBatch(db: D1Database, items: Array<{ statement: D1PreparedStat
   });
 }
 
-async function applyIncomingChanges(db: D1Database, body: SyncRequestBody): Promise<ApplyResult> {
+async function applyIncomingChanges(db: D1Database, body: SyncRequestBody, updatedBy: string | null): Promise<ApplyResult> {
   const rejected: RejectedRecord[] = [];
   const applied: AppliedRecord[] = [];
 
@@ -261,7 +343,7 @@ async function applyIncomingChanges(db: D1Database, body: SyncRequestBody): Prom
         continue;
       }
       startDayOwner.set(fast.startDay, fast.uuid);
-      fastStatements.push({ statement: buildFastUpsert(db, fast, takeSeq()), record: { recordType: 'fasts', uuid: fast.uuid } });
+      fastStatements.push({ statement: buildFastUpsert(db, fast, takeSeq(), updatedBy), record: { recordType: 'fasts', uuid: fast.uuid } });
     }
   }
   await runBatch(db, fastStatements, applied);
@@ -269,30 +351,30 @@ async function applyIncomingChanges(db: D1Database, body: SyncRequestBody): Prom
   // --- fieldDefinitions / trackableDefinitions / trackableEntries / settings ---
   await runBatch(
     db,
-    fields.map((f) => ({ statement: buildFieldUpsert(db, f, takeSeq()), record: { recordType: 'fieldDefinitions' as const, uuid: f.id } })),
+    fields.map((f) => ({ statement: buildFieldUpsert(db, f, takeSeq(), updatedBy), record: { recordType: 'fieldDefinitions' as const, uuid: f.id } })),
     applied,
   );
   await runBatch(
     db,
     trackables.map((t) => ({
-      statement: buildTrackableUpsert(db, t, takeSeq()),
+      statement: buildTrackableUpsert(db, t, takeSeq(), updatedBy),
       record: { recordType: 'trackableDefinitions' as const, uuid: t.id },
     })),
     applied,
   );
   await runBatch(
     db,
-    entries.map((e) => ({ statement: buildEntryUpsert(db, e, takeSeq()), record: { recordType: 'trackableEntries' as const, uuid: e.id } })),
+    entries.map((e) => ({ statement: buildEntryUpsert(db, e, takeSeq(), updatedBy), record: { recordType: 'trackableEntries' as const, uuid: e.id } })),
     applied,
   );
   if (settings) {
-    await runBatch(db, [{ statement: buildSettingsUpsert(db, settings, takeSeq()), record: { recordType: 'settings', uuid: settings.id } }], applied);
+    await runBatch(db, [{ statement: buildSettingsUpsert(db, settings, takeSeq(), updatedBy), record: { recordType: 'settings', uuid: settings.id } }], applied);
   }
 
   // --- tombstones (soft deletes), LWW-aware ---
   const deletes: Array<{ statement: D1PreparedStatement; record: AppliedRecord }> = [];
   for (const t of tombstones) {
-    const statement = buildTombstoneUpdate(db, t, takeSeq());
+    const statement = buildTombstoneUpdate(db, t, takeSeq(), updatedBy);
     if (statement) deletes.push({ statement, record: { recordType: t.recordType, uuid: t.uuid, deleted: true } });
   }
   await runBatch(db, deletes, applied);
@@ -305,17 +387,17 @@ async function applyIncomingChanges(db: D1Database, body: SyncRequestBody): Prom
 // so no separate pre-check SELECT is needed per record)
 // ---------------------------------------------------------------------------
 
-function buildFastUpsert(db: D1Database, fast: FastRecord, serverSeq: number): D1PreparedStatement {
+function buildFastUpsert(db: D1Database, fast: FastRecord, serverSeq: number, updatedBy: string | null): D1PreparedStatement {
   return db
     .prepare(
-      `INSERT INTO fasts (uuid, startTime, startDay, endTime, method, presetId, presetLabel, targetHours, moodRating, energyRating, hungerRating, tags, note, createdAt, updatedAt, deletedAt, serverSeq)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
+      `INSERT INTO fasts (uuid, startTime, startDay, endTime, method, presetId, presetLabel, targetHours, moodRating, energyRating, hungerRating, tags, note, createdAt, updatedAt, deletedAt, serverSeq, updatedBy)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
        ON CONFLICT(uuid) DO UPDATE SET
          startTime=excluded.startTime, startDay=excluded.startDay, endTime=excluded.endTime,
          method=excluded.method, presetId=excluded.presetId, presetLabel=excluded.presetLabel,
          targetHours=excluded.targetHours, moodRating=excluded.moodRating, energyRating=excluded.energyRating,
          hungerRating=excluded.hungerRating, tags=excluded.tags, note=excluded.note,
-         createdAt=excluded.createdAt, updatedAt=excluded.updatedAt, deletedAt=NULL, serverSeq=excluded.serverSeq
+         createdAt=excluded.createdAt, updatedAt=excluded.updatedAt, deletedAt=NULL, serverSeq=excluded.serverSeq, updatedBy=excluded.updatedBy
        WHERE excluded.updatedAt > fasts.updatedAt`,
     )
     .bind(
@@ -335,18 +417,19 @@ function buildFastUpsert(db: D1Database, fast: FastRecord, serverSeq: number): D
       fast.createdAt,
       fast.updatedAt,
       serverSeq,
+      updatedBy,
     );
 }
 
-function buildFieldUpsert(db: D1Database, field: FieldDefinition, serverSeq: number): D1PreparedStatement {
+function buildFieldUpsert(db: D1Database, field: FieldDefinition, serverSeq: number, updatedBy: string | null): D1PreparedStatement {
   return db
     .prepare(
-      `INSERT INTO fieldDefinitions (id, name, kind, unit, ratingMin, ratingMax, aggregation, createdAt, updatedAt, deletedAt, serverSeq)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
+      `INSERT INTO fieldDefinitions (id, name, kind, unit, ratingMin, ratingMax, aggregation, createdAt, updatedAt, deletedAt, serverSeq, updatedBy)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          name=excluded.name, kind=excluded.kind, unit=excluded.unit, ratingMin=excluded.ratingMin,
          ratingMax=excluded.ratingMax, aggregation=excluded.aggregation, createdAt=excluded.createdAt, updatedAt=excluded.updatedAt,
-         deletedAt=NULL, serverSeq=excluded.serverSeq
+         deletedAt=NULL, serverSeq=excluded.serverSeq, updatedBy=excluded.updatedBy
        WHERE excluded.updatedAt > fieldDefinitions.updatedAt`,
     )
     .bind(
@@ -360,22 +443,23 @@ function buildFieldUpsert(db: D1Database, field: FieldDefinition, serverSeq: num
       field.createdAt,
       field.updatedAt,
       serverSeq,
+      updatedBy,
     );
 }
 
-function buildTrackableUpsert(db: D1Database, trackable: TrackableDefinition, serverSeq: number): D1PreparedStatement {
+function buildTrackableUpsert(db: D1Database, trackable: TrackableDefinition, serverSeq: number, updatedBy: string | null): D1PreparedStatement {
   return db
     .prepare(
       `INSERT INTO trackableDefinitions (id, name, icon, color, fieldIds, displayMode, goalType, goalValue, pinned, archived, sortOrder,
-         scheduleDays, skipDays, pausedUntil, createdAt, updatedAt, deletedAt, serverSeq)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
+         scheduleDays, skipDays, pausedUntil, createdAt, updatedAt, deletedAt, serverSeq, updatedBy)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          name=excluded.name, icon=excluded.icon, color=excluded.color, fieldIds=excluded.fieldIds,
          displayMode=excluded.displayMode, goalType=excluded.goalType, goalValue=excluded.goalValue,
          pinned=excluded.pinned, archived=excluded.archived, sortOrder=excluded.sortOrder,
          scheduleDays=excluded.scheduleDays, skipDays=excluded.skipDays, pausedUntil=excluded.pausedUntil,
          createdAt=excluded.createdAt, updatedAt=excluded.updatedAt,
-         deletedAt=NULL, serverSeq=excluded.serverSeq
+         deletedAt=NULL, serverSeq=excluded.serverSeq, updatedBy=excluded.updatedBy
        WHERE excluded.updatedAt > trackableDefinitions.updatedAt`,
     )
     .bind(
@@ -396,18 +480,19 @@ function buildTrackableUpsert(db: D1Database, trackable: TrackableDefinition, se
       trackable.createdAt,
       trackable.updatedAt,
       serverSeq,
+      updatedBy,
     );
 }
 
-function buildEntryUpsert(db: D1Database, entry: TrackableEntry, serverSeq: number): D1PreparedStatement {
+function buildEntryUpsert(db: D1Database, entry: TrackableEntry, serverSeq: number, updatedBy: string | null): D1PreparedStatement {
   return db
     .prepare(
-      `INSERT INTO trackableEntries (id, trackableId, timestamp, note, tags, fieldValues, createdAt, updatedAt, deletedAt, serverSeq)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
+      `INSERT INTO trackableEntries (id, trackableId, timestamp, note, tags, fieldValues, createdAt, updatedAt, deletedAt, serverSeq, updatedBy)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          trackableId=excluded.trackableId, timestamp=excluded.timestamp, note=excluded.note, tags=excluded.tags,
          fieldValues=excluded.fieldValues, createdAt=excluded.createdAt, updatedAt=excluded.updatedAt,
-         deletedAt=NULL, serverSeq=excluded.serverSeq
+         deletedAt=NULL, serverSeq=excluded.serverSeq, updatedBy=excluded.updatedBy
        WHERE excluded.updatedAt > trackableEntries.updatedAt`,
     )
     .bind(
@@ -420,22 +505,23 @@ function buildEntryUpsert(db: D1Database, entry: TrackableEntry, serverSeq: numb
       entry.createdAt,
       entry.updatedAt,
       serverSeq,
+      updatedBy,
     );
 }
 
-function buildSettingsUpsert(db: D1Database, settings: SettingsRecord, serverSeq: number): D1PreparedStatement {
+function buildSettingsUpsert(db: D1Database, settings: SettingsRecord, serverSeq: number, updatedBy: string | null): D1PreparedStatement {
   return db
     .prepare(
       `INSERT INTO settings (id, defaultPresetId, notificationsEnabled, heightInches, goalWeightLb, weightFieldId,
-         waistFieldId, neckFieldId, hipFieldId, bodyFatSex, fastScheduleTime, customFastPresets, updatedAt, serverSeq)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         waistFieldId, neckFieldId, hipFieldId, bodyFatSex, fastScheduleTime, customFastPresets, updatedAt, serverSeq, updatedBy)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          defaultPresetId=excluded.defaultPresetId, notificationsEnabled=excluded.notificationsEnabled,
          heightInches=excluded.heightInches, goalWeightLb=excluded.goalWeightLb, weightFieldId=excluded.weightFieldId,
          waistFieldId=excluded.waistFieldId, neckFieldId=excluded.neckFieldId, hipFieldId=excluded.hipFieldId,
          bodyFatSex=excluded.bodyFatSex, fastScheduleTime=excluded.fastScheduleTime,
          customFastPresets=excluded.customFastPresets,
-         updatedAt=excluded.updatedAt, serverSeq=excluded.serverSeq
+         updatedAt=excluded.updatedAt, serverSeq=excluded.serverSeq, updatedBy=excluded.updatedBy
        WHERE excluded.updatedAt > settings.updatedAt`,
     )
     .bind(
@@ -453,10 +539,11 @@ function buildSettingsUpsert(db: D1Database, settings: SettingsRecord, serverSeq
       settings.customFastPresets ? JSON.stringify(settings.customFastPresets) : null,
       settings.updatedAt,
       serverSeq,
+      updatedBy,
     );
 }
 
-function buildTombstoneUpdate(db: D1Database, tombstone: Tombstone, serverSeq: number): D1PreparedStatement | null {
+function buildTombstoneUpdate(db: D1Database, tombstone: Tombstone, serverSeq: number, updatedBy: string | null): D1PreparedStatement | null {
   if (!Object.hasOwn(TOMBSTONE_TABLES, tombstone.recordType) || !tombstone.uuid) return null;
   const target = TOMBSTONE_TABLES[tombstone.recordType];
   // Only apply if the current row's updatedAt doesn't postdate this delete
@@ -465,9 +552,9 @@ function buildTombstoneUpdate(db: D1Database, tombstone: Tombstone, serverSeq: n
   // its health content is cleared so a deleted entry doesn't keep its values.
   return db
     .prepare(
-      `UPDATE ${target.table} SET ${target.scrub ? `${target.scrub}, ` : ''}deletedAt = ?, updatedAt = ?, serverSeq = ? WHERE ${target.keyColumn} = ? AND updatedAt <= ?`,
+      `UPDATE ${target.table} SET ${target.scrub ? `${target.scrub}, ` : ''}deletedAt = ?, updatedAt = ?, serverSeq = ?, updatedBy = ? WHERE ${target.keyColumn} = ? AND updatedAt <= ?`,
     )
-    .bind(tombstone.deletedAt, tombstone.deletedAt, serverSeq, tombstone.uuid, tombstone.deletedAt);
+    .bind(tombstone.deletedAt, tombstone.deletedAt, serverSeq, updatedBy, tombstone.uuid, tombstone.deletedAt);
 }
 
 // ---------------------------------------------------------------------------
@@ -516,6 +603,7 @@ function mapFastRow(row: Record<string, unknown>): WireRow<FastRecord> {
     createdAt: row.createdAt as number,
     updatedAt: row.updatedAt as number,
     deletedAt: (row.deletedAt as number) ?? undefined,
+    updatedBy: (row.updatedBy as string) ?? undefined,
   };
 }
 
@@ -531,6 +619,7 @@ function mapFieldRow(row: Record<string, unknown>): WireRow<FieldDefinition> {
     createdAt: row.createdAt as number,
     updatedAt: row.updatedAt as number,
     deletedAt: (row.deletedAt as number) ?? undefined,
+    updatedBy: (row.updatedBy as string) ?? undefined,
   };
 }
 
@@ -553,6 +642,7 @@ function mapTrackableRow(row: Record<string, unknown>): WireRow<TrackableDefinit
     createdAt: row.createdAt as number,
     updatedAt: row.updatedAt as number,
     deletedAt: (row.deletedAt as number) ?? undefined,
+    updatedBy: (row.updatedBy as string) ?? undefined,
   };
 }
 
@@ -567,6 +657,7 @@ function mapEntryRow(row: Record<string, unknown>): WireRow<TrackableEntry> {
     createdAt: row.createdAt as number,
     updatedAt: row.updatedAt as number,
     deletedAt: (row.deletedAt as number) ?? undefined,
+    updatedBy: (row.updatedBy as string) ?? undefined,
   };
 }
 
@@ -586,5 +677,6 @@ function mapSettingsRow(row: Record<string, unknown>): WireRow<SettingsRecord> {
     customFastPresets: row.customFastPresets ? JSON.parse(row.customFastPresets as string) : undefined,
     updatedAt: row.updatedAt as number,
     deletedAt: (row.deletedAt as number) ?? undefined,
+    updatedBy: (row.updatedBy as string) ?? undefined,
   };
 }

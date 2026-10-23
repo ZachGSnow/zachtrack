@@ -19,6 +19,8 @@ export interface SyncHistoryEntry {
   sentDetails?: string[];
   /** How many sent records beyond `sentDetails` weren't listed. */
   moreSentCount?: number;
+  /** Edits made here that a newer edit from another device replaced, one line each. */
+  overwritten?: string[];
   /** How long the sync took. */
   durationMs?: number;
   /** This sync sent the whole dataset (the first sync, an import, Full resync, or the daily check). */
@@ -55,6 +57,11 @@ function countParts(c: AppliedCounts): string[] {
   return parts;
 }
 
+/** "2 entries, 1 delete", or "" when the counts are all zero. */
+export function describeCounts(c: AppliedCounts): string {
+  return countParts(c).join(', ');
+}
+
 /** "Sent 2 entries, 1 delete; received 1 fast", "Received 1 trackable", or "No changes". */
 export function summarizeSync(sent: AppliedCounts | undefined, received: ReceivedCounts): string {
   const sentParts = countParts(sent ?? {});
@@ -66,7 +73,17 @@ export function summarizeSync(sent: AppliedCounts | undefined, received: Receive
 }
 
 function hasDetails(e: SyncHistoryEntry): boolean {
-  return !!(e.details?.length || e.sentDetails?.length || e.rejectedDetails?.length || e.rejectedCount);
+  return !!(e.details?.length || e.sentDetails?.length || e.rejectedDetails?.length || e.rejectedCount || e.overwritten?.length);
+}
+
+/** Whether `entry` says the same as `head` with nothing to expand, so the two can be kept as one. */
+export function canMerge(head: SyncHistoryEntry | undefined, entry: SyncHistoryEntry): head is SyncHistoryEntry {
+  return !!head && head.outcome === entry.outcome && head.summary === entry.summary && !hasDetails(head) && !hasDetails(entry);
+}
+
+/** `entry` kept as one with `head` (see addToHistory). */
+export function mergeInto(head: SyncHistoryEntry, entry: SyncHistoryEntry): SyncHistoryEntry {
+  return { ...entry, repeat: (head.repeat ?? 1) + 1, firstAt: head.firstAt ?? head.completedAt };
 }
 
 /**
@@ -77,9 +94,6 @@ function hasDetails(e: SyncHistoryEntry): boolean {
  */
 export function addToHistory(history: SyncHistoryEntry[], entry: SyncHistoryEntry, limit: number): SyncHistoryEntry[] {
   const [head, ...rest] = history;
-  if (head && head.outcome === entry.outcome && head.summary === entry.summary && !hasDetails(head) && !hasDetails(entry)) {
-    const merged: SyncHistoryEntry = { ...entry, repeat: (head.repeat ?? 1) + 1, firstAt: head.firstAt ?? head.completedAt };
-    return [merged, ...rest].slice(0, limit);
-  }
+  if (canMerge(head, entry)) return [mergeInto(head, entry), ...rest].slice(0, limit);
   return [entry, ...history].slice(0, limit);
 }
