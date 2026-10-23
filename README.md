@@ -47,7 +47,9 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
   sorts by what's due (or your own order, or A-Z), with pinning and
   archiving; fasts and entries can be filtered by tag. In-app reminders
   instead of notifications: a Needs attention list of overdue and due goals,
-  and badges on the Trackables and Fasting tabs.
+  and badges on the Trackables and Fasting tabs. Each trackable's page adds
+  plain-language insights: goal consistency, best weekday, and how a value
+  differs on days with your other trackables.
   A starter set (Body Measurements, Vitals, Nutrition, Sleep, Wellness,
   Activity, Menstrual Cycle, Male Health) is created on a new install and is
   fully editable, including each field's name, unit and rating scale.

@@ -7,6 +7,7 @@
   import { formatShortDate } from '../lib/utils/time';
   import { kindStats, resolveKind, summarize } from '../lib/utils/trackableKinds';
   import { describeGoal, GOAL_STATE_COLORS, goalStatus } from '../lib/utils/trackableGoals';
+  import { trackableInsights } from '../lib/utils/insights';
   import { formatPreciseAge, daysUntilNextBirthday, ageTurningOn, formatBirthdayCountdown } from '../lib/utils/age';
   import { rangeStartFor, type ChartRange } from '../lib/utils/stats';
   import {
@@ -46,6 +47,9 @@
       .then((list) => list.sort((a, b) => b.timestamp - a.timestamp)),
   );
   const allFields = liveQuery(() => db.fieldDefinitions.toArray());
+  // For insights comparing this trackable with the others.
+  const allTrackables = liveQuery(() => db.trackableDefinitions.toArray());
+  const allEntries = liveQuery(() => db.trackableEntries.toArray());
 
   type TrendsView = 'table' | 'chart';
 
@@ -129,6 +133,15 @@
   const stats = $derived(kindStats(kind, $entries ?? [], attachedFields, now));
   const goal = $derived($trackable && !isAges ? goalStatus($trackable, $entries ?? [], attachedFields, now) : null);
   const goalText = $derived($trackable ? describeGoal($trackable, attachedFields) : null);
+
+  const insights = $derived.by(() => {
+    const t = $trackable;
+    if (!t || isAges) return [];
+    const others = ($allTrackables ?? [])
+      .filter((o) => o.id !== t.id && !o.archived && o.displayMode !== 'ages')
+      .map((o) => ({ trackable: o, entries: ($allEntries ?? []).filter((e) => e.trackableId === o.id) }));
+    return trackableInsights(t, $entries ?? [], attachedFields, others, now);
+  });
 
   /**
    * Today's combined total for each 'sum'-aggregated attached field (e.g. Water,
@@ -302,6 +315,18 @@
         <div class="flex min-w-0 flex-col gap-5">
           {#if showHabitHistory && wide.current}
             {@render history()}
+          {/if}
+
+          {#if insights.length > 0}
+            <section class="rounded-2xl border p-4" style="border-color: var(--color-border); background: var(--color-surface);" aria-label="Insights">
+              <p class="mb-2 text-sm font-medium text-text-muted">Insights</p>
+              <ul class="flex flex-col gap-1.5">
+                {#each insights as insight, i (i)}
+                  <li class="text-sm text-text"><span class="text-xs text-text-muted">{insight.label}:</span> {insight.text}</li>
+                {/each}
+              </ul>
+              <p class="mt-2 text-[11px] text-text-muted">From your own entries; patterns, not causes.</p>
+            </section>
           {/if}
 
           <div class="flex flex-col gap-2">

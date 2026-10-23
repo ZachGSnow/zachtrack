@@ -682,6 +682,21 @@ today (not archived, not ages), most urgent first.
   **Fasting tab** a dot while the daily schedule's start has passed with no
   fast started today.
 
+### 3.28 Insights
+A trackable's page shows a few plain-language insights (`utils/insights.ts`),
+built to resist over-reading small personal datasets:
+- **Last 30 days:** a daily goal met on N of the scheduled days, or logged on
+  N of 30 days.
+- **By weekday** (last 12 weeks): the most and least common weekday, only
+  when they differ by at least 25 points.
+- **On days with** (last 90 days): this trackable's first rating or number
+  field (or whether it was logged at all) on days with and without each other
+  trackable. Each side needs at least 5 days, and the difference must be an
+  effect size (Cohen's d) of 0.6 or more, or 20 points of share; the top
+  three are shown, with their day counts, worded as patterns, not causes.
+  A threshold based on the range let a 0.3 lb wobble in a drifting weight
+  through on the sample data; a test now holds that case.
+
 ## 4. Issues hit during implementation, and how they were resolved
 
 These are real bugs that shipped and got fixed during this project's build,
@@ -1015,9 +1030,9 @@ this," not a promise.
   better / lower is better" setting so ^/v could be colored green/red.
   Deliberately left neutral for now (3.11) because it needs a new
   `FieldDefinition` property, and so a D1 schema and sync change.
-- **Correlation hints:** e.g. a Pearson coefficient between two selected
-  Data-tab columns. Floated as a follow-up to the tables. Not built,
-  because with small personal datasets it's easy to over-read.
+- **Correlation coefficients** between Data-tab columns: still not built.
+  The plain-language comparisons on a trackable's page (3.28) cover the
+  useful part with less room to over-read.
 - **Cross-device shared sync history/audit log:** the sync-status pill's
   history (see 3.10) is per-device (`localStorage`) by design. A unified
   log visible identically on every device - "what changed, from which
