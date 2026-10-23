@@ -673,6 +673,26 @@ upcoming list across trackables (`upcomingDates`, with 1,000-day milestones
 for birthdays and anniversaries). Migration `0008_dates.sql` adds the three
 columns; `validate.ts` checks each rule's exact shape.
 
+Where dates show:
+- **Trackable page and card:** each entry's next occurrence with its
+  countdown and what it is; past one-off dates under Past; the card lists
+  the next three.
+- **Needs attention** (`datesDueSoon`): dates inside their trackable's lead
+  time, with "Turns 61 in 3 days" (`dateReminderText`); a date today ranks
+  with a goal due today. Items gained a `key`, since one trackable can now
+  have several.
+- **Coming up** (`ComingUp.svelte`) on Trackables: the next 14 days, minus
+  what Needs attention already lists, and "See all dates".
+- **Dates page** (`/dates`): the next year from every dates trackable, as a
+  list grouped Today, This week and by month, or a month calendar (this
+  month and the next 11) with a dot per date and the tapped day's dates
+  below. Being a page and not a tab keeps the tab bar at five.
+
+The edit sheet picks the kind and lead time; templates add Birthdays,
+Anniversaries, Countdowns and US holidays (`data/holidays.ts`, 18 entries,
+rule-based ones included). No notifications, and no calendar export: a
+phone calendar would turn the dates into notifications.
+
 ### 3.21 Trackables list: pin, archive, order; tag filters
 - **Sort** (per device, `zachtrack:trackables-view`): Due first (goal
   urgency from 3.18: overdue, then due, then the rest, then trackables

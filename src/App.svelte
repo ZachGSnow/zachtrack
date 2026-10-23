@@ -24,6 +24,7 @@
     '/history': History,
     '/settings': wrap({ asyncComponent: () => import('./routes/Settings.svelte') }),
     '/sync': wrap({ asyncComponent: () => import('./routes/Sync.svelte') }),
+    '/dates': wrap({ asyncComponent: () => import('./routes/Dates.svelte') }),
     '/help/:topic?': wrap({ asyncComponent: () => import('./routes/Help.svelte') }),
   };
 

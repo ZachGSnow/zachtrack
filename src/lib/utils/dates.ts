@@ -265,6 +265,32 @@ function milestones(trackable: DatesTrackable, entry: DateEntry, now: number, wi
   return out;
 }
 
+/** "Turns 61 in 3 days", "12th anniversary tomorrow", "Today": a date as a reminder line. */
+export function dateReminderText(item: DateItem): string {
+  const when = item.daysUntil <= 1 ? item.countdown.toLowerCase() : item.countdown;
+  if (!item.detail) return item.countdown;
+  return `${item.detail} ${when}`;
+}
+
+/**
+ * The dates inside each trackable's lead time (Edit > Show in Needs attention
+ * this many days ahead), soonest first: the in-app reminders for dates.
+ */
+export function datesDueSoon(
+  trackables: readonly DatesTrackable[],
+  entries: readonly (DateEntry & { trackableId: string })[],
+  now: number,
+): DateItem[] {
+  return trackables
+    .flatMap((t) => upcomingDates([t], entries, now, leadDaysOf(t)))
+    .sort((a, b) => a.daysUntil - b.daysUntil || a.name.localeCompare(b.name));
+}
+
+/** A stable key for a listed date (an entry's date, or one of its milestones). */
+export function dateItemKey(item: DateItem): string {
+  return `${item.trackableId}:${item.entryId}${item.milestone ? `:${item.at}` : ''}`;
+}
+
 /**
  * Dates coming up across these trackables, soonest first: every entry whose
  * next occurrence is within `withinDays` (today included), plus 1,000-day

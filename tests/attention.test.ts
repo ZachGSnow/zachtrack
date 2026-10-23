@@ -36,4 +36,25 @@ describe('needs attention', () => {
       ['Plants', 'Due today'],
     ]);
   });
+
+  it("lists dates inside their trackable's lead time, after goals due today", () => {
+    const dates = { ...trackable('Birthdays', {}), displayMode: 'ages' as const, dateKind: 'birthday' as const, dateLeadDays: 7 };
+    const snapshot = {
+      trackables: [trackable('Plants', { goalType: 'everyDays', goalValue: 3 }), dates],
+      fields: [],
+      entries: [
+        entry('Plants', oct(19)),
+        { ...entry('Birthdays', new Date(1965, 9, 25).getTime()), note: 'Mom' }, // in 3 days
+        { ...entry('Birthdays', new Date(1990, 10, 20).getTime()), note: 'Far' }, // in 29 days: not yet
+      ],
+      recentFasts: [],
+      scheduleTime: undefined,
+    };
+    const items = attentionItems(snapshot, oct(22, 12));
+    expect(items.map((i) => [i.name, i.text])).toEqual([
+      ['Plants', 'Due today'],
+      ['Mom', 'Turns 61 in 3 days'],
+    ]);
+    expect(new Set(items.map((i) => i.key)).size).toBe(2);
+  });
 });
