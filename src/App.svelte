@@ -9,6 +9,7 @@
   import { fastTimer } from './lib/stores/fast.svelte';
   import { settingsStore } from './lib/stores/settings.svelte';
   import { syncStore } from './lib/stores/sync.svelte';
+  import { attentionStore } from './lib/stores/attention.svelte';
   import { liveQuery } from 'dexie';
   import { db, seedDefaultTrackablesIfEmpty } from './lib/db';
   import { addDays, startOfDay } from './lib/utils/time';
@@ -41,6 +42,7 @@
   onMount(() => {
     fastTimer.init();
     settingsStore.init();
+    attentionStore.init();
     // Try an initial sync pull before seeding defaults, so a second device
     // picks up trackables/fields another device already created and synced,
     // instead of generating its own duplicate default set. If the server is
