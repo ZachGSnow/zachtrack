@@ -14,8 +14,8 @@
   import { liveQuery } from 'dexie';
   import { db } from '../lib/db';
   import { addDays, fromDatetimeLocal, startOfDay, toDatetimeLocal } from '../lib/utils/time';
-  import { scheduleStatus } from '../lib/utils/fastingSchedule';
-  import { endSummary, fastTimeline, startedAgo } from '../lib/utils/fastProgress';
+  import { planForDay, scheduleStatus } from '../lib/utils/fastingSchedule';
+  import { endSummary, fastTimeline, longFastGuidance, refeedingNote, startedAgo } from '../lib/utils/fastProgress';
   import { eatingWindowStatus } from '../lib/utils/fastingJourney';
 
   // The schedule countdown and the timeline lines change with the clock, also while no fast runs.
@@ -25,7 +25,7 @@
     return () => clearInterval(timer);
   });
   const recentFasts = liveQuery(() => db.fasts.where('startDay').aboveOrEqual(addDays(startOfDay(Date.now()), -1)).toArray());
-  const schedule = $derived(fastTimer.activeFast ? null : scheduleStatus(settingsStore.data.fastScheduleTime, $recentFasts ?? [], now));
+  const schedule = $derived(fastTimer.activeFast ? null : scheduleStatus(settingsStore.data, $recentFasts ?? [], now));
   // A fast can run past a day, so the eating window looks a few days back for the last one that ended.
   const lastFasts = liveQuery(() => db.fasts.where('startDay').aboveOrEqual(addDays(startOfDay(Date.now()), -3)).toArray());
   const eatingWindow = $derived(fastTimer.activeFast ? null : eatingWindowStatus($lastFasts ?? [], now));
@@ -35,7 +35,8 @@
   let presetInitialized = false;
   $effect(() => {
     if (!presetInitialized && settingsStore.ready) {
-      selectedPresetId = settingsStore.data.defaultPresetId;
+      // Today's method from the weekly plan, else the default.
+      selectedPresetId = planForDay(settingsStore.data, startOfDay(Date.now())).presetId ?? settingsStore.data.defaultPresetId;
       presetInitialized = true;
     }
   });
@@ -65,6 +66,8 @@
   let goalError = $state('');
 
   const summary = $derived(showStopPanel && fastTimer.activeFast ? endSummary(fastTimer.activeFast, fastTimer.now) : null);
+  const guidance = $derived(fastTimer.activeFast ? longFastGuidance(fastTimer.activeFast, fastTimer.now) : []);
+  const refeeding = $derived(showStopPanel ? refeedingNote(fastTimer.elapsedHrs) : null);
 
   function chosenStart(): number | string {
     if (startedChoice === 'pick') {
@@ -208,6 +211,16 @@
 
       <ZoneCard zone={fastTimer.zone} />
 
+      {#if guidance.length}
+        <section class="w-full rounded-2xl border p-4 text-sm" style="border-color: var(--color-border); background: var(--color-surface);" aria-labelledby="long-fast">
+          <h2 id="long-fast" class="mb-1 font-semibold text-text">Long fast</h2>
+          <ul class="flex list-disc flex-col gap-1 pl-5 text-text-muted">
+            {#each guidance as line (line)}<li>{line}</li>{/each}
+          </ul>
+          <p class="mt-2 text-xs text-text-muted">General information, not medical advice.</p>
+        </section>
+      {/if}
+
       {#if !showStopPanel}
         <button
           class="w-full rounded-xl border py-3 text-base font-semibold"
@@ -225,6 +238,9 @@
                 <p class="text-sm font-medium" style="color: {summary.goalMet ? 'var(--color-brand)' : '#fbbf24'};">{summary.goal}</p>
               {/if}
               <p class="text-xs text-text-muted">Reached: {summary.zone}</p>
+              {#if refeeding}
+                <p class="mt-2 text-xs text-text-muted">{refeeding} General information, not medical advice.</p>
+              {/if}
             </div>
           {/if}
 

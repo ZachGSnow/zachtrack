@@ -170,6 +170,15 @@
         fast and says when you're late. Forgot to time a fast altogether? History > Log a past fast.
       </p>
       <p>
+        <strong>Weekly plan</strong> (Settings > Fasting): give each weekday its own method and start time, or make it a rest
+        day. Start Fast picks the day's method, the countdown uses the day's time, and nothing is late on a rest day. A day
+        left on Default uses the default method and the daily start time.
+      </p>
+      <p>
+        <strong>Long fasts:</strong> from 20 hours in, or with a goal past a day, the timer adds a card about water and
+        electrolytes, with cautions at 48 and 72 hours, and ending a fast of a day or more says how to break it gently.
+      </p>
+      <p>
         <strong>Journey:</strong> the goal streak counts days in a row with a fast that met its goal (a count-up fast counts
         from 12 hours), next to the days you fasted in the last 30. Below: this week against last week, a habit grid of fasting
         days (a full square met its goal), insights, the table and charts. The weight insight compares how your weight changes

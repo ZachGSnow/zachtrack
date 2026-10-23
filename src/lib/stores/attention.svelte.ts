@@ -25,7 +25,7 @@ class AttentionStore {
       fields: await db.fieldDefinitions.toArray(),
       entries: await db.trackableEntries.toArray(),
       recentFasts: await db.fasts.where('startDay').aboveOrEqual(addDays(startOfDay(Date.now()), -1)).toArray(),
-      scheduleTime: (await db.settings.get('app-settings'))?.fastScheduleTime,
+      scheduleTime: await db.settings.get('app-settings'),
     })).subscribe({
       next: (snapshot) => {
         this.snapshot = snapshot;

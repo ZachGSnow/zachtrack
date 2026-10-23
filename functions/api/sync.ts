@@ -534,14 +534,14 @@ function buildSettingsUpsert(db: D1Database, settings: SettingsRecord, serverSeq
   return db
     .prepare(
       `INSERT INTO settings (id, defaultPresetId, notificationsEnabled, heightInches, goalWeightLb, weightFieldId,
-         waistFieldId, neckFieldId, hipFieldId, bodyFatSex, fastScheduleTime, customFastPresets, updatedAt, serverSeq, updatedBy)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         waistFieldId, neckFieldId, hipFieldId, bodyFatSex, fastScheduleTime, customFastPresets, fastWeekPlan, updatedAt, serverSeq, updatedBy)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          defaultPresetId=excluded.defaultPresetId, notificationsEnabled=excluded.notificationsEnabled,
          heightInches=excluded.heightInches, goalWeightLb=excluded.goalWeightLb, weightFieldId=excluded.weightFieldId,
          waistFieldId=excluded.waistFieldId, neckFieldId=excluded.neckFieldId, hipFieldId=excluded.hipFieldId,
          bodyFatSex=excluded.bodyFatSex, fastScheduleTime=excluded.fastScheduleTime,
-         customFastPresets=excluded.customFastPresets,
+         customFastPresets=excluded.customFastPresets, fastWeekPlan=excluded.fastWeekPlan,
          updatedAt=excluded.updatedAt, serverSeq=excluded.serverSeq, updatedBy=excluded.updatedBy
        WHERE excluded.updatedAt > settings.updatedAt`,
     )
@@ -558,6 +558,7 @@ function buildSettingsUpsert(db: D1Database, settings: SettingsRecord, serverSeq
       settings.bodyFatSex ?? null,
       settings.fastScheduleTime ?? null,
       settings.customFastPresets ? JSON.stringify(settings.customFastPresets) : null,
+      settings.fastWeekPlan ? JSON.stringify(settings.fastWeekPlan) : null,
       settings.updatedAt,
       serverSeq,
       updatedBy,
@@ -696,6 +697,7 @@ function mapSettingsRow(row: Record<string, unknown>): WireRow<SettingsRecord> {
     bodyFatSex: (row.bodyFatSex as SettingsRecord['bodyFatSex']) ?? undefined,
     fastScheduleTime: (row.fastScheduleTime as string) ?? undefined,
     customFastPresets: row.customFastPresets ? JSON.parse(row.customFastPresets as string) : undefined,
+    fastWeekPlan: row.fastWeekPlan ? JSON.parse(row.fastWeekPlan as string) : undefined,
     updatedAt: row.updatedAt as number,
     deletedAt: (row.deletedAt as number) ?? undefined,
     updatedBy: (row.updatedBy as string) ?? undefined,

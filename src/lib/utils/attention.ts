@@ -1,6 +1,7 @@
 import type { FastRecord, FieldDefinition, TrackableDefinition, TrackableEntry } from '../db';
 import { goalStatus, type GoalState } from './trackableGoals';
 import { resolveKind } from './trackableKinds';
+import type { ScheduleInput } from './fastingSchedule';
 
 // What needs attention right now: the in-app reminders (stores/attention.svelte.ts).
 
@@ -20,7 +21,8 @@ export interface Snapshot {
   fields: FieldDefinition[];
   entries: TrackableEntry[];
   recentFasts: FastRecord[];
-  scheduleTime: string | undefined;
+  /** The fasting schedule: the settings, for the daily time and the weekly plan (utils/fastingSchedule.ts). */
+  scheduleTime: ScheduleInput;
 }
 
 /** Overdue and due goals of trackables that aren't archived, most urgent first. */

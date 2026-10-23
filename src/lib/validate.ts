@@ -145,6 +145,22 @@ const checks: Record<Exclude<RecordKind, 'tombstones'>, Check> = {
         'a list of { id, label, targetHours }',
       ),
       optional(r, 'fastScheduleTime', (v) => typeof v === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(v), "a time like '20:00'"),
+      optional(
+        r,
+        'fastWeekPlan',
+        (v) =>
+          Array.isArray(v) &&
+          v.length === 7 &&
+          v.every(
+            (d) =>
+              d === null ||
+              (isObject(d) &&
+                (d.presetId === undefined || (isId(d.presetId) && (d.presetId as string).length <= 64)) &&
+                (d.time === undefined || (typeof d.time === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(d.time))) &&
+                (d.rest === undefined || typeof d.rest === 'boolean')),
+          ),
+        'a list of 7 day plans',
+      ),
     ),
 };
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { endSummary, fastTimeline, latestMilestone, startedAgo } from '../src/lib/utils/fastProgress';
+import { endSummary, fastTimeline, latestMilestone, longFastGuidance, refeedingNote, startedAgo } from '../src/lib/utils/fastProgress';
 
 // America/New_York (vitest config).
 const oct = (d: number, h: number, m = 0) => new Date(2026, 9, d, h, m).getTime();
@@ -55,5 +55,23 @@ describe('ending', () => {
 
   it('started earlier is minutes before now', () => {
     expect(startedAgo(90, oct(22, 12))).toBe(oct(22, 10, 30));
+  });
+});
+
+describe('long fasts', () => {
+  it('nothing for an ordinary fast, hydration from 20h or a goal past a day', () => {
+    expect(longFastGuidance(fast(oct(22, 0), 16), oct(22, 15))).toEqual([]);
+    expect(longFastGuidance(fast(oct(22, 0), 36), oct(22, 2))).toHaveLength(1);
+    expect(longFastGuidance(fast(oct(22, 0)), oct(22, 21))[0]).toMatch(/electrolytes/);
+  });
+
+  it('adds cautions at 48 and 72 hours', () => {
+    expect(longFastGuidance(fast(oct(20, 0), 72), oct(22, 1))).toHaveLength(2);
+    expect(longFastGuidance(fast(oct(19, 0), 72), oct(22, 1))[2]).toMatch(/doctor/);
+  });
+
+  it('refeeding advice for a fast of a day or more', () => {
+    expect(refeedingNote(23.9)).toBeNull();
+    expect(refeedingNote(24)).toMatch(/^Break a fast this long gently/);
   });
 });

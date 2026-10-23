@@ -32,7 +32,9 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
   summary of how it went against the goal. Milestones show in the app, never as
   notifications. Between fasts the tab shows the eating window, and History
   logs a fast you didn't time. An optional daily start time counts down to
-  your next fast. Journey has a goal streak (days a fast met its goal), this
+  your next fast, and a weekly plan gives each weekday its own method and
+  time or a rest day. Long fasts get hydration and electrolyte prompts,
+  cautions at 48 and 72 hours, and refeeding advice when they end. Journey has a goal streak (days a fast met its goal), this
   week against last, a habit grid of fasting days, and a weight-after-fasting
   insight next to the table and charts.
 - **Trackables:** define anything to track, with number (optional unit),
