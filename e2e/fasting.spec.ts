@@ -83,3 +83,34 @@ test('a start time in the future is refused, and Settings has no notifications',
   await openSettings(page);
   await expect(page.getByText(/notification/i)).toHaveCount(0);
 });
+
+test('a fast logged after the fact shows in History, opens the eating window, and counts on Journey', async ({ page }) => {
+  await page.goto('/#/history');
+  await page.getByRole('button', { name: '+ Log a past fast' }).click();
+  await page.getByRole('button', { name: '16:8', exact: true }).click();
+  await page.getByLabel('Started', { exact: true }).fill(await hoursAgo(page, 18));
+  await page.getByLabel('Ended', { exact: true }).fill(await hoursAgo(page, 2));
+  await page.getByRole('button', { name: 'Save fast' }).click();
+  await expect(page.getByText('Duration: 16h')).toBeVisible();
+
+  // Ended two hours ago after 16h: six hours of the eating window are left.
+  await page.getByRole('link', { name: /Fasting/ }).locator('visible=true').first().click();
+  const window = page.getByLabel('Eating window');
+  await expect(window).toContainText(/Eating window: 6h left, until/);
+  await expect(window).toContainText(/Last fast: 16h, ended 2h( 1m)? ago/); // the countdown rounds up
+
+  await page.getByRole('link', { name: /Journey/ }).locator('visible=true').first().click();
+  await expect(page.getByText('Goal streak', { exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'This week vs last week' })).toContainText('Goal fasts');
+  await expect(page.getByRole('region', { name: 'Fasting days' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Insights' })).toContainText('goal met on 1 of 1 fasts');
+});
+
+test('a past fast ending in the future is refused', async ({ page }) => {
+  await page.goto('/#/history');
+  await page.getByRole('button', { name: '+ Log a past fast' }).click();
+  await page.getByLabel('Started', { exact: true }).fill(await hoursAgo(page, 10));
+  await page.getByLabel('Ended', { exact: true }).fill(await hoursAgo(page, -1));
+  await page.getByRole('button', { name: 'Save fast' }).click();
+  await expect(page.getByText(/The end cannot be in the future/)).toBeVisible();
+});

@@ -30,8 +30,11 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
   Start a fast you forgot to start (30m, 1h, 2h ago or a time), see the start,
   goal and next zone under the timer, change the goal mid-fast, and end with a
   summary of how it went against the goal. Milestones show in the app, never as
-  notifications. An optional daily start time counts down to your next fast,
-  and Journey shows how often you hit the target.
+  notifications. Between fasts the tab shows the eating window, and History
+  logs a fast you didn't time. An optional daily start time counts down to
+  your next fast. Journey has a goal streak (days a fast met its goal), this
+  week against last, a habit grid of fasting days, and a weight-after-fasting
+  insight next to the table and charts.
 - **Trackables:** define anything to track, with number (optional unit),
   rating (custom scale) or yes/no fields. Each field chooses how several
   entries on one day combine (`sum` for Water, `last` for Weight, `average`).

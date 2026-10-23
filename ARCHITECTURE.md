@@ -601,6 +601,34 @@ reload can't start another. The query doesn't match the service worker's
   the deepest zone (`endSummary`); ratings, tags and note fold under Add
   details. The ratings are one snippet instead of three copies.
 
+### 3.35 Fasting between fasts, and Journey (v1.11.0)
+`utils/fastingJourney.ts`, unit tested in `tests/fastingJourney.test.ts`:
+
+- **Goal met** (`goalMet`): finished at or past the target, or running and
+  already past it. A count-up fast has no target and counts from 12 hours
+  (`COUNT_UP_GOAL_HOURS`, the shortest preset), so a 20-minute count-up
+  doesn't. `computeFastStats` now counts streaks over `goalDays`, which
+  changes existing numbers: before, any fast, however short, kept a streak.
+  `daysFasted30` keeps the any-fast view as its own tile. Today, and the
+  start day of a fast still running short of its goal, are pending: they
+  neither count nor break the current streak.
+- **This week vs last** (`weekComparison`): goal fasts, hours (a running fast
+  to now) and the average start time, Monday-start weeks. Start times average
+  from noon (`averageStartTime`), so 11 PM and 1 AM give midnight, not noon.
+- **Fasting grid** (`fastGridWeeks`): the trackables' HabitGrid with each day
+  filled by how far its best fast got toward its goal. It replaces the ECharts
+  consistency heatmap (`ConsistencyHeatmapChart`, `computeHeatmapData`,
+  removed), one chart fewer.
+- **Weight after goal fasts** (`fastingWeightInsight`): the day-to-next-day
+  weight change after a day that started a goal fast, against other days,
+  shown only with 5 days a side and Cohen's d of at least 0.6, like 3.28.
+- **Eating window** (`eatingWindowStatus`) on the idle Fasting tab for a day
+  after a fast with a target under 24h ends: the rest of the day (24 minus the
+  target), then closed; plus how long ago the last fast ended.
+- **Log a past fast** (History, `AddPastFastSheet.svelte`): method, start and
+  end through `addFast`, so the one-fast-per-day rule applies; an end in the
+  future is refused.
+
 ### 3.21 Trackables list: pin, archive, order; tag filters
 - **Sort** (per device, `zachtrack:trackables-view`): Due first (goal
   urgency from 3.18: overdue, then due, then the rest, then trackables
