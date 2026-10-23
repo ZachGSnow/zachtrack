@@ -35,7 +35,7 @@
   {#if $fasts === undefined}
     <p class="text-sm text-text-muted">Loading&hellip;</p>
   {:else if $fasts.length === 0}
-    <p class="mt-8 text-center text-sm text-text-muted">No fasts logged yet. Start one from the Timer tab.</p>
+    <p class="mt-8 text-center text-sm text-text-muted">No fasts logged yet. Start one from Timer, or log a past one.</p>
   {:else}
     <TagFilter items={$fasts} bind:selected={tagFilter} />
     <ul class="flex flex-col gap-2">

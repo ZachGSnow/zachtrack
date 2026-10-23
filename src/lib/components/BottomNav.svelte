@@ -4,14 +4,14 @@
   import { attentionStore } from '../stores/attention.svelte';
   import { fastTimer } from '../stores/fast.svelte';
   import SyncStatus from './SyncStatus.svelte';
+  import { SECTIONS } from '../data/sections';
 
   // 'bottom': the phone tab bar (hidden on wide screens); 'side': the sidebar
   // that replaces it from the lg breakpoint (1024px) up.
   let { variant = 'bottom' }: { variant?: 'bottom' | 'side' } = $props();
 
-  // A tab is active on its own page and the pages under it (/trackables and /trackables/:id).
-  // A '/trackables/*' pattern missed the page itself, so no tab lit up there.
-  const activePath = (href: string) => (href === '/' ? '/' : new RegExp(`^${href}(/.*)?$`));
+  // Help and Settings are active on their own page and the pages under it (/help/:topic).
+  const activePath = (href: string) => new RegExp(`^${href}(/.*)?$`);
 
   // In-app reminders: how many trackables are due or overdue, and a dot on Fasting while a scheduled
   // fast is late or a running fast has reached a milestone you have not seen.
@@ -25,13 +25,8 @@
     return null;
   };
 
-  const items = [
-    { href: '/', label: 'Fasting', icon: '\u23f1' },
-    { href: '/trackables', label: 'Trackables', icon: '\ud83d\udccb' },
-    { href: '/journey', label: 'Journey', icon: '\ud83d\udcc8' },
-    { href: '/charting', label: 'Data', icon: '\ud83d\udd00' },
-    { href: '/history', label: 'History', icon: '\ud83d\udcdc' },
-  ];
+  // The three sections (data/sections.ts); a section's tab is lit on any of its pages.
+  const items = SECTIONS;
 </script>
 
 {#if variant === 'side'}
@@ -48,7 +43,7 @@
       <a
         href={item.href}
         use:link
-        use:active={{ path: activePath(item.href), className: 'active' }}
+        use:active={{ path: item.match, className: 'active' }}
         class="side flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium"
       >
         <span class="w-6 text-center text-lg leading-none">{item.icon}</span>
@@ -58,6 +53,15 @@
           <span class="badge ml-auto" class:dot={!b.text} aria-label={b.label}>{b.text}</span>
         {/if}
       </a>
+      <!-- A section's pages, indented under it, each one click away. -->
+      {#each item.pages ?? [] as p (p.href)}
+        <a
+          href={p.href}
+          use:link
+          use:active={{ path: p.href === '/trackables' ? /^\/trackables(\/.*)?$/ : p.href, className: 'current' }}
+          class="side sub flex items-center rounded-lg py-1.5 pr-3 pl-12 text-sm"
+        >{p.label}</a>
+      {/each}
     {/each}
     <a
       href="/help"
@@ -88,7 +92,7 @@
       <a
         href={item.href}
         use:link
-        use:active={{ path: activePath(item.href), className: 'active' }}
+        use:active={{ path: item.match, className: 'active' }}
         class="flex flex-1 flex-col items-center gap-0.5 py-2.5 text-xs font-medium"
       >
         <span class="relative text-lg leading-none">
@@ -135,5 +139,10 @@
   }
   a.side:global(.active) {
     background: var(--color-surface-2);
+  }
+  /* A section's page links: the section stays lit, and the current page is marked in brand color. */
+  a.sub:global(.current) {
+    color: var(--color-brand);
+    font-weight: 600;
   }
 </style>
