@@ -564,3 +564,14 @@ test('a late scheduled fast puts a dot on the Fasting tab until a fast starts', 
   await page.getByRole('button', { name: 'Start Fast' }).click();
   await expect(fastingTab.getByLabel('fast is late')).toHaveCount(0);
 });
+
+test("a trackable's page shows insights from its entries", async ({ page }) => {
+  const problems = watchForProblems(page);
+  await mockSync(page, noServer);
+  await importSampleData(page);
+  await page.goto('/#/trackables');
+  await page.getByRole('link', { name: /Wellness Check-in/ }).click();
+  const insights = page.getByRole('region', { name: 'Insights' });
+  await expect(insights).toContainText(/Last 30 days: Logged on \d+ of \d+ days/);
+  expect(problems).toEqual([]);
+});
