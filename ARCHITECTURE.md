@@ -693,6 +693,24 @@ Anniversaries, Countdowns and US holidays (`data/holidays.ts`, 18 entries,
 rule-based ones included). No notifications, and no calendar export: a
 phone calendar would turn the dates into notifications.
 
+### 3.39 Three sections (v1.13.0)
+Five tabs became three. Journey and History were fasting-only but looked
+app-wide, Data compared everything, and the Dates page had no tab. Now:
+
+- **Fasting** (`/`, `/journey`, `/history`): Timer, Journey, History.
+- **Trackables** (`/trackables`, `/trackables/:id`, `/dates`): List, Dates.
+- **Insights** (`/insights`; `/charting`, the Data tab's old address, still
+  opens it).
+
+`data/sections.ts` defines them: each section's `match` lights its tab on
+any of its routes, and its `pages` are the page switcher. On a phone,
+`SectionTabs.svelte` (above the router) shows that switcher at the top of a
+section's own pages, not on a page inside one such as a trackable's. On a
+laptop the sidebar lists each section's pages indented under it instead,
+marked `current`. Routes and home-screen shortcuts are unchanged. A "Today"
+tab combining the timer, Needs attention and Coming up was considered and
+left out: Needs attention and the badges already cover it.
+
 ### 3.21 Trackables list: pin, archive, order; tag filters
 - **Sort** (per device, `zachtrack:trackables-view`): Due first (goal
   urgency from 3.18: overdue, then due, then the rest, then trackables

@@ -16,7 +16,7 @@
     { id: 'attention', title: 'Needs attention' },
     { id: 'insights', title: 'Insights' },
     { id: 'fasting', title: 'Fasting' },
-    { id: 'data', title: 'Tables, the Data tab and your files' },
+    { id: 'data', title: 'Tables, comparing and your files' },
     { id: 'sync', title: 'Sync and privacy' },
   ];
 
@@ -43,6 +43,11 @@
   <article class="help flex flex-col gap-8 text-sm leading-relaxed text-text">
     <section id="help-getting-started">
       <h2>Getting started</h2>
+      <p class="mb-2">
+        Three tabs: <strong>Fasting</strong> (the timer, Journey with your stats, and History of past fasts),
+        <strong>Trackables</strong> (the list, and Dates), and <strong>Insights</strong>. Switch a tab's pages with the buttons at
+        the top of the page; on a laptop they're listed in the sidebar.
+      </p>
       <ol>
         <li>
           <strong>Install it.</strong> In Chrome on your phone, open the app's menu and choose Add to Home screen. It then opens like
@@ -201,11 +206,11 @@
     </section>
 
     <section id="help-data">
-      <h2>Tables, the Data tab and your files</h2>
+      <h2>Tables, comparing and your files</h2>
       <p>
         Trends tables show one row per day, week or month: weekly and monthly rows average the days you logged, and the gray
         line is the change from the previous period (or a 7-day average in day view). Copy puts a table on the clipboard for a
-        spreadsheet. The Data tab lines up any mix of fasting and trackable columns to compare them.
+        spreadsheet. Insights lines up any mix of fasting and trackable columns to compare them.
       </p>
       <p>
         Settings > Your data: <strong>Export data</strong> saves everything as a JSON file, the one to restore from;

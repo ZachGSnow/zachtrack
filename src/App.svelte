@@ -3,6 +3,7 @@
   import { wrap } from 'svelte-spa-router/wrap';
   import { onMount } from 'svelte';
   import BottomNav from './lib/components/BottomNav.svelte';
+  import SectionTabs from './lib/components/SectionTabs.svelte';
   import Fasting from './routes/Fasting.svelte';
   import Trackables from './routes/Trackables.svelte';
   import History from './routes/History.svelte';
@@ -20,7 +21,9 @@
     // Lazy-loaded: these pull in ECharts, so keep them out of the initial bundle.
     '/trackables/:id': wrap({ asyncComponent: () => import('./routes/TrackableDetail.svelte') }),
     '/journey': wrap({ asyncComponent: () => import('./routes/Journey.svelte') }),
-    '/charting': wrap({ asyncComponent: () => import('./routes/Charting.svelte') }),
+    '/insights': wrap({ asyncComponent: () => import('./routes/Insights.svelte') }),
+    // The Data tab's old address, so links and bookmarks to it still work.
+    '/charting': wrap({ asyncComponent: () => import('./routes/Insights.svelte') }),
     '/history': History,
     '/settings': wrap({ asyncComponent: () => import('./routes/Settings.svelte') }),
     '/sync': wrap({ asyncComponent: () => import('./routes/Sync.svelte') }),
@@ -71,6 +74,7 @@
       >&#9881;</a>
     </header>
     <main class="flex flex-1 flex-col">
+      <SectionTabs />
       <Router {routes} />
     </main>
     <BottomNav />
