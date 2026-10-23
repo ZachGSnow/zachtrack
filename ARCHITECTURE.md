@@ -534,6 +534,17 @@ under 3.16):
   offers Undo for six seconds (Undo deletes the entry like any delete, so the
   tombstone syncs). Trackables with fields still open the log sheet.
 
+### 3.19 Home-screen shortcuts
+The manifest's `shortcuts` (vite.config.ts) appear on a long press of the
+installed app's icon on Android: Start a fast, Trackables and Journey. A
+manifest is fixed at build time, so shortcuts can't list your own
+trackables; Trackables is the way in to them. Start a fast opens
+`/?shortcut=start-fast#/`: once the running fast and the settings have
+loaded, the Fasting screen starts the default method unless a fast is already
+running, and `utils/shortcuts.ts` removes the marker from the address so a
+reload can't start another. The query doesn't match the service worker's
+`navigateFallbackDenylist`, so the shortcut opens offline like the app itself.
+
 ## 4. Issues hit during implementation, and how they were resolved
 
 These are real bugs that shipped and got fixed during this project's build,

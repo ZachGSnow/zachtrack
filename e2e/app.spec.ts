@@ -246,3 +246,19 @@ test('a goal shows progress and due dates, and a trackable without fields logs i
   await expect(card('Male Health')).toContainText('No entries yet');
   expect(problems).toEqual([]);
 });
+
+test('the home-screen shortcuts are in the manifest, and Start fast starts the default method once', async ({ page, request }) => {
+  const problems = watchForProblems(page);
+  const manifest = await (await request.get('/manifest.webmanifest')).json();
+  expect(manifest.shortcuts.map((s: { url: string }) => s.url)).toEqual(['/?shortcut=start-fast#/', '/#/trackables', '/#/journey']);
+
+  await mockSync(page, noServer);
+  await waitForStarterSet(page);
+  await page.goto('/?shortcut=start-fast#/');
+  await expect(page.getByRole('button', { name: 'End Fast' })).toBeVisible();
+  // The marker is removed, so reloading doesn't start another fast.
+  await expect.poll(() => new URL(page.url()).search).toBe('');
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'End Fast' })).toBeVisible();
+  expect(problems).toEqual([]);
+});

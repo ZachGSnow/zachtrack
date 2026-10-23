@@ -11,6 +11,7 @@
   import ZoneReferenceList from '../lib/components/ZoneReferenceList.svelte';
   import BottomSheet from '../lib/components/BottomSheet.svelte';
   import EditFastSheet from '../lib/components/EditFastSheet.svelte';
+  import { takeShortcut } from '../lib/utils/shortcuts';
 
   let selectedPresetId = $state(DEFAULT_PRESET_ID);
   let presetInitialized = false;
@@ -46,6 +47,16 @@
           : 'Something went wrong starting your fast. Please try again.';
     }
   }
+
+  // The "Start fast" home-screen shortcut starts the default method once the
+  // running fast (if any) and the settings have loaded; with a fast already
+  // running it just shows it.
+  let shortcutChecked = false;
+  $effect(() => {
+    if (shortcutChecked || !fastTimer.ready || !settingsStore.ready) return;
+    shortcutChecked = true;
+    if (takeShortcut('start-fast') && !fastTimer.activeFast) void handleStart();
+  });
 
   async function handleFinish() {
     finishError = '';

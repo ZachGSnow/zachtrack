@@ -40,6 +40,30 @@ export default defineConfig({
           { src: '/pwa-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
           { src: '/maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
+        // Long-press the installed app's icon (Android) for these. See src/lib/utils/shortcuts.ts.
+        shortcuts: [
+          {
+            name: 'Start a fast',
+            short_name: 'Start fast',
+            description: 'Start a fast with your default method',
+            url: '/?shortcut=start-fast#/',
+            icons: [{ src: '/pwa-192.png', sizes: '192x192', type: 'image/png' }],
+          },
+          {
+            name: 'Trackables',
+            short_name: 'Trackables',
+            description: 'Log something or check what is due',
+            url: '/#/trackables',
+            icons: [{ src: '/pwa-192.png', sizes: '192x192', type: 'image/png' }],
+          },
+          {
+            name: 'Journey',
+            short_name: 'Journey',
+            description: 'Fasting streaks and history',
+            url: '/#/journey',
+            icons: [{ src: '/pwa-192.png', sizes: '192x192', type: 'image/png' }],
+          },
+        ],
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest}'],
