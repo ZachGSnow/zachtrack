@@ -70,6 +70,9 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
 - **Two-way sync** across devices: per-record last-write-wins, deletes that
   propagate, conflicts reported instead of guessed, and a sync status pill
   with a per-device history of the last 5 syncs.
+- **Templates** for new trackables (Water, Workout, Weigh-in, ...), and a
+  compact list view.
+- **CSV export** for a spreadsheet, one row per value.
 - **Export and import** (Profile > Your data): a JSON file of everything on
   the device, and an import that previews what it will add or update, merges
   by newest version, never deletes, then syncs.

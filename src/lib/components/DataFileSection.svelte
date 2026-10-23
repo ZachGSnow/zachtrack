@@ -1,6 +1,6 @@
 <script lang="ts">
   import { getAllSyncableRecords, importRecords } from '../db';
-  import { buildExport, exportFileName, planImport, type ExportFile, type ImportPlan } from '../dataFile';
+  import { buildCsv, buildExport, csvFileName, exportFileName, planImport, type ImportPlan } from '../dataFile';
 
   // $state.raw, not $state: the plan's records go straight into IndexedDB,
   // which can't clone Svelte's deep proxies (ARCHITECTURE.md 4.4). The plan is
@@ -13,13 +13,13 @@
 
   const pluralize = (n: number, singular: string, plural = `${singular}s`) => `${n} ${n === 1 ? singular : plural}`;
 
-  /** Hands the export to the browser as a file download. */
-  function downloadExport(file: ExportFile, now: Date): void {
-    const blob = new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' });
+  /** Hands text to the browser as a file download. */
+  function download(text: string, name: string, type: string): void {
+    const blob = new Blob([text], { type });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = exportFileName(now);
+    link.download = name;
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -33,9 +33,22 @@
     try {
       const now = new Date();
       const file = buildExport(await getAllSyncableRecords(), now);
-      downloadExport(file, now);
+      download(JSON.stringify(file, null, 2), exportFileName(now), 'application/json');
       const d = file.data;
       message = `Exported ${pluralize(d.fasts.length, 'fast')}, ${pluralize(d.trackableEntries.length, 'entry', 'entries')} and ${pluralize(d.trackableDefinitions.length, 'trackable')}.`;
+    } catch (err) {
+      error = `Export failed: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  }
+
+  /** Entries and fasts as CSV for a spreadsheet; the JSON export stays the one to restore from. */
+  async function exportCsv() {
+    error = undefined;
+    message = undefined;
+    try {
+      const now = new Date();
+      download(buildCsv(await getAllSyncableRecords()), csvFileName(now), 'text/csv');
+      message = 'Exported a CSV of your entries and fasts, one row per value.';
     } catch (err) {
       error = `Export failed: ${err instanceof Error ? err.message : String(err)}`;
     }
@@ -96,6 +109,9 @@
     >
     <input bind:this={fileInput} type="file" accept="application/json,.json" class="hidden" onchange={chooseFile} />
   </div>
+  <button type="button" class="w-full rounded-lg border py-2" style="border-color: var(--color-border);" onclick={exportCsv}
+    >Export CSV for a spreadsheet</button
+  >
 
   {#if plan}
     <div class="space-y-2 rounded-lg p-2" style="background: var(--color-surface-2);" role="status">

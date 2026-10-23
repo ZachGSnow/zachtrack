@@ -15,6 +15,7 @@
     onQuickLog,
     onUncheck,
     onMove,
+    compact = false,
   }: {
     trackable: TrackableDefinition;
     fields: FieldDefinition[];
@@ -24,6 +25,8 @@
     onUncheck?: () => void;
     /** Set while reordering the list: shows up/down buttons instead of "+". */
     onMove?: (direction: -1 | 1) => void;
+    /** Hides a goal card's grid strip (the list's compact view). */
+    compact?: boolean;
   } = $props();
 
   const attachedFields = $derived(
@@ -51,7 +54,9 @@
   const goalCard = $derived(!!trackable.goalType && trackable.goalType !== 'avoid' && kind !== 'ages');
   const noFields = $derived(trackable.fieldIds.length === 0);
   const loggedToday = $derived(entries.some((e) => startOfDay(e.timestamp) === startOfDay(now)));
-  const counted = $derived(trackable.goalType === 'dailyTotal' || trackable.goalType === 'perDay');
+  // Counting (a ring) from two times a day up; once a day is a plain check.
+  const multiple = $derived(trackable.goalType === 'perDay' && (trackable.goalValue ?? 1) > 1);
+  const counted = $derived(trackable.goalType === 'dailyTotal' || multiple);
   const todayCount = $derived(entries.filter((e) => startOfDay(e.timestamp) === startOfDay(now)).length);
   const doneToday = $derived(counted ? goal?.state === 'done' : loggedToday);
   // Daily totals and times-per-day show a ring filling toward today's goal until it's met.
@@ -73,7 +78,7 @@
       ? `Log ${trackable.name}`
       : doneToday
         ? `Uncheck ${trackable.name} for today`
-        : trackable.goalType === 'perDay'
+        : multiple
           ? `Log one ${trackable.name} (${todayCount} of ${trackable.goalValue} today)`
           : `Check ${trackable.name} for today`,
   );
@@ -134,7 +139,7 @@
           <svg class="absolute inset-0 -rotate-90" viewBox="0 0 40 40" aria-hidden="true">
             <circle cx="20" cy="20" r="19" fill="none" stroke={trackable.color} stroke-width="2" stroke-linecap="round" pathLength="100" stroke-dasharray="{ring * 100} 100" />
           </svg>
-          <span class="text-sm">{trackable.goalType === 'perDay' && noFields ? todayCount : '+'}</span>
+          <span class="text-sm">{multiple && noFields ? todayCount : '+'}</span>
         {:else if doneToday}
           &#10003;
         {:else if !noFields}
@@ -150,7 +155,7 @@
       >+</button>
     {/if}
   </div>
-  {#if goalCard}
+  {#if goalCard && !compact}
     <div class="mt-2.5" bind:clientWidth={stripWidth}>
       <HabitGrid weeks={strip} color={trackable.color} labels={false} maxCell={16} />
     </div>

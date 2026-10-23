@@ -30,13 +30,15 @@
   const allEntries = liveQuery(() => db.trackableEntries.toArray());
 
   const PREFS_KEY = 'trackables-view';
-  const saved = loadPrefs<{ sort: unknown }>(PREFS_KEY, { sort: 'due' });
+  const saved = loadPrefs<{ sort: unknown; compact: unknown }>(PREFS_KEY, { sort: 'due', compact: false });
   let sort = $state<ListSort>(oneOf(saved.sort, LIST_SORTS.map((s) => s.id), 'due'));
   $effect(() => {
-    savePrefs(PREFS_KEY, { sort });
+    savePrefs(PREFS_KEY, { sort, compact });
   });
 
   let reordering = $state(false);
+  /** Compact: goal cards without their grid strips, for a shorter list. Per device. */
+  let compact = $state(saved.compact === true);
   let showArchived = $state(false);
 
   const entriesByTrackable = $derived.by(() => {
@@ -196,7 +198,10 @@
       {#if reordering}
         <button class="text-sm font-semibold" style="color: var(--color-brand);" onclick={() => (reordering = false)}>Done</button>
       {:else}
-        <button class="text-sm text-text-muted" onclick={startReordering}>Reorder</button>
+        <div class="flex items-center gap-3">
+          <button class="text-sm text-text-muted" onclick={() => (compact = !compact)} aria-pressed={compact}>{compact ? 'Grids' : 'Compact'}</button>
+          <button class="text-sm text-text-muted" onclick={startReordering}>Reorder</button>
+        </div>
       {/if}
     </div>
     {#if reordering}
@@ -212,6 +217,7 @@
           onQuickLog={() => openQuickLog(t)}
           onUncheck={() => uncheckToday(t)}
           onMove={reordering ? (direction) => move(t, direction) : undefined}
+          {compact}
         />
       {/each}
     </div>

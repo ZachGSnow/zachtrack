@@ -183,3 +183,59 @@ export function planImport(text: string, local: LocalSnapshot): ParseResult {
     },
   };
 }
+
+/**
+ * Every entry and completed fast as CSV for a spreadsheet: one row per value
+ * (Date, Time, Trackable, Field, Value, Unit, Note, Tags), so it filters and
+ * pivots without reshaping. An entry with no values is one row with an empty
+ * field. Fasts are rows of trackable "Fast": hours, then any ratings. Local
+ * time, CRLF line ends and a byte-order mark so Excel reads it as UTF-8.
+ */
+export function buildCsv(local: LocalSnapshot): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const date = (ms: number) => {
+    const d = new Date(ms);
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  };
+  const time = (ms: number) => {
+    const d = new Date(ms);
+    return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+  const cell = (v: string | number | undefined) => {
+    const s = v == null ? '' : String(v);
+    return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  type Row = { at: number; cells: (string | number | undefined)[] };
+  const rows: Row[] = [];
+  const row = (at: number, trackable: string, field: string, value: string | number | undefined, unit?: string, note?: string, tags?: string[]) =>
+    rows.push({ at, cells: [date(at), time(at), trackable, field, value, unit, note, tags?.join('; ')] });
+
+  const trackables = new Map(local.trackableDefinitions.map((t) => [t.id, t]));
+  const fields = new Map(local.fieldDefinitions.map((f) => [f.id, f]));
+  for (const e of local.trackableEntries) {
+    const t = trackables.get(e.trackableId);
+    if (!t) continue;
+    const values = Object.entries(e.values ?? {});
+    if (values.length === 0) row(e.timestamp, t.name, '', '', undefined, e.note, e.tags);
+    for (const [fieldId, raw] of values) {
+      const f = fields.get(fieldId);
+      const value = typeof raw === 'boolean' ? (raw ? 'Yes' : 'No') : raw;
+      row(e.timestamp, t.name, f?.name ?? fieldId, value, f?.kind === 'number' ? f.unit : undefined, e.note, e.tags);
+    }
+  }
+  for (const f of local.fasts) {
+    if (f.endTime == null) continue;
+    const name = f.presetLabel ? `Fast (${f.presetLabel})` : 'Fast';
+    row(f.startTime, name, 'Hours', Math.round(((f.endTime - f.startTime) / 3600000) * 100) / 100, 'h', f.note, f.tags);
+    for (const [label, v] of [['Mood', f.moodRating], ['Energy', f.energyRating], ['Hunger', f.hungerRating]] as const) {
+      if (v != null) row(f.startTime, name, label, v, '1-5');
+    }
+  }
+  rows.sort((a, b) => a.at - b.at);
+  const lines = [['Date', 'Time', 'Trackable', 'Field', 'Value', 'Unit', 'Note', 'Tags'], ...rows.map((r) => r.cells)].map((cells) => cells.map(cell).join(','));
+  return String.fromCharCode(0xfeff) + lines.join('\r\n') + '\r\n';
+}
+
+export function csvFileName(now: Date): string {
+  return exportFileName(now).replace(/\.json$/, '.csv');
+}

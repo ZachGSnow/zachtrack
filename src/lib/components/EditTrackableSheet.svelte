@@ -23,6 +23,7 @@
 
   import { DAILY_GOALS, GOAL_LABELS, GOAL_TYPES, goalField, WEEKDAY_NAMES } from '../utils/trackableGoals';
   import { fromDateInputValue, toDateInputValue } from '../utils/time';
+  import { TEMPLATES, type TrackableTemplate } from '../data/templates';
 
   const KINDS: TrackableKind[] = ['event', 'measurement', 'daily', 'checkin', 'ages'];
 
@@ -126,6 +127,36 @@
     const id = (e.target as HTMLSelectElement).value;
     if (id) fieldIds = [...fieldIds, id];
     (e.target as HTMLSelectElement).value = '';
+  }
+
+  /** Fills the new-trackable sheet from a template, reusing fields you already have by name and kind. */
+  async function applyTemplate(template: TrackableTemplate) {
+    error = '';
+    try {
+      const ids: string[] = [];
+      for (const spec of template.fields) {
+        const existing = ($allFields ?? []).find((f) => f.kind === spec.kind && f.name.trim().toLowerCase() === spec.name.toLowerCase());
+        const field =
+          existing ??
+          (await createFieldDefinition({
+            name: spec.name,
+            kind: spec.kind,
+            unit: spec.unit,
+            ratingMin: spec.kind === 'rating' ? 1 : undefined,
+            ratingMax: spec.kind === 'rating' ? (spec.ratingMax ?? 5) : undefined,
+            aggregation: spec.aggregation,
+          }));
+        ids.push(field.id);
+      }
+      name = template.name;
+      icon = template.icon;
+      color = template.color;
+      fieldIds = ids;
+      goalType = template.goalType ?? '';
+      goalValueDraft = template.goalValue?.toString() ?? '';
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Could not use that template. Please try again.';
+    }
   }
 
   async function createAndAttachField() {
@@ -276,6 +307,25 @@
 
 <div class="space-y-4">
   <h2 class="text-lg font-semibold text-text">{trackable ? 'Edit trackable' : 'New trackable'}</h2>
+
+  {#if !trackable}
+    <div>
+      <p class="mb-1.5 text-sm text-text-muted">Start from a template</p>
+      <div class="flex flex-wrap gap-1.5">
+        {#each TEMPLATES as template (template.name)}
+          <button
+            type="button"
+            class="rounded-full border px-2.5 py-1 text-xs font-medium"
+            style={name === template.name
+              ? `background: ${template.color}22; color: ${template.color}; border-color: ${template.color}80;`
+              : 'border-color: var(--color-border); color: var(--color-text-muted);'}
+            onclick={() => applyTemplate(template)}
+          >{template.icon} {template.name}</button>
+        {/each}
+      </div>
+      <p class="mt-1 text-xs text-text-muted">Or fill in your own below. Everything stays editable.</p>
+    </div>
+  {/if}
 
   <div class="grid grid-cols-[1fr_auto] gap-2">
     <label class="block text-sm">

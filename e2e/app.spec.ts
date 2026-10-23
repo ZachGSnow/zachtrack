@@ -575,3 +575,35 @@ test("a trackable's page shows insights from its entries", async ({ page }) => {
   await expect(insights).toContainText(/Last 30 days: Logged on \d+ of \d+ days/);
   expect(problems).toEqual([]);
 });
+
+test('a trackable can start from a template, the list has a compact view, and data exports as CSV', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await mockSync(page, noServer);
+  await importSampleData(page);
+  await page.goto('/#/trackables');
+
+  // The Water template reuses the existing Water field and sets a daily total.
+  await page.getByRole('button', { name: '+ New' }).click();
+  await page.getByRole('button', { name: /Vitamins$/ }).click();
+  await expect(page.getByRole('textbox', { name: 'Name' })).toHaveValue('Vitamins');
+  await expect(page.getByRole('combobox', { name: /^Goal/ })).toHaveValue('perDay');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.getByText('Goal: Once a day')).toBeVisible();
+
+  // Compact hides the goal cards' grid strips.
+  await page.goto('/#/trackables');
+  const vitamins = page.locator('div.rounded-2xl', { has: page.getByRole('link', { name: /Vitamins/ }) });
+  await expect(vitamins.getByRole('group', { name: 'Days' })).toBeVisible();
+  await page.getByRole('button', { name: 'Compact' }).click();
+  await expect(vitamins.getByRole('group', { name: 'Days' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Check Vitamins for today' })).toBeVisible();
+
+  // CSV export from Profile > Your data.
+  await page.getByRole('button', { name: 'Profile' }).click();
+  const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Export CSV for a spreadsheet' }).click()]);
+  expect(download.suggestedFilename()).toMatch(/^zachtrack-export-\d{4}-\d{2}-\d{2}\.csv$/);
+  const text = await (await download.createReadStream()).toArray().then((chunks) => Buffer.concat(chunks).toString('utf8'));
+  expect(text.split('\r\n')[0]).toBe('\ufeffDate,Time,Trackable,Field,Value,Unit,Note,Tags');
+  expect(text).toMatch(/,Body Measurements,Weight,\d+(\.\d)?,lb,/);
+  expect(problems).toEqual([]);
+});
