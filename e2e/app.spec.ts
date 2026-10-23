@@ -607,3 +607,25 @@ test('a trackable can start from a template, the list has a compact view, and da
   expect(text).toMatch(/,Body Measurements,Weight,\d+(\.\d)?,lb,/);
   expect(problems).toEqual([]);
 });
+
+test('Help opens from the header and from the question marks next to settings that need explaining', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await mockSync(page, noServer);
+  await waitForStarterSet(page);
+  await page.getByRole('link', { name: 'Help', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Help', level: 1 })).toBeVisible();
+  const topics = page.getByRole('navigation', { name: 'Help topics' }).getByRole('link');
+  await expect(topics).toHaveCount(10);
+  for (const title of await topics.allTextContents()) {
+    await expect(page.getByRole('heading', { name: title, level: 2 })).toHaveCount(1);
+  }
+
+  // The "?" next to Goal in a trackable's Edit sheet opens the Goals topic, scrolled into view.
+  await page.goto('/#/trackables');
+  await page.getByRole('link', { name: /Wellness Check-in/ }).click();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.getByRole('link', { name: 'Help: goals' }).click();
+  await expect(page).toHaveURL(/#\/help\/goals$/);
+  await expect(page.getByRole('heading', { name: 'Goals', level: 2 })).toBeInViewport();
+  expect(problems).toEqual([]);
+});

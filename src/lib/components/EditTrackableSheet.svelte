@@ -24,6 +24,7 @@
   import { DAILY_GOALS, GOAL_LABELS, GOAL_TYPES, goalField, WEEKDAY_NAMES } from '../utils/trackableGoals';
   import { fromDateInputValue, toDateInputValue } from '../utils/time';
   import { TEMPLATES, type TrackableTemplate } from '../data/templates';
+  import HelpLink from './HelpLink.svelte';
 
   const KINDS: TrackableKind[] = ['event', 'measurement', 'daily', 'checkin', 'ages'];
 
@@ -366,7 +367,7 @@
   </div>
 
   <label class="block text-sm">
-    <span class="mb-1 block text-text-muted">Summary</span>
+    <span class="mb-1 flex items-center gap-1.5 text-text-muted">Summary <HelpLink topic="trackables" label="what each kind shows" /></span>
     <select
       bind:value={summaryMode}
       class="w-full rounded-lg border bg-transparent p-2 text-text"
@@ -387,7 +388,7 @@
   {#if summaryMode !== 'ages'}
     <div class="space-y-2">
       <label class="block text-sm">
-        <span class="mb-1 block text-text-muted">Goal</span>
+        <span class="mb-1 flex items-center gap-1.5 text-text-muted">Goal <HelpLink topic="goals" label="goals" /></span>
         <select
           bind:value={goalType}
           class="w-full rounded-lg border bg-transparent p-2 text-text"

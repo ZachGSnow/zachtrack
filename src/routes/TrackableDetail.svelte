@@ -31,6 +31,7 @@
   import OccurrenceBucketChart from '../lib/components/charts/OccurrenceBucketChart.svelte';
   import IntervalTrendChart from '../lib/components/charts/IntervalTrendChart.svelte';
   import HabitHistory from '../lib/components/HabitHistory.svelte';
+  import HelpLink from '../lib/components/HelpLink.svelte';
   import TrackableFieldsChart from '../lib/components/charts/TrackableFieldsChart.svelte';
 
   let { params }: { params: { id: string } } = $props();
@@ -319,7 +320,7 @@
 
           {#if insights.length > 0}
             <section class="rounded-2xl border p-4" style="border-color: var(--color-border); background: var(--color-surface);" aria-label="Insights">
-              <p class="mb-2 text-sm font-medium text-text-muted">Insights</p>
+              <p class="mb-2 flex items-center gap-1.5 text-sm font-medium text-text-muted"><span>Insights</span> <HelpLink topic="insights" label="insights" /></p>
               <ul class="flex flex-col gap-1.5">
                 {#each insights as insight, i (i)}
                   <li class="text-sm text-text"><span class="text-xs text-text-muted">{insight.label}:</span> {insight.text}</li>

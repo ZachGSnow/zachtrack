@@ -725,6 +725,18 @@ double-tap shows) and About (version, health note).
 - The browser tests reach Settings through these links (`openSettings` in
   `e2e/helpers.ts`), so the links themselves are covered.
 
+### 3.31 Help
+`/help` (`routes/Help.svelte`) is an in-app guide bundled with the app, so it
+works offline: Getting started (install, a first fast, a first trackable, a
+goal, sync or local-only), then short topics on trackables and kinds, goals,
+streaks with rest/skip/pause, the habit grid, Needs attention, insights,
+fasting (with the health note), tables and files, and sync and privacy.
+`/help/<topic>` opens at that topic. It's reached from a "?" in the phone
+header and Help in the sidebar, and `HelpLink.svelte` puts small "?" links
+where questions come up: Summary and Goal in the Edit sheet, the habit grid's
+History card and Insights. Plain text in the app's own words, for refining
+later; no first-run welcome by choice.
+
 ## 4. Issues hit during implementation, and how they were resolved
 
 These are real bugs that shipped and got fixed during this project's build,

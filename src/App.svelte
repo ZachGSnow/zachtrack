@@ -27,6 +27,7 @@
     '/charting': wrap({ asyncComponent: () => import('./routes/Charting.svelte') }),
     '/history': History,
     '/settings': wrap({ asyncComponent: () => import('./routes/Settings.svelte') }),
+    '/help/:topic?': wrap({ asyncComponent: () => import('./routes/Help.svelte') }),
   };
 
   // Fasts started since yesterday: enough to tell whether today's scheduled start is done.
@@ -64,9 +65,16 @@
 <div class="flex flex-1 flex-col lg:flex-row">
   <BottomNav variant="side" />
   <div class="mx-auto flex w-full max-w-md flex-1 flex-col lg:max-w-[1400px] lg:px-6">
-    <!-- Phone header: sync status and Settings. On a laptop both live in the sidebar. -->
+    <!-- Phone header: sync status, Help and Settings. On a laptop they live in the sidebar. -->
     <header class="flex items-center justify-end gap-2 px-3 pt-2 lg:hidden">
       <SyncStatus />
+      <a
+        href="/help"
+        use:link
+        class="flex h-7 w-7 items-center justify-center rounded-full border text-sm font-semibold"
+        style="border-color: var(--color-border); color: var(--color-text-muted); background: var(--color-surface-2);"
+        aria-label="Help"
+      >?</a>
       <a
         href="/settings"
         use:link

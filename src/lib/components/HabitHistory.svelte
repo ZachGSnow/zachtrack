@@ -6,6 +6,7 @@
   import { loadPrefs, oneOf, savePrefs } from '../utils/prefs';
   import HabitGrid from './HabitGrid.svelte';
   import SegmentedControl from './SegmentedControl.svelte';
+  import HelpLink from './HelpLink.svelte';
 
   // The trackable page's main history view: the habit grid over a week, a
   // month (as a calendar), six months or a year. Tapping a day shows what was
@@ -94,7 +95,7 @@
 
 <div class="rounded-2xl border p-4" style="border-color: var(--color-border); background: var(--color-surface);">
   <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-    <p class="text-sm font-medium text-text-muted">History</p>
+    <p class="flex items-center gap-1.5 text-sm font-medium text-text-muted"><span>History</span> <HelpLink topic="grid" label="the habit grid" /></p>
     <SegmentedControl options={PERIODS} bind:value={period} />
   </div>
 

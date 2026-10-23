@@ -57,10 +57,19 @@
       </a>
     {/each}
     <a
+      href="/help"
+      use:link
+      use:active={{ path: activePath('/help'), className: 'active' }}
+      class="side mt-auto flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium"
+    >
+      <span class="w-6 text-center text-lg leading-none">?</span>
+      <span>Help</span>
+    </a>
+    <a
       href="/settings"
       use:link
       use:active={{ path: activePath('/settings'), className: 'active' }}
-      class="side mt-auto flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium"
+      class="side flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium"
     >
       <span class="w-6 text-center text-lg leading-none">&#9881;</span>
       <span>Settings</span>
