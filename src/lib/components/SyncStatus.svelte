@@ -37,7 +37,7 @@
       syncing: 'Syncing\u2026',
       error: 'Sync error',
       offline: 'Offline',
-      unauthenticated: 'Login expired',
+      unauthenticated: syncStore.signedOut ? 'Signed out' : 'Login expired',
       local: 'Local only',
     }[syncStore.status],
   );

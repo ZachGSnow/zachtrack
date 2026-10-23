@@ -181,11 +181,43 @@
       <h2>Sync and privacy</h2>
       <p>
         Your data lives on each device and, if you set up the backend, in a database in your own Cloudflare account behind
-        Cloudflare Access. Nothing goes anywhere else and there are no analytics. The pill at the top (in the sidebar on a
-        laptop) shows the sync status; tap it to sync now, double-tap for the recent syncs, also listed under Settings > Sync.
-        If it says Login expired, use Log in again. Edits made on two devices are resolved record by record, and the newer one
-        wins.
+        Cloudflare Access. Nothing goes anywhere else and there are no analytics.
       </p>
+      <ul>
+        <li>
+          <strong>When it syncs:</strong> a few seconds after each change, when you come back to the app or back online, and
+          every few minutes while it's open. Each sync sends only what changed; once a day it sends everything as a check.
+        </li>
+        <li>
+          <strong>The pill</strong> at the top (in the sidebar on a laptop) shows the status: tap it to sync now, double-tap for
+          the recent syncs. Offline, it shows how many changes are waiting. If it says Login expired, use Log in again.
+        </li>
+        <li>
+          <strong>Two devices, one record:</strong> edits are resolved record by record and the newer one wins. When that
+          replaces an edit you made here, the history says so in amber.
+        </li>
+        <li>
+          <strong>The Sync page</strong> (Settings > Sync): this device's name, your devices with their app version (an older
+          one is flagged: reopen the app on it to update), the activity on all devices for 90 days, and 30 days of this
+          device's syncs. The activity lists what kind of record changed and its name, never values or notes.
+        </li>
+        <li>
+          <strong>Check sync</strong> compares how many records this device and the server have; <strong>Full resync</strong>
+          sends and receives everything again, without deleting anything here first.
+        </li>
+        <li>
+          <strong>Sign out</strong> (Settings > Sync) ends the Cloudflare login on <em>every</em> device, not just this one:
+          Cloudflare signs you out everywhere at once. Your data stays on each device and syncs again after you log in.
+        </li>
+        <li>
+          <strong>Sign out and erase this device</strong> also deletes everything stored here, after a confirmation that says
+          whether any change hasn't reached the server. Use it on a device you're giving away.
+        </li>
+        <li>
+          <strong>A lost phone:</strong> in the Cloudflare dashboard, Zero Trust > Access > Applications > your app > Revoke
+          existing tokens stops it syncing. What's already on it is protected by the phone's own lock.
+        </li>
+      </ul>
     </section>
   </article>
 </div>

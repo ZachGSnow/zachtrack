@@ -248,6 +248,16 @@ describe('what a sync sends back', () => {
   });
 });
 
+describe('check sync', () => {
+  it('counts live records when asked, leaving deleted ones out', async () => {
+    await sync(syncBody(0, { fasts: [fast('a', day(20), 10)], fieldDefinitions: [field], trackableEntries: [entry('e1', 10, 1), entry('e2', 10, 2)] }));
+    await sync(syncBody(0, {}, [{ recordType: 'trackableEntries', uuid: 'e2', deletedAt: 20 }]));
+    expect((await sync(syncBody(0))).body.counts).toBeUndefined();
+    const res = await sync({ ...syncBody(0), check: true });
+    expect(res.body.counts).toEqual({ fasts: 1, fieldDefinitions: 1, trackableDefinitions: 0, trackableEntries: 1 });
+  });
+});
+
 describe('hardening', () => {
   it('rejects a malformed record by itself and still stores the rest of the batch', async () => {
     const res = await sync(

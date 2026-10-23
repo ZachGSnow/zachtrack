@@ -7,6 +7,7 @@
   import DataFileSection from '../lib/components/DataFileSection.svelte';
   import { link } from 'svelte-spa-router';
   import SyncHistory from '../lib/components/SyncHistory.svelte';
+  import SignOutSection from '../lib/components/SignOutSection.svelte';
   import { syncStore } from '../lib/stores/sync.svelte';
   import type { CustomFastPreset } from '../lib/data/presets';
 
@@ -246,7 +247,7 @@
   <section class="space-y-3" aria-labelledby="settings-sync">
     <h2 id="settings-sync" class="text-sm font-semibold uppercase tracking-wide text-text-muted">Sync</h2>
     <div class="flex items-center justify-between gap-3 text-sm">
-      <span class="text-text">{SYNC_LABELS[syncStore.status]}</span>
+      <span class="text-text">{syncStore.status === 'unauthenticated' && syncStore.signedOut ? 'Signed out' : SYNC_LABELS[syncStore.status]}</span>
       {#if syncStore.status === 'unauthenticated'}
         <button class="rounded-lg px-3 py-1.5 text-sm font-semibold" style="background: var(--color-brand); color: #06140c;" onclick={() => syncStore.reauthenticate()}>Log in again</button>
       {:else if syncStore.status !== 'local'}
@@ -267,8 +268,11 @@
       <SyncHistory limit={5} />
     </div>
     <a href="/sync" use:link class="block text-sm font-semibold" style="color: var(--color-brand);"
-      >Devices, activity on all devices, and 30 days of syncs</a
+      >Devices, activity on all devices, 30 days of syncs, and Check sync</a
     >
+    {#if syncStore.status !== 'local'}
+      <SignOutSection />
+    {/if}
   </section>
 
   <section class="space-y-1 text-sm" aria-labelledby="settings-about">

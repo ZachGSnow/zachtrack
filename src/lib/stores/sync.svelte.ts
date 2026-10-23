@@ -1,7 +1,9 @@
 import {
   applyRemoteChanges,
+  countLocalRecords,
   countWaitingChanges,
   db,
+  eraseLocalData,
   getAllSyncableRecords,
   getDevice,
   getChangedSyncableRecords,
@@ -45,6 +47,13 @@ const AUTO_SYNC_MS = 5 * 60_000;
 const RETURN_SYNC_GAP_MS = 30_000;
 /** Query param that forces a navigation past the service worker's app-shell fallback (see vite.config.ts). */
 const REAUTH_PARAM = 'reauth';
+/**
+ * Cloudflare Access's sign-out page on the app's own domain. It ends the
+ * user's Access session, which signs out every device, not just this one.
+ * `/cdn-cgi/` is denylisted from the service worker's fallback, so the
+ * navigation reaches Cloudflare.
+ */
+const LOGOUT_URL = '/cdn-cgi/access/logout';
 
 /** `local`: there is no sync server at all (local-only install or `npm run dev`); data stays on the device. */
 export type SyncStatus = 'idle' | 'syncing' | 'error' | 'offline' | 'unauthenticated' | 'local';
@@ -96,7 +105,22 @@ interface SyncResponseBody {
   appliedCounts?: AppliedCounts;
   applied?: AppliedRecord[];
   devices?: DeviceInfo[];
+  /** Live records per type on the server, when the request asked to check. */
+  counts?: Record<'fasts' | 'fieldDefinitions' | 'trackableDefinitions' | 'trackableEntries', number>;
 }
+
+/** What Check sync found: this device's records against the server's, per type. */
+export interface CheckResult {
+  at: number;
+  rows: Array<{ label: string; here: number; server: number }>;
+  matches: boolean;
+  /** Records the server refused, which stay on this device only and explain a difference. */
+  rejected: number;
+  /** The server is older than v1.10.0 and can't count. */
+  unsupported?: boolean;
+}
+
+const CHECK_LABELS = { fasts: 'Fasts', fieldDefinitions: 'Fields', trackableDefinitions: 'Trackables', trackableEntries: 'Entries' } as const;
 
 /** Calls an /api endpoint the way sync does, mapping an expired login to UnauthenticatedError. */
 async function callApi(url: string, init: RequestInit = {}): Promise<Response> {
@@ -329,6 +353,12 @@ class SyncStore {
   deviceName = $state<string | undefined>(undefined);
   /** Every device that has synced in the last 90 days, from the last sync or activity read. */
   devices = $state<DeviceInfo[]>([]);
+  /** Signed out with Sign out (not just an expired login), until the next good sync. */
+  signedOut = $state(false);
+  /** The last Check sync's result. */
+  lastCheck = $state<CheckResult | undefined>(undefined);
+
+  private checkRequested = false;
 
   private debounceTimer: ReturnType<typeof setTimeout> | undefined;
   private inFlight: Promise<void> | undefined;
@@ -380,6 +410,54 @@ class SyncStore {
     this.devices = ((await res.json()) as { devices: DeviceInfo[] }).devices;
   }
 
+  /**
+   * Check sync: a sync that sends everything and asks the server how many
+   * records it has, then compares with this device (`lastCheck`).
+   */
+  async checkSync(): Promise<void> {
+    if (this.inFlight) await this.inFlight.catch(() => {});
+    this.checkRequested = true;
+    await this.syncNow();
+  }
+
+  /**
+   * Full resync: sends everything and receives everything again from the
+   * start, as a repair when Check sync finds a difference. Nothing local is
+   * deleted first, so a record only this device has goes up, not away.
+   */
+  async fullResync(): Promise<void> {
+    if (this.inFlight) await this.inFlight.catch(() => {});
+    await setSyncMeta({ cursor: 0, fullSendRequestedAt: Date.now() });
+    this.checkRequested = true;
+    await this.syncNow();
+  }
+
+  /** Sends what's waiting, then signs out through Cloudflare Access (every device). Data stays here. */
+  async signOut(): Promise<void> {
+    if (this.status !== 'local') await this.syncNow().catch(() => {});
+    await setSyncMeta({ signedOutAt: Date.now() });
+    window.location.assign(LOGOUT_URL);
+  }
+
+  /** Before erasing: one more sync, then what would be lost and what would be deleted. */
+  async prepareErase(): Promise<{ waiting: number; synced: boolean; counts: Awaited<ReturnType<typeof countLocalRecords>> }> {
+    let synced = this.status !== 'local';
+    if (synced) await this.syncNow().catch(() => (synced = false));
+    await this.refreshWaiting();
+    return { waiting: this.waiting, synced, counts: await countLocalRecords() };
+  }
+
+  /** Removes this device from the list, deletes everything stored here, and signs out (every device). */
+  async eraseAndSignOut(): Promise<void> {
+    if (this.deviceId && this.status !== 'local') await this.forgetDevice(this.deviceId).catch(() => {});
+    this.unsubscribe?.();
+    this.unsubscribe = undefined;
+    if (this.debounceTimer) clearTimeout(this.debounceTimer);
+    this.history = [];
+    await eraseLocalData();
+    window.location.assign(LOGOUT_URL);
+  }
+
   /** One page of the shared activity log, newest first; `before` continues from an earlier page. */
   async loadActivity(before?: number): Promise<{ events: ActivityEvent[]; more: boolean }> {
     const query = new URLSearchParams({ limit: '50', ...(before ? { before: String(before) } : {}) });
@@ -412,6 +490,7 @@ class SyncStore {
 
     const meta = await getSyncMeta();
     this.lastSyncedAt = meta.lastSyncedAt;
+    this.signedOut = !!meta.signedOutAt;
     const device = await getDevice();
     this.deviceId = device.id;
     this.deviceName = device.name;
@@ -524,11 +603,14 @@ class SyncStore {
     this.lastAttemptAt = startedAt;
     this.status = 'syncing';
     this.lastError = undefined;
+    const check = this.checkRequested;
+    this.checkRequested = false;
     try {
       const meta = await getSyncMeta();
       // Usually only what changed since the last good sync; everything on the
       // first sync, after an import or Full resync, and once a day.
       const full =
+        check ||
         meta.sentThrough == null ||
         meta.lastFullSendAt == null ||
         startedAt - meta.lastFullSendAt >= FULL_SEND_EVERY_MS ||
@@ -554,6 +636,7 @@ class SyncStore {
           changes: records,
           tombstones: tombstones.map(({ recordType, uuid, deletedAt }) => ({ recordType, uuid, deletedAt })),
           device: { id: device.id, name: device.name, appVersion: __APP_VERSION__ },
+          ...(check ? { check: true } : {}),
         }),
       });
 
@@ -603,8 +686,10 @@ class SyncStore {
         lastSyncedAt: Date.now(),
         sentThrough: startedAt,
         retry,
+        signedOutAt: undefined,
         ...(full ? { lastFullSendAt: startedAt } : {}),
       });
+      this.signedOut = false;
 
       this.lastSyncedAt = Date.now();
       this.rejected = body.rejected ?? [];
@@ -614,6 +699,23 @@ class SyncStore {
           )
         : [];
       this.status = 'idle';
+
+      if (check) {
+        const here = await countLocalRecords();
+        const server = body.counts;
+        const rows = (Object.keys(CHECK_LABELS) as Array<keyof typeof CHECK_LABELS>).map((k) => ({
+          label: CHECK_LABELS[k],
+          here: here[k],
+          server: server?.[k] ?? 0,
+        }));
+        this.lastCheck = {
+          at: Date.now(),
+          rows,
+          matches: !!server && rows.every((r) => r.here === r.server),
+          rejected: this.rejected.length,
+          ...(server ? {} : { unsupported: true }),
+        };
+      }
 
       const received = await describeReceived(body.changes, from).catch(() => [] as string[]);
       const sent = await describeSent(body.applied ?? [], records, tombstones).catch(() => [] as string[]);
@@ -657,12 +759,13 @@ class SyncStore {
       const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
       const isUnauthenticated = err instanceof UnauthenticatedError;
       this.status = isOffline ? 'offline' : isUnauthenticated ? 'unauthenticated' : 'error';
-      this.lastError = err instanceof Error ? err.message : String(err);
+      this.lastError =
+        isUnauthenticated && this.signedOut ? 'Signed out -- log in again to sync.' : err instanceof Error ? err.message : String(err);
 
       await this.pushHistory({
         completedAt: Date.now(),
         outcome: isOffline ? 'offline' : 'error',
-        summary: isOffline ? 'Offline -- sync skipped' : isUnauthenticated ? 'Login expired' : 'Sync failed',
+        summary: isOffline ? 'Offline -- sync skipped' : isUnauthenticated ? (this.signedOut ? 'Signed out' : 'Login expired') : 'Sync failed',
         rejectedCount: 0,
         error: this.lastError,
       });

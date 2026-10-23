@@ -177,6 +177,8 @@ export interface SyncMeta {
   deviceId?: string;
   /** What this device is called in the device list and activity, e.g. "Phone". */
   deviceName?: string;
+  /** Set by Sign out, so the pill says "Signed out" rather than "Login expired"; cleared by the next good sync. */
+  signedOutAt?: number;
 }
 
 /** A row of this device's own sync history (see utils/syncHistory.ts), kept 30 days. */
@@ -597,6 +599,31 @@ export async function countWaitingChanges(): Promise<number> {
     changes.trackableEntries.length +
     (changes.settings ? 1 : 0)
   );
+}
+
+/** Live records per type on this device, for Check sync and the erase confirmation. */
+export async function countLocalRecords(): Promise<{ fasts: number; fieldDefinitions: number; trackableDefinitions: number; trackableEntries: number }> {
+  const [fasts, fieldDefinitions, trackableDefinitions, trackableEntries] = await Promise.all([
+    db.fasts.count(),
+    db.fieldDefinitions.count(),
+    db.trackableDefinitions.count(),
+    db.trackableEntries.count(),
+  ]);
+  return { fasts, fieldDefinitions, trackableDefinitions, trackableEntries };
+}
+
+/**
+ * Deletes everything this app stores on this device: the whole IndexedDB
+ * database (records, history, sync state and device id) and its localStorage
+ * keys. The next start is a fresh install that waits for a sync before
+ * creating anything (App.svelte).
+ */
+export async function eraseLocalData(): Promise<void> {
+  db.close();
+  await db.delete();
+  if (typeof localStorage !== 'undefined') {
+    for (const key of Object.keys(localStorage)) if (key.startsWith('zachtrack:')) localStorage.removeItem(key);
+  }
 }
 
 /** All tombstones not yet acknowledged by the sync server. */

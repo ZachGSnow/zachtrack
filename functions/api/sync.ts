@@ -42,6 +42,16 @@ interface SyncRequestBody {
   };
   tombstones: Tombstone[];
   device?: unknown;
+  /** Check sync: also return how many live records the server holds. */
+  check?: boolean;
+}
+
+/** Live (not deleted) records per type on the server, for Check sync. */
+export interface ServerCounts {
+  fasts: number;
+  fieldDefinitions: number;
+  trackableDefinitions: number;
+  trackableEntries: number;
 }
 
 interface RejectedRecord {
@@ -80,6 +90,8 @@ interface SyncResponseBody {
   applied: AppliedRecord[];
   /** Every device that has synced in the last ACTIVITY_DAYS, most recent first. */
   devices: DeviceInfo[];
+  /** Only when the request asked to `check`. */
+  counts?: ServerCounts;
 }
 
 /**
@@ -143,6 +155,7 @@ export async function handleSync(request: Request, env: Env, deps: AccessDeps = 
       appliedCounts,
       applied: applied.slice(0, APPLIED_RECORDS_LIMIT),
       devices: await listDevices(db),
+      ...(body.check === true ? { counts: await countLive(db) } : {}),
     };
     return jsonResponse(responseBody);
   } catch (err) {
@@ -246,6 +259,14 @@ async function nameApplied(db: D1Database, applied: AppliedRecord[]): Promise<st
     const name = names.get(`${a.recordType}:${a.uuid}`);
     return name ? `${head} -- ${name}` : head;
   });
+}
+
+async function countLive(db: D1Database): Promise<ServerCounts> {
+  const tables = ['fasts', 'fieldDefinitions', 'trackableDefinitions', 'trackableEntries'] as const;
+  const results = await db.batch<{ n: number }>(tables.map((t) => db.prepare(`SELECT COUNT(*) AS n FROM ${t} WHERE deletedAt IS NULL`)));
+  const counts = {} as ServerCounts;
+  tables.forEach((t, i) => (counts[t] = results[i].results?.[0]?.n ?? 0));
+  return counts;
 }
 
 async function currentSeq(db: D1Database): Promise<number> {
