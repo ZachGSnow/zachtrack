@@ -5,6 +5,7 @@
   import { BODY_FIELD_SETTING, resolveBodyFieldIds, type BodyFatSex } from '../lib/utils/health';
   import { allPresets } from '../lib/data/presets';
   import DataFileSection from '../lib/components/DataFileSection.svelte';
+  import { link } from 'svelte-spa-router';
   import SyncHistory from '../lib/components/SyncHistory.svelte';
   import { syncStore } from '../lib/stores/sync.svelte';
   import type { CustomFastPreset } from '../lib/data/presets';
@@ -263,8 +264,11 @@
       </p>
     {/if}
     <div class="rounded-lg border p-1.5" style="border-color: var(--color-border); background: var(--color-surface-2);">
-      <SyncHistory />
+      <SyncHistory limit={5} />
     </div>
+    <a href="/sync" use:link class="block text-sm font-semibold" style="color: var(--color-brand);"
+      >Devices, activity on all devices, and 30 days of syncs</a
+    >
   </section>
 
   <section class="space-y-1 text-sm" aria-labelledby="settings-about">

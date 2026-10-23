@@ -70,8 +70,10 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
   home-screen shortcuts (long-press the icon): Start a fast, Trackables,
   Journey.
 - **Two-way sync** across devices: per-record last-write-wins, deletes that
-  propagate, conflicts reported instead of guessed, and a sync status pill
-  with a per-device history of the last 5 syncs.
+  propagate, conflicts reported instead of guessed, and a sync status pill.
+  A Sync page lists your devices and their app versions, the activity on
+  all devices for 90 days (names, never values), and 30 days of this
+  device's syncs, including edits another device's newer one replaced.
 - **Templates** for new trackables (Water, Workout, Weigh-in, ...), and a
   compact list view.
 - **CSV export** for a spreadsheet, one row per value.

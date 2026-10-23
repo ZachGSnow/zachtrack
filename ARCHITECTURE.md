@@ -263,26 +263,27 @@ create/edit/sync is identical to any other trackable. This keeps faith with
 the project's core Trackables principle: nothing about what can be tracked
 is hardcoded.
 
-### 3.10 Sync history on the status pill is per-device, not server-synced
+### 3.10 This device's sync history
 
 Double-clicking/double-tapping the sync-status pill (`SyncStatus.svelte`)
 shows the last 5 sync attempts on *that device* - timestamp, what was sent
 and received (or the error), how long it took, and any rejected records -
-read from
-`syncStore.history`, which is persisted to that browser's `localStorage`
-(key `zachtrack:sync-history`) so it survives reloads.
+read from `syncStore.history`. Since v1.10.0 that history lives in the
+device's own `syncLog` table (Dexie v6) and keeps 30 days (at most 2000
+entries); the Sync page shows all of it. Before that it was the last 5 in
+`localStorage` (`zachtrack:sync-history`), which the first start of v1.10.0
+copies over.
 
-This is deliberately per-device rather than a shared, cross-device log: a
+This history is per-device; the shared log across devices is 3.32. A
 sync event ("sent 1 entry; received 2 entries at 3:04pm") describes that
 device's own conversation with the server at that moment. Since v1.10.0 the
 client sends only what changed (3.4) and the server says what it stored, so
 the summary covers both directions (`summarizeSync` in
 `utils/syncHistory.ts`). Identical syncs in a row with nothing to show ("No
 changes", "Offline") are kept as one entry with a count and a time range
-(`addToHistory`), so a quiet day doesn't push everything else out. A true unified history
-visible identically on every device would require a new server-side concept
-(a logged/synced audit table), which is a bigger, separate feature - see
-Section 6.
+(`addToHistory`), so a quiet day doesn't push everything else out. Received
+lines name the device a change came from ("(Laptop)", from the row's
+`updatedBy`, 3.32).
 
 Each history entry with changes is also expandable (tap the row) into
 a plain-text, human-readable line per changed record, under Sent and
@@ -758,6 +759,38 @@ where questions come up: Summary and Goal in the Edit sheet, the habit grid's
 History card and Insights. Plain text in the app's own words, for refining
 later; no first-run welcome by choice.
 
+### 3.32 Devices, shared activity, and overwritten edits
+Migration `0006_devices_activity.sql` adds two tables and an `updatedBy`
+column on every synced table. Each sync carries the device's id, name and
+app version (`SyncMeta.deviceId`/`deviceName`, made on first use, the name
+guessed from the browser until renamed on the Sync page).
+
+- **Devices:** the sync endpoint upserts the device's row and returns the
+  whole list, so every device knows the others' names. The Sync page lists
+  them with their version and last sync, and flags any older than the newest
+  version seen: an older build can clear fields a newer one added when it
+  edits a record (the v1.8.0 note). Remove (`DELETE /api/devices?id=`) only
+  tidies the list; it signs nothing out.
+- **Activity:** a sync that stored something, or had records refused, adds
+  one `syncEvents` row: device, time, counts per type, and up to 20 names
+  ("Entry -- Water", "Trackable deleted -- Reading") from `nameApplied`.
+  Names only, never values, notes or dates, so the log is safe to keep
+  longer than a device's own history. `GET /api/activity` pages through it
+  newest first. Rows and devices unseen for 90 days are deleted by the sync
+  endpoint itself, in the same batch as the insert, so there's no separate
+  cleanup job. Neither table is in the nightly backup: it's a log, not data.
+- **Where a change came from:** upserts and deletes set `updatedBy`, pulled
+  rows carry it, and `applyRemoteChanges` drops it before storing. Rows from
+  before v1.10.0, or from an older app, have none.
+- **Overwritten edits:** last-write-wins stays, but when a record this device
+  edited since its last good sync comes back newer from another device, the
+  history says so in amber ("Your edit to Water was replaced by Laptop's newer
+  one"). `findOverwritten` compares the sent copies with what came back,
+  before `applyRemoteChanges` replaces them.
+
+`server/endpoint.ts` holds what the three Functions share: the Access check
+(`refuseUnlessOwner`), `jsonResponse` and the device list.
+
 ## 4. Issues hit during implementation, and how they were resolved
 
 These are real bugs that shipped and got fixed during this project's build,
@@ -1094,11 +1127,9 @@ this," not a promise.
 - **Correlation coefficients** between Data-tab columns: still not built.
   The plain-language comparisons on a trackable's page (3.28) cover the
   useful part with less room to over-read.
-- **Cross-device shared sync history/audit log:** the sync-status pill's
-  history (see 3.10) is per-device (`localStorage`) by design. A unified
-  log visible identically on every device - "what changed, from which
-  device, and when" - was discussed as a possible follow-up, but would need
-  a new server-side logged/synced table and isn't built.
+- **Before/after values in the shared activity log:** built in v1.10.0
+  with names only (3.32). Values would make it a second copy of the health
+  data with its own retention, so they stay out.
 
 ## 7. Validation conventions
 

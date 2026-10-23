@@ -3,6 +3,7 @@ import {
   countWaitingChanges,
   db,
   getAllSyncableRecords,
+  getDevice,
   getChangedSyncableRecords,
   getPendingTombstones,
   getSyncMeta,
@@ -12,6 +13,8 @@ import {
   type FastRecord,
   type FieldDefinition,
   type RemoteSyncChanges,
+  type SettingsRecord,
+  type SyncLogRow,
   type SyncRetryKey,
   type SyncTombstone,
   type TrackableDefinition,
@@ -19,14 +22,20 @@ import {
 } from '../db';
 import { formatClockTime, formatDateTime } from '../utils/time';
 import { describeRejected, REJECTED_DETAILS_LIMIT, type RejectedRecord } from '../utils/rejected';
-import { addToHistory, summarizeSync, type AppliedCounts, type SyncHistoryEntry } from '../utils/syncHistory';
+import { canMerge, mergeInto, summarizeSync, type AppliedCounts, type SyncHistoryEntry } from '../utils/syncHistory';
 
 export type { SyncHistoryEntry } from '../utils/syncHistory';
 
 const SYNC_ENDPOINT = '/api/sync';
+const ACTIVITY_ENDPOINT = '/api/activity';
+const DEVICES_ENDPOINT = '/api/devices';
 const DEBOUNCE_MS = 2500;
-const HISTORY_STORAGE_KEY = 'zachtrack:sync-history';
-const HISTORY_LIMIT = 5;
+/** Where the history lived before v1.10.0 (last 5); copied into the syncLog table once. */
+const OLD_HISTORY_STORAGE_KEY = 'zachtrack:sync-history';
+/** This device keeps its own sync history this long. */
+export const HISTORY_DAYS = 30;
+/** And at most this many entries, whatever their age. */
+const HISTORY_MAX = 2000;
 const HISTORY_DETAILS_LIMIT = 20;
 /** A device sends its whole dataset at least this often, in case a change slipped past (a clock set back, a server restore). */
 const FULL_SEND_EVERY_MS = 24 * 3600_000;
@@ -60,6 +69,25 @@ interface AppliedRecord {
   deleted?: boolean;
 }
 
+/** A device in the server's list (functions/api/sync.ts). */
+export interface DeviceInfo {
+  id: string;
+  name: string;
+  appVersion?: string;
+  firstSeenAt: number;
+  lastSeenAt: number;
+}
+
+/** One sync that changed something, from any device (functions/api/activity.ts). */
+export interface ActivityEvent {
+  id: number;
+  deviceId: string;
+  at: number;
+  counts: AppliedCounts;
+  details: string[];
+  rejectedCount: number;
+}
+
 interface SyncResponseBody {
   cursor: number;
   changes: RemoteSyncChanges;
@@ -67,6 +95,21 @@ interface SyncResponseBody {
   /** Absent from servers before v1.10.0. */
   appliedCounts?: AppliedCounts;
   applied?: AppliedRecord[];
+  devices?: DeviceInfo[];
+}
+
+/** Calls an /api endpoint the way sync does, mapping an expired login to UnauthenticatedError. */
+async function callApi(url: string, init: RequestInit = {}): Promise<Response> {
+  const response = await fetch(url, {
+    ...init,
+    credentials: 'include',
+    redirect: 'manual',
+    headers: { 'X-Requested-With': 'XMLHttpRequest', ...(init.headers ?? {}) },
+  });
+  if (response.type === 'opaqueredirect' || response.status === 401) throw new UnauthenticatedError();
+  if (response.status === 404 || response.status === 405) throw new NoBackendError();
+  if (!response.ok) throw new Error(`Request failed (${response.status})`);
+  return response;
 }
 
 const RETRY_TYPES = new Set<string>(['fasts', 'fieldDefinitions', 'trackableDefinitions', 'trackableEntries', 'settings']);
@@ -124,29 +167,89 @@ function describeEntry(entry: TrackableEntry, names: Names): string {
  * One line per record received from the server, for the history's detail view.
  * Names come from the local DB, so call this after `applyRemoteChanges`.
  */
-async function describeReceived(changes: RemoteSyncChanges): Promise<string[]> {
+async function describeReceived(changes: RemoteSyncChanges, from: (deviceId: string | null | undefined) => string): Promise<string[]> {
   const details: string[] = [];
+  const by = (deviceId: string | null | undefined) => {
+    const name = from(deviceId);
+    return name ? ` (${name})` : '';
+  };
   for (const fast of changes.fasts) {
-    details.push(fast.deletedAt ? `Fast deleted -- started ${formatDateTime(fast.startTime)}` : describeFast(fast));
+    details.push((fast.deletedAt ? `Fast deleted -- started ${formatDateTime(fast.startTime)}` : describeFast(fast)) + by(fast.updatedBy));
   }
   for (const field of changes.fieldDefinitions) {
-    details.push(field.deletedAt ? `Field deleted -- ${field.name}` : `Field -- ${field.name}`);
+    details.push((field.deletedAt ? `Field deleted -- ${field.name}` : `Field -- ${field.name}`) + by(field.updatedBy));
   }
   for (const trackable of changes.trackableDefinitions) {
-    details.push(trackable.deletedAt ? `Trackable deleted -- ${trackable.name}` : `Trackable -- ${trackable.name}`);
+    details.push((trackable.deletedAt ? `Trackable deleted -- ${trackable.name}` : `Trackable -- ${trackable.name}`) + by(trackable.updatedBy));
   }
   if (changes.trackableEntries.length > 0) {
     const names = await nameLookup();
     for (const entry of changes.trackableEntries) {
       if (entry.deletedAt) {
-        details.push(`Entry deleted -- ${names.trackableById.get(entry.trackableId)?.name ?? 'Unknown trackable'}`);
+        details.push(`Entry deleted -- ${names.trackableById.get(entry.trackableId)?.name ?? 'Unknown trackable'}${by(entry.updatedBy)}`);
         continue;
       }
-      details.push(describeEntry(entry, names));
+      details.push(describeEntry(entry, names) + by(entry.updatedBy));
     }
   }
-  if (changes.settings) details.push('Settings updated');
+  if (changes.settings) details.push(`Settings updated${by(changes.settings.updatedBy)}`);
   return details;
+}
+
+interface SentRecords {
+  fasts: FastRecord[];
+  fieldDefinitions: FieldDefinition[];
+  trackableDefinitions: TrackableDefinition[];
+  trackableEntries: TrackableEntry[];
+  settings: SettingsRecord | null;
+}
+
+/**
+ * Edits made on this device (changed since the last good sync) that a newer
+ * edit from another device replaced: the server kept the other one and sent
+ * it back. One line each, e.g. "Your edit to Water (12 oz) was replaced by
+ * Laptop's newer one". Call before `applyRemoteChanges`, while the local copy
+ * still has this device's edit.
+ */
+async function findOverwritten(
+  sent: SentRecords,
+  editedSince: number | undefined,
+  changes: RemoteSyncChanges,
+  from: (deviceId: string | null | undefined) => string,
+): Promise<string[]> {
+  if (editedSince == null) return [];
+  const edited = <T extends { updatedAt: number }>(list: T[]) => list.filter((r) => r.updatedAt >= editedSince);
+  const lines: string[] = [];
+  const newer = (remote: { updatedAt: number; deletedAt?: number | null; updatedBy?: string | null }, local: { updatedAt: number }, what: string) => {
+    if (Math.max(remote.updatedAt, remote.deletedAt ?? 0) <= local.updatedAt) return;
+    const who = from(remote.updatedBy) || 'another device';
+    lines.push(remote.deletedAt ? `Your edit to ${what} was replaced: ${who} deleted it` : `Your edit to ${what} was replaced by ${who}'s newer one`);
+  };
+  const fasts = new Map(edited(sent.fasts).map((f) => [f.uuid, f] as const));
+  for (const r of changes.fasts) {
+    const local = fasts.get(r.uuid);
+    if (local) newer(r, local, `the fast from ${formatDateTime(local.startTime)}`);
+  }
+  const fields = new Map(edited(sent.fieldDefinitions).map((f) => [f.id, f] as const));
+  for (const r of changes.fieldDefinitions) {
+    const local = fields.get(r.id);
+    if (local) newer(r, local, `the field ${local.name}`);
+  }
+  const trackables = new Map(edited(sent.trackableDefinitions).map((t) => [t.id, t] as const));
+  for (const r of changes.trackableDefinitions) {
+    const local = trackables.get(r.id);
+    if (local) newer(r, local, local.name);
+  }
+  const entries = new Map(edited(sent.trackableEntries).map((e) => [e.id, e] as const));
+  if (changes.trackableEntries.some((r) => entries.has(r.id))) {
+    const names = await nameLookup();
+    for (const r of changes.trackableEntries) {
+      const local = entries.get(r.id);
+      if (local) newer(r, local, `an entry: ${describeEntry(local, names)}`);
+    }
+  }
+  if (sent.settings && sent.settings.updatedAt >= editedSince && changes.settings) newer(changes.settings, sent.settings, 'Settings');
+  return lines;
 }
 
 /** One line per record the server stored from this device (`applied`), named from what was sent. */
@@ -193,25 +296,21 @@ async function describeSent(
   });
 }
 
-function loadHistory(): SyncHistoryEntry[] {
-  if (typeof localStorage === 'undefined') return [];
+/** Reads this device's history (newest first), first copying in the pre-v1.10.0 entries from localStorage. */
+async function loadHistory(): Promise<SyncLogRow[]> {
   try {
-    const raw = localStorage.getItem(HISTORY_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    const old = typeof localStorage === 'undefined' ? null : localStorage.getItem(OLD_HISTORY_STORAGE_KEY);
+    if (old) {
+      const parsed = JSON.parse(old);
+      if (Array.isArray(parsed)) await db.syncLog.bulkAdd(parsed as SyncLogRow[]);
+      localStorage.removeItem(OLD_HISTORY_STORAGE_KEY);
+    }
   } catch {
-    return [];
+    // An unreadable old history just isn't copied.
   }
-}
-
-function saveHistory(history: SyncHistoryEntry[]): void {
-  if (typeof localStorage === 'undefined') return;
-  try {
-    localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(history));
-  } catch {
-    // Storage full or unavailable (e.g. private mode) -- history just won't persist.
-  }
+  return (await db.syncLog.orderBy('completedAt').reverse().toArray()).filter(
+    (e) => e.completedAt >= Date.now() - HISTORY_DAYS * 24 * 3600_000,
+  );
 }
 
 class SyncStore {
@@ -221,10 +320,15 @@ class SyncStore {
   rejected = $state<Array<{ recordType: string; uuid: string; reason: string }>>([]);
   /** `rejected` as readable lines (record name and reason), for the pill's tooltip and history. */
   rejectedDetails = $state<string[]>([]);
-  /** Last few sync attempts (newest first), persisted per-device in localStorage. */
-  history = $state<SyncHistoryEntry[]>(loadHistory());
+  /** This device's sync attempts over the last HISTORY_DAYS (newest first), kept in its syncLog table. */
+  history = $state<SyncLogRow[]>([]);
   /** Local changes the server doesn't have yet (what the next sync sends). */
   waiting = $state(0);
+  /** This device's id and name in the server's device list. */
+  deviceId = $state<string | undefined>(undefined);
+  deviceName = $state<string | undefined>(undefined);
+  /** Every device that has synced in the last 90 days, from the last sync or activity read. */
+  devices = $state<DeviceInfo[]>([]);
 
   private debounceTimer: ReturnType<typeof setTimeout> | undefined;
   private inFlight: Promise<void> | undefined;
@@ -232,9 +336,57 @@ class SyncStore {
   private syncedListeners: Array<() => void> = [];
   private lastAttemptAt = 0;
 
-  private pushHistory(entry: SyncHistoryEntry): void {
-    this.history = addToHistory(this.history, entry, HISTORY_LIMIT);
-    saveHistory(this.history);
+  /** Adds a history entry, or folds it into the newest one when it says the same (utils/syncHistory.ts). */
+  private async pushHistory(entry: SyncHistoryEntry): Promise<void> {
+    const cutoff = Date.now() - HISTORY_DAYS * 24 * 3600_000;
+    const [head, ...rest] = this.history;
+    try {
+      if (canMerge(head, entry)) {
+        const merged: SyncLogRow = { ...mergeInto(head, entry), id: head.id };
+        this.history = [merged, ...rest];
+        await db.syncLog.put(merged);
+      } else {
+        const row: SyncLogRow = { ...entry };
+        this.history = [row, ...this.history];
+        row.id = await db.syncLog.add(row);
+      }
+      this.history = this.history.filter((e) => e.completedAt >= cutoff).slice(0, HISTORY_MAX);
+      await db.syncLog.where('completedAt').below(cutoff).delete();
+      const extra = (await db.syncLog.count()) - HISTORY_MAX;
+      if (extra > 0) await db.syncLog.orderBy('completedAt').limit(extra).delete();
+    } catch {
+      // The history is informational; a failed write doesn't fail the sync.
+    }
+  }
+
+  /** The name to show for a device id: its name, "" for this device or none. */
+  deviceLabel(deviceId: string | null | undefined): string {
+    if (!deviceId || deviceId === this.deviceId) return '';
+    return this.devices.find((d) => d.id === deviceId)?.name ?? (deviceId === 'unknown' ? 'an older app' : 'another device');
+  }
+
+  /** Renames this device; the server hears it on the next sync, which runs now. */
+  async renameDevice(name: string): Promise<void> {
+    const trimmed = name.trim().slice(0, 40);
+    if (!trimmed) return;
+    await setSyncMeta({ deviceName: trimmed });
+    this.deviceName = trimmed;
+    if (this.status !== 'local') await this.syncNow().catch(() => {});
+  }
+
+  /** Removes another device from the server's list (functions/api/devices.ts). */
+  async forgetDevice(id: string): Promise<void> {
+    const res = await callApi(`${DEVICES_ENDPOINT}?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+    this.devices = ((await res.json()) as { devices: DeviceInfo[] }).devices;
+  }
+
+  /** One page of the shared activity log, newest first; `before` continues from an earlier page. */
+  async loadActivity(before?: number): Promise<{ events: ActivityEvent[]; more: boolean }> {
+    const query = new URLSearchParams({ limit: '50', ...(before ? { before: String(before) } : {}) });
+    const res = await callApi(`${ACTIVITY_ENDPOINT}?${query}`);
+    const body = (await res.json()) as { events: ActivityEvent[]; devices: DeviceInfo[]; more: boolean };
+    this.devices = body.devices;
+    return { events: body.events, more: body.more };
   }
 
   /** Recounts `waiting`; cheap enough to run after every local write at this app's scale. */
@@ -260,6 +412,10 @@ class SyncStore {
 
     const meta = await getSyncMeta();
     this.lastSyncedAt = meta.lastSyncedAt;
+    const device = await getDevice();
+    this.deviceId = device.id;
+    this.deviceName = device.name;
+    this.history = await loadHistory().catch(() => []);
 
     let outcome: 'synced' | 'no-backend' | 'failed';
     try {
@@ -377,9 +533,10 @@ class SyncStore {
         meta.lastFullSendAt == null ||
         startedAt - meta.lastFullSendAt >= FULL_SEND_EVERY_MS ||
         (meta.fullSendRequestedAt ?? 0) > meta.lastFullSendAt;
-      const [records, tombstones] = await Promise.all([
+      const [records, tombstones, device] = await Promise.all([
         full ? getAllSyncableRecords() : getChangedSyncableRecords(meta.sentThrough!, meta.retry),
         getPendingTombstones(),
+        getDevice(),
       ]);
 
       const response = await fetch(SYNC_ENDPOINT, {
@@ -396,6 +553,7 @@ class SyncStore {
           cursor: meta.cursor,
           changes: records,
           tombstones: tombstones.map(({ recordType, uuid, deletedAt }) => ({ recordType, uuid, deletedAt })),
+          device: { id: device.id, name: device.name, appVersion: __APP_VERSION__ },
         }),
       });
 
@@ -426,7 +584,10 @@ class SyncStore {
       }
 
       const body: SyncResponseBody = await response.json();
+      if (body.devices) this.devices = body.devices;
+      const from = (id: string | null | undefined) => this.deviceLabel(id);
 
+      const overwritten = await findOverwritten(records, meta.sentThrough, body.changes, from).catch(() => [] as string[]);
       await applyRemoteChanges(body.changes);
 
       const tombstoneIds = tombstones.map((t) => t.id).filter((id): id is number => id != null);
@@ -454,11 +615,11 @@ class SyncStore {
         : [];
       this.status = 'idle';
 
-      const received = await describeReceived(body.changes).catch(() => [] as string[]);
+      const received = await describeReceived(body.changes, from).catch(() => [] as string[]);
       const sent = await describeSent(body.applied ?? [], records, tombstones).catch(() => [] as string[]);
       const sentTotal = Object.values(body.appliedCounts ?? {}).reduce((a, b) => a + (b ?? 0), 0);
 
-      this.pushHistory({
+      await this.pushHistory({
         completedAt: this.lastSyncedAt,
         outcome: 'success',
         summary: summarizeSync(body.appliedCounts, {
@@ -476,6 +637,7 @@ class SyncStore {
         moreSentCount: Math.max(0, sentTotal - Math.min(sent.length, HISTORY_DETAILS_LIMIT)),
         durationMs: Date.now() - startedAt,
         ...(full ? { full: true } : {}),
+        ...(overwritten.length ? { overwritten } : {}),
       });
       void this.refreshWaiting();
 
@@ -488,7 +650,7 @@ class SyncStore {
         // use, `npm run dev`). Record it once, not on every edit.
         this.status = 'local';
         if (!wasLocalOnly) {
-          this.pushHistory({ completedAt: Date.now(), outcome: 'local', summary: err.message, rejectedCount: 0 });
+          await this.pushHistory({ completedAt: Date.now(), outcome: 'local', summary: err.message, rejectedCount: 0 });
         }
         throw err;
       }
@@ -497,7 +659,7 @@ class SyncStore {
       this.status = isOffline ? 'offline' : isUnauthenticated ? 'unauthenticated' : 'error';
       this.lastError = err instanceof Error ? err.message : String(err);
 
-      this.pushHistory({
+      await this.pushHistory({
         completedAt: Date.now(),
         outcome: isOffline ? 'offline' : 'error',
         summary: isOffline ? 'Offline -- sync skipped' : isUnauthenticated ? 'Login expired' : 'Sync failed',

@@ -2,9 +2,11 @@
   import { syncStore } from '../stores/sync.svelte';
   import type { SyncHistoryEntry } from '../utils/syncHistory';
 
-  // The last few syncs on this device (ARCHITECTURE.md 3.10): shown from a double-tap on the
-  // sync pill and on the Settings page.
+  // This device's syncs (ARCHITECTURE.md 3.10): the last few from a double-tap on the sync
+  // pill and on Settings, all 30 days on the Sync page.
+  let { limit, title = 'Recent syncs' }: { limit?: number; title?: string } = $props();
   let expandedEntryAt = $state<number | null>(null);
+  const entries = $derived(limit ? syncStore.history.slice(0, limit) : syncStore.history);
 
   function formatEntryTime(ts: number): string {
     const date = new Date(ts);
@@ -38,14 +40,15 @@
 </script>
 
 <p class="px-1 pb-1 text-left text-[10px] font-semibold opacity-70" style="color: var(--color-text-muted);">
-  Recent syncs
+  {title}
 </p>
-{#if syncStore.history.length === 0}
+{#if entries.length === 0}
   <p class="px-1 py-1 text-left text-[10px]" style="color: var(--color-text-muted);">No sync history yet.</p>
 {:else}
   <ul class="flex flex-col gap-1">
-    {#each syncStore.history as entry (entry.completedAt)}
-      {@const hasDetails = !!entry.details?.length || !!entry.sentDetails?.length || !!entry.rejectedDetails?.length}
+    {#each entries as entry (entry.completedAt)}
+      {@const hasDetails =
+        !!entry.details?.length || !!entry.sentDetails?.length || !!entry.rejectedDetails?.length || !!entry.overwritten?.length}
       <li class="overflow-hidden rounded" style="background: var(--color-surface);">
         <button
           type="button"
@@ -71,6 +74,11 @@
             {entry.outcome === 'error' ? (entry.error ?? entry.summary) : entry.summary}
           </span>
         </button>
+        {#if entry.overwritten?.length}
+          <p class="px-1.5 pb-1 text-left text-[10px] text-amber-400">
+            &#x26A0; {entry.overwritten.length === 1 ? 'An edit here was' : `${entry.overwritten.length} edits here were`} replaced by a newer one (tap for which)
+          </p>
+        {/if}
         {#if entry.rejectedCount > 0}
           <p class="px-1.5 pb-1 text-left text-[10px] text-amber-400">
             &#x26A0; {entry.rejectedCount} not synced{entry.rejectedDetails?.length ? ' (tap for why)' : ''}
@@ -81,6 +89,9 @@
             class="flex flex-col gap-0.5 border-t px-1.5 py-1 text-left text-[10px]"
             style="border-color: var(--color-border);"
           >
+            {#each entry.overwritten ?? [] as line, i (i)}
+              <li class="break-words text-amber-400">{line}</li>
+            {/each}
             {#each entry.rejectedDetails ?? [] as line, i (i)}
               <li class="break-words text-amber-400">{line}</li>
             {/each}
