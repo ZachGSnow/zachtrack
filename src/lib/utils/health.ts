@@ -16,7 +16,7 @@ export const BODY_FIELD_ROLES = Object.keys(BODY_FIELD_SETTING) as BodyFieldRole
 export type BodyFieldIds = Partial<Record<BodyFieldRole, string>>;
 
 /**
- * The field a body measurement comes from: the one chosen in Profile (e.g.
+ * The field a body measurement comes from: the one chosen in Settings (e.g.
  * `settings.waistFieldId`), or else the first number field named after the
  * role ("Weight", "Waist", "Neck", "Hip"). The name fallback keeps installs
  * from before the setting existed working.
