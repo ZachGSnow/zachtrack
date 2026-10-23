@@ -8,8 +8,11 @@
     type TrackableDefinition,
     type TrackableEntry,
     type FieldDefinition,
+    type DateRepeat,
   } from '../db';
   import { toDatetimeLocal, fromDatetimeLocal, toDateInputValue, fromDateInputValue } from '../utils/time';
+  import { DATE_KIND_ITEM, dateKindOf, defaultRepeat, describeRepeat, ordinal } from '../utils/dates';
+  import { WEEKDAY_NAMES } from '../utils/trackableGoals';
   import TagInput from './TagInput.svelte';
 
   let {
@@ -33,6 +36,49 @@
       : [],
   );
   const isAges = $derived(trackable?.displayMode === 'ages');
+  const dateKind = $derived(trackable ? dateKindOf(trackable) : 'birthday');
+  const item = $derived(DATE_KIND_ITEM[dateKind]);
+
+  // How a date repeats (DateRepeat): holidays can follow a rule, countdowns can repeat as renewals.
+  type RepeatChoice = 'yearly' | 'once' | 'everyMonths' | 'everyYears' | 'nthWeekday' | 'easter';
+  let repeatChoice = $state<RepeatChoice>('yearly');
+  let repeatCount = $state('1');
+  let ruleNth = $state(1);
+  let ruleWeekday = $state(0);
+  let ruleMonth = $state(0);
+  let easterOffset = $state('0');
+  const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const usesDate = $derived(repeatChoice !== 'nthWeekday' && repeatChoice !== 'easter');
+
+  function loadRepeat(r: DateRepeat) {
+    repeatChoice = r.type === 'every' ? (r.unit === 'years' ? 'everyYears' : 'everyMonths') : r.type;
+    repeatCount = r.type === 'every' ? String(r.count) : '1';
+    ruleNth = r.type === 'nthWeekday' ? r.nth : 1;
+    ruleWeekday = r.type === 'nthWeekday' ? r.weekday : 0;
+    ruleMonth = r.type === 'nthWeekday' ? r.month : 0;
+    easterOffset = r.type === 'easter' ? String(r.offsetDays ?? 0) : '0';
+  }
+
+  /** The rule as chosen, or an error message. */
+  function chosenRepeat(): DateRepeat | string {
+    switch (repeatChoice) {
+      case 'everyMonths':
+      case 'everyYears': {
+        const count = Number(repeatCount);
+        if (!Number.isInteger(count) || count < 1 || count > 100) return 'Enter how often as a whole number from 1 to 100.';
+        return { type: 'every', count, unit: repeatChoice === 'everyYears' ? 'years' : 'months' };
+      }
+      case 'nthWeekday':
+        return { type: 'nthWeekday', month: ruleMonth, weekday: ruleWeekday, nth: ruleNth };
+      case 'easter': {
+        const offset = Number(easterOffset || '0');
+        if (!Number.isInteger(offset) || offset < -100 || offset > 100) return 'Enter the days from Easter as a whole number from -100 to 100.';
+        return offset ? { type: 'easter', offsetDays: offset } : { type: 'easter' };
+      }
+      default:
+        return { type: repeatChoice };
+    }
+  }
 
   let dateLocal = $state('');
   let note = $state('');
@@ -40,30 +86,34 @@
   let fieldInputs = $state<Record<string, string | number | boolean>>({});
   let error = $state('');
 
-  // Guards against re-populating fieldInputs from unrelated field-definition
-  // edits while the sheet is open and being typed in, while still allowing
-  // the *initial* population to wait until the fieldDefinitions liveQuery
-  // (allFields) has actually loaded -- it starts out `undefined` on mount.
+  // The sheet fills itself once per entry (or new entry) it opens for. The
+  // date, name, note and tags straight away, so nothing typed right after it
+  // opens is overwritten; the field inputs once the fieldDefinitions liveQuery
+  // (allFields) has loaded, since it starts out `undefined`. Neither refills
+  // on unrelated edits while the sheet is open and being typed in.
   let initKey = '';
-  let initialized = false;
+  let fieldsKey = '';
 
   $effect(() => {
     if (!open || !trackable) return;
     const key = `${trackable.id}|${entry?.id ?? `new@${defaultTimestamp ?? ''}`}`;
-    if (key !== initKey) {
-      initKey = key;
-      initialized = false;
-    }
-    if (initialized) return;
-    if ($allFields === undefined) return; // wait for fields to load before snapshotting
-    initialized = true;
-
-    const fields = attachedFields;
+    if (key === initKey) return;
+    initKey = key;
     const ages = isAges;
     const when = entry?.timestamp ?? defaultTimestamp ?? Date.now();
     dateLocal = ages ? toDateInputValue(when) : toDatetimeLocal(when);
+    if (ages) loadRepeat(entry?.dateRepeat ?? defaultRepeat(dateKindOf(trackable)));
     note = entry?.note ?? '';
     tags = entry?.tags ?? [];
+    error = '';
+  });
+
+  $effect(() => {
+    if (!open || !trackable || $allFields === undefined) return;
+    const key = `${trackable.id}|${entry?.id ?? `new@${defaultTimestamp ?? ''}`}`;
+    if (key === fieldsKey) return;
+    fieldsKey = key;
+    const fields = attachedFields;
     const inputs: Record<string, string | number | boolean> = {};
     for (const f of fields) {
       const raw = entry?.values?.[f.id];
@@ -72,7 +122,6 @@
       else inputs[f.id] = typeof raw === 'boolean' ? raw : false;
     }
     fieldInputs = inputs;
-    error = '';
   });
 
   function setRating(fieldId: string, value: number) {
@@ -86,13 +135,24 @@
   async function handleSave() {
     if (!trackable) return;
     error = '';
-    const timestamp = isAges ? fromDateInputValue(dateLocal) : fromDatetimeLocal(dateLocal);
+    let dateRepeat: DateRepeat | undefined;
+    if (isAges) {
+      const r = chosenRepeat();
+      if (typeof r === 'string') {
+        error = r;
+        return;
+      }
+      // The kind's default is left unset, so it follows the kind.
+      dateRepeat = JSON.stringify(r) === JSON.stringify(defaultRepeat(dateKind)) ? undefined : r;
+    }
+    // A rule-based holiday has no date of its own; it keeps (or gets) a placeholder.
+    const timestamp = isAges && !usesDate ? (entry?.timestamp ?? new Date(2000, 0, 1).getTime()) : isAges ? fromDateInputValue(dateLocal) : fromDatetimeLocal(dateLocal);
     if (Number.isNaN(timestamp)) {
       error = 'Please enter a valid date.';
       return;
     }
     if (isAges && !note.trim()) {
-      error = 'Please enter a name.';
+      error = `Please enter ${item.name === 'Name' ? 'a name' : 'what it is'}.`;
       return;
     }
 
@@ -121,6 +181,7 @@
       note: note.trim() || undefined,
       tags: tags.length ? [...tags] : undefined,
       values: Object.keys(values).length ? values : undefined,
+      ...(isAges ? { dateRepeat } : {}),
     };
 
     try {
@@ -151,25 +212,74 @@
 
     {#if isAges}
       <label class="block text-sm">
-        <span class="mb-1 block text-text-muted">Name</span>
+        <span class="mb-1 block text-text-muted">{item.name}</span>
         <input
           type="text"
           bind:value={note}
-          placeholder="e.g. Mom"
+          placeholder={item.namePlaceholder}
           class="w-full rounded-lg border bg-transparent p-2 text-text placeholder:text-text-muted"
           style="border-color: var(--color-border);"
         />
       </label>
 
-      <label class="block text-sm">
-        <span class="mb-1 block text-text-muted">Birthdate</span>
-        <input
-          type="date"
-          bind:value={dateLocal}
-          class="w-full rounded-lg border bg-transparent p-2 text-text"
-          style="border-color: var(--color-border);"
-        />
-      </label>
+      {#if dateKind === 'holiday' || dateKind === 'countdown'}
+        <label class="block text-sm">
+          <span class="mb-1 block text-text-muted">Repeats</span>
+          <select bind:value={repeatChoice} class="w-full rounded-lg border bg-transparent p-2 text-text" style="border-color: var(--color-border);">
+            {#if dateKind === 'holiday'}
+              <option value="yearly">Same date every year</option>
+              <option value="nthWeekday">A weekday of a month (e.g. 4th Thursday)</option>
+              <option value="easter">Easter, or days from it</option>
+              <option value="once">Just once</option>
+            {:else}
+              <option value="once">Just once</option>
+              <option value="yearly">Every year</option>
+              <option value="everyMonths">Every few months</option>
+              <option value="everyYears">Every few years</option>
+            {/if}
+          </select>
+        </label>
+        {#if repeatChoice === 'everyMonths' || repeatChoice === 'everyYears'}
+          <label class="block text-sm">
+            <span class="mb-1 block text-text-muted">Every how many {repeatChoice === 'everyYears' ? 'years' : 'months'}</span>
+            <input type="text" inputmode="numeric" bind:value={repeatCount} class="w-full rounded-lg border bg-transparent p-2 text-text" style="border-color: var(--color-border);" />
+          </label>
+        {:else if repeatChoice === 'nthWeekday'}
+          <div class="grid grid-cols-3 gap-2 text-sm">
+            <select bind:value={ruleNth} aria-label="Which" class="rounded-lg border bg-transparent p-2 text-text" style="border-color: var(--color-border);">
+              {#each [1, 2, 3, 4, 5] as n (n)}<option value={n}>{ordinal(n)}</option>{/each}
+              <option value={-1}>Last</option>
+            </select>
+            <select bind:value={ruleWeekday} aria-label="Weekday" class="rounded-lg border bg-transparent p-2 text-text" style="border-color: var(--color-border);">
+              {#each WEEKDAY_NAMES as w, i (w)}<option value={i}>{w}</option>{/each}
+            </select>
+            <select bind:value={ruleMonth} aria-label="Month" class="rounded-lg border bg-transparent p-2 text-text" style="border-color: var(--color-border);">
+              {#each MONTH_NAMES as m, i (m)}<option value={i}>{m}</option>{/each}
+            </select>
+          </div>
+        {:else if repeatChoice === 'easter'}
+          <label class="block text-sm">
+            <span class="mb-1 block text-text-muted">Days from Easter (0 = Easter Sunday, -2 = Good Friday)</span>
+            <input type="text" inputmode="numeric" bind:value={easterOffset} class="w-full rounded-lg border bg-transparent p-2 text-text" style="border-color: var(--color-border);" />
+          </label>
+        {/if}
+        {#if !usesDate}
+          {@const r = chosenRepeat()}
+          <p class="text-xs text-text-muted">{typeof r === 'string' ? r : describeRepeat(r)}</p>
+        {/if}
+      {/if}
+
+      {#if usesDate}
+        <label class="block text-sm">
+          <span class="mb-1 block text-text-muted">{repeatChoice === 'everyMonths' || repeatChoice === 'everyYears' ? 'Next due, or last done' : item.date}</span>
+          <input
+            type="date"
+            bind:value={dateLocal}
+            class="w-full rounded-lg border bg-transparent p-2 text-text"
+            style="border-color: var(--color-border);"
+          />
+        </label>
+      {/if}
     {:else}
       <label class="block text-sm">
         <span class="mb-1 block text-text-muted">Date & time</span>

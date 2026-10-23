@@ -10,7 +10,7 @@ import { computeFieldValuesByDay, formatTimeSinceAdaptive, type TimestampedValue
  * - measurement: the latest value and how it changed (Weight, BP)
  * - daily:       today's total (Calories, Water: fields that sum same-day entries)
  * - checkin:     logged today or not, with a streak (ratings, yes/no)
- * - ages:        people by birthdate (its own view, see TrackableDetail)
+ * - ages:        dates: birthdays, anniversaries, holidays, countdowns (utils/dates.ts; its own view)
  */
 export type TrackableKind = 'event' | 'measurement' | 'daily' | 'checkin' | 'ages';
 
@@ -19,7 +19,7 @@ export const KIND_LABELS: Record<TrackableKind, string> = {
   measurement: 'Latest value',
   daily: 'Daily total',
   checkin: 'Check-in',
-  ages: 'Ages (people)',
+  ages: 'Dates (birthdays, holidays...)',
 };
 
 export const KIND_DESCRIPTIONS: Record<TrackableKind, string> = {
@@ -27,7 +27,7 @@ export const KIND_DESCRIPTIONS: Record<TrackableKind, string> = {
   measurement: 'Leads with the latest reading of the first field and how it changed.',
   daily: "Leads with today's total of the first field and your daily average.",
   checkin: 'Leads with whether you logged today and your streak.',
-  ages: 'People by birthdate: live ages and birthday countdowns.',
+  ages: 'Named dates with countdowns: birthdays with ages, anniversaries, holidays, or countdowns and renewals.',
 };
 
 const EXPLICIT_KINDS: readonly TrackableDisplayMode[] = ['event', 'measurement', 'daily', 'checkin', 'ages'];

@@ -79,7 +79,12 @@
         <li><strong>Latest value:</strong> a reading like Weight. Shows the latest value and how it changed over about a week.</li>
         <li><strong>Daily total:</strong> a field that adds up, like Calories or Water. Shows today's total and your daily average.</li>
         <li><strong>Check-in:</strong> a rating or yes/no. Shows whether you logged today and your streak.</li>
-        <li><strong>Ages:</strong> people by birthdate, with live ages and birthday countdowns.</li>
+        <li>
+          <strong>Dates:</strong> named dates with countdowns, of one kind per trackable (Edit > Dates are): birthdays with
+          ages, anniversaries ("12th anniversary"), holidays, or countdowns and renewals. A holiday can follow a rule like the
+          4th Thursday of November or Easter; a renewal can repeat every few months or years. The templates include
+          Birthdays, Anniversaries, Countdowns and a ready-made US holidays list.
+        </li>
       </ul>
       <p>
         Fields are shared between trackables, and Edit on a field changes its name, unit or scale everywhere. A unit is only a

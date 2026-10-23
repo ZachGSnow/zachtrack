@@ -3,7 +3,7 @@
   import type { FieldDefinition, TrackableDefinition, TrackableEntry } from '../db';
   import { resolveKind, summarize } from '../utils/trackableKinds';
   import { GOAL_STATE_COLORS, goalCardLine, goalStatus } from '../utils/trackableGoals';
-  import { daysUntilNextBirthday, formatBirthdayCountdown } from '../utils/age';
+  import { describeDate } from '../utils/dates';
   import { habitGridWeeks } from '../utils/habitGrid';
   import { startOfDay } from '../utils/time';
   import HabitGrid from './HabitGrid.svelte';
@@ -41,10 +41,15 @@
     return () => clearInterval(timer);
   });
 
+  // A dates trackable's card lists its next few dates: "Mom in 12 days, Wedding tomorrow".
   const nextUp = $derived(
-    (entries)
-      .map((e) => ({ name: e.note?.trim() || 'Someone', daysUntil: daysUntilNextBirthday(e.timestamp) }))
-      .sort((a, b) => a.daysUntil - b.daysUntil)[0] ?? null,
+    kind === 'ages'
+      ? entries
+          .map((e) => describeDate(trackable, e, now))
+          .filter((d) => d.daysUntil >= 0)
+          .sort((a, b) => a.daysUntil - b.daysUntil)
+          .slice(0, 3)
+      : [],
   );
 
   const goal = $derived(kind === 'ages' ? null : goalStatus(trackable, entries, attachedFields, now));
@@ -85,9 +90,11 @@
 
   const subtitle = $derived(
     kind === 'ages'
-      ? nextUp
-        ? `\u{1F382} ${nextUp.name}'s birthday ${formatBirthdayCountdown(nextUp.daysUntil)}`
-        : 'No one added yet'
+      ? nextUp.length
+        ? nextUp.map((d) => `${d.name} ${d.daysUntil <= 1 ? d.countdown.toLowerCase() : d.countdown}`).join(', ')
+        : entries.length
+          ? 'Nothing coming up'
+          : 'Nothing added yet'
       : goal && trackable.goalType
         ? goalCardLine(goal, trackable.goalType, summarize(kind, entries, attachedFields, now).card)
         : summarize(kind, entries, attachedFields, now).card,

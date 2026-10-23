@@ -2,6 +2,7 @@
   import { liveQuery } from 'dexie';
   import {
     db,
+    addTrackableEntry,
     createFieldDefinition,
     updateFieldDefinition,
     createTrackable,
@@ -9,6 +10,7 @@
     deleteTrackable,
     type TrackableDefinition,
     type TrackableGoalType,
+    type DateKind,
     type FieldDefinition,
     type FieldKind,
     type FieldAggregation,
@@ -24,6 +26,8 @@
   import { DAILY_GOALS, GOAL_LABELS, GOAL_TYPES, goalField, WEEKDAY_NAMES } from '../utils/trackableGoals';
   import { fromDateInputValue, toDateInputValue } from '../utils/time';
   import { TEMPLATES, type TrackableTemplate } from '../data/templates';
+  import { holidayEntry, US_HOLIDAYS } from '../data/holidays';
+  import { DATE_KINDS, DATE_KIND_LABELS, DEFAULT_LEAD_DAYS } from '../utils/dates';
   import HelpLink from './HelpLink.svelte';
 
   const KINDS: TrackableKind[] = ['event', 'measurement', 'daily', 'checkin', 'ages'];
@@ -74,6 +78,11 @@
   /** Weekdays a daily goal applies, 0 = Monday; all seven = every day. */
   let scheduleDays = $state<number[]>([0, 1, 2, 3, 4, 5, 6]);
   let pausedUntilDraft = $state('');
+  /** For a dates trackable (summary 'ages'): what its dates are, and how many days ahead they show in Needs attention. */
+  let dateKind = $state<DateKind>('birthday');
+  let leadDaysDraft = $state('');
+  /** Set by the US holidays template: add the pack's entries once the trackable is created. */
+  let withHolidayPack = $state(false);
   let error = $state('');
 
   let showNewField = $state(false);
@@ -95,6 +104,9 @@
     pinned = trackable?.pinned ?? false;
     scheduleDays = trackable?.scheduleDays?.length ? [...trackable.scheduleDays] : [0, 1, 2, 3, 4, 5, 6];
     pausedUntilDraft = trackable?.pausedUntil ? toDateInputValue(trackable.pausedUntil) : '';
+    dateKind = trackable?.dateKind ?? 'birthday';
+    leadDaysDraft = trackable?.dateLeadDays?.toString() ?? '';
+    withHolidayPack = false;
     error = '';
     editingFieldId = null;
     showNewField = false;
@@ -155,6 +167,10 @@
       fieldIds = ids;
       goalType = template.goalType ?? '';
       goalValueDraft = template.goalValue?.toString() ?? '';
+      summaryMode = template.dateKind ? 'ages' : 'auto';
+      dateKind = template.dateKind ?? 'birthday';
+      leadDaysDraft = '';
+      withHolidayPack = !!template.holidayPack;
     } catch (e) {
       error = e instanceof Error ? e.message : 'Could not use that template. Please try again.';
     }
@@ -239,8 +255,17 @@
       error = 'Please enter a name.';
       return;
     }
+    const isDates = summaryMode === 'ages';
+    let dateLeadDays: number | undefined;
+    if (isDates && leadDaysDraft.trim()) {
+      dateLeadDays = Number(leadDaysDraft);
+      if (!Number.isInteger(dateLeadDays) || dateLeadDays < 0 || dateLeadDays > 365) {
+        error = 'Enter how many days ahead as a whole number from 0 to 365.';
+        return;
+      }
+    }
     let goalValue: number | undefined;
-    if (goalType && goalType !== 'avoid') {
+    if (!isDates && goalType && goalType !== 'avoid') {
       goalValue = Number(goalValueDraft);
       const wholeNumber = goalType !== 'dailyTotal';
       if (!Number.isFinite(goalValue) || goalValue <= 0 || (wholeNumber && !Number.isInteger(goalValue))) {
@@ -266,8 +291,11 @@
       color,
       fieldIds: [...fieldIds],
       displayMode: summaryMode === 'auto' ? undefined : summaryMode,
-      goalType: goalType || undefined,
-      goalValue,
+      // A dates trackable has no goal; its dates show in Needs attention by lead time instead.
+      goalType: isDates ? undefined : goalType || undefined,
+      goalValue: isDates ? undefined : goalValue,
+      dateKind: isDates ? dateKind : undefined,
+      dateLeadDays,
       pinned: pinned || undefined,
       scheduleDays: goalType && DAILY_GOALS.includes(goalType) && scheduleDays.length < 7 ? [...scheduleDays].sort((a, b) => a - b) : undefined,
       pausedUntil: goalType && pausedUntilDraft ? fromDateInputValue(pausedUntilDraft) : undefined,
@@ -278,6 +306,9 @@
         onSaved?.(trackable.id);
       } else {
         const created = await createTrackable(payload);
+        if (isDates && withHolidayPack) {
+          for (const spec of US_HOLIDAYS) await addTrackableEntry({ trackableId: created.id, ...holidayEntry(spec) });
+        }
         onSaved?.(created.id);
       }
       open = false;
@@ -450,6 +481,33 @@
           </div>
           <span class="mt-1 block text-xs text-text-muted">For a holiday or a sick week: nothing is due, and the streak waits.</span>
         </label>
+      {/if}
+    </div>
+  {:else}
+    <div class="space-y-2">
+      <label class="block text-sm">
+        <span class="mb-1 block text-text-muted">Dates are</span>
+        <select bind:value={dateKind} class="w-full rounded-lg border bg-transparent p-2 text-text" style="border-color: var(--color-border);">
+          {#each DATE_KINDS as k (k)}
+            <option value={k}>{DATE_KIND_LABELS[k]}</option>
+          {/each}
+        </select>
+      </label>
+      <label class="block text-sm">
+        <span class="mb-1 block text-text-muted">Show in Needs attention this many days ahead</span>
+        <input
+          type="text"
+          inputmode="numeric"
+          bind:value={leadDaysDraft}
+          placeholder={String(DEFAULT_LEAD_DAYS[dateKind])}
+          class="w-full rounded-lg border bg-transparent p-2 text-text placeholder:text-text-muted"
+          style="border-color: var(--color-border);"
+          aria-label="Days ahead"
+        />
+        <span class="mt-1 block text-xs text-text-muted">Blank uses {DEFAULT_LEAD_DAYS[dateKind]} days. Upcoming dates also show under Coming up.</span>
+      </label>
+      {#if withHolidayPack && !trackable}
+        <p class="text-xs text-text-muted">Saving adds {US_HOLIDAYS.length} US holidays; edit or delete any of them afterwards.</p>
       {/if}
     </div>
   {/if}
