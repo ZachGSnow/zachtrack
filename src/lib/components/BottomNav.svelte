@@ -2,6 +2,7 @@
   import { link } from 'svelte-spa-router';
   import active from 'svelte-spa-router/active';
   import { attentionStore } from '../stores/attention.svelte';
+  import SyncStatus from './SyncStatus.svelte';
 
   // 'bottom': the phone tab bar (hidden on wide screens); 'side': the sidebar
   // that replaces it from the lg breakpoint (1024px) up.
@@ -36,7 +37,10 @@
     style="border-color: var(--color-border);"
     aria-label="Main"
   >
-    <p class="mb-4 px-3 text-lg font-semibold text-text">ZachTrack</p>
+    <p class="px-3 text-lg font-semibold text-text">ZachTrack</p>
+    <div class="mb-4 px-3 pt-2">
+      <SyncStatus align="start" />
+    </div>
     {#each items as item (item.href)}
       <a
         href={item.href}
@@ -52,6 +56,15 @@
         {/if}
       </a>
     {/each}
+    <a
+      href="/settings"
+      use:link
+      use:active={{ path: activePath('/settings'), className: 'active' }}
+      class="side mt-auto flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium"
+    >
+      <span class="w-6 text-center text-lg leading-none">&#9881;</span>
+      <span>Settings</span>
+    </a>
   </nav>
 {:else}
   <nav

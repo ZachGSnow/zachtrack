@@ -67,11 +67,10 @@ export async function readStarterDefinitions(page: Page): Promise<StarterDefinit
   );
 }
 
-/** Opens the Profile sheet from the Trackables tab. */
-export async function openProfile(page: Page) {
-  await page.goto('/#/trackables');
-  await page.getByRole('button', { name: 'Profile' }).click();
-  await expect(page.getByRole('heading', { name: 'Profile' })).toBeVisible();
+/** Opens Settings through the header's Settings link (the sidebar's on a laptop-width page). */
+export async function openSettings(page: Page) {
+  await page.getByRole('link', { name: 'Settings' }).locator('visible=true').first().click();
+  await expect(page.getByRole('heading', { name: 'Settings', level: 1 })).toBeVisible();
 }
 
 /** Waits for a fresh install's starter trackables (created once the first sync attempt settles). */
@@ -81,11 +80,11 @@ export async function waitForStarterSet(page: Page) {
   await expect(page.getByText('Wellness Check-in')).toBeVisible();
 }
 
-/** Imports fictional sample data through the real Profile > Import file flow. */
+/** Imports fictional sample data through the real Settings > Import file flow. */
 export async function importSampleData(page: Page) {
   await waitForStarterSet(page);
   const file = buildSampleExport(await readStarterDefinitions(page), new Date());
-  await openProfile(page);
+  await openSettings(page);
   await page.locator('input[type=file]').setInputFiles({
     name: 'sample-export.json',
     mimeType: 'application/json',
@@ -94,6 +93,5 @@ export async function importSampleData(page: Page) {
   await expect(page.getByText(/new records? to add/)).toBeVisible();
   await page.getByRole('button', { name: 'Import', exact: true }).click();
   await expect(page.getByText(/^Imported: \d+ added/)).toBeVisible();
-  await page.getByRole('button', { name: 'Done' }).click();
   return file;
 }

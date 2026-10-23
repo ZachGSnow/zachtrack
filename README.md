@@ -59,7 +59,7 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
   day, week or month with a 7-day rolling average or change vs the previous
   period, an Avg / Change / Per-week trend footer, and a Copy button that puts
   TSV on the clipboard. Each has a chart view (ECharts) behind a toggle.
-- **BMI** derived from your weight field (chosen in Profile) and your height,
+- **BMI** derived from your weight field (chosen in Settings) and your height,
   and a **body-fat estimate** (US Navy method) from waist, neck and hip
   measurements logged together.
 - **Phone and laptop layouts:** a tab bar on phones; on wider screens a
@@ -73,7 +73,7 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
 - **Templates** for new trackables (Water, Workout, Weigh-in, ...), and a
   compact list view.
 - **CSV export** for a spreadsheet, one row per value.
-- **Export and import** (Profile > Your data): a JSON file of everything on
+- **Export and import** (Settings > Your data): a JSON file of everything on
   the device, and an import that previews what it will add or update, merges
   by newest version, never deletes, then syncs.
 
@@ -93,7 +93,7 @@ npm run dev
 Open the printed URL. Without a sync backend the app runs local-only: data
 stays in the browser's IndexedDB, the starter trackables are created on first
 launch, and the sync pill reads "Local only" instead of an error. Export and
-import (Profile > Your data) move data between local-only installs.
+import (Settings > Your data) move data between local-only installs.
 
 ## Deploy your own (Cloudflare)
 
@@ -129,7 +129,7 @@ coming from v1.3 or older, first add the v1.4.0 and v1.5.0 columns
 `bodyFatSex`, all `TEXT`) with `ALTER TABLE ... ADD COLUMN`.
 
 Install the app from your custom domain in Chrome (Add to Home screen).
-The Profile sheet (person icon on the Trackables tab) shows the version each
+Settings (the gear in the header; in the sidebar on a laptop) shows the version each
 device is running. After a deploy, a device that still shows the old number
 picks up the new one when the app is closed and reopened.
 

@@ -1,12 +1,13 @@
 <script lang="ts">
   import { liveQuery } from 'dexie';
-  import { db } from '../db';
-  import { settingsStore } from '../stores/settings.svelte';
-  import { BODY_FIELD_SETTING, resolveBodyFieldIds, type BodyFatSex } from '../utils/health';
-  import { allPresets } from '../data/presets';
-  import DataFileSection from './DataFileSection.svelte';
-
-  let { open = $bindable(false) }: { open: boolean } = $props();
+  import { db } from '../lib/db';
+  import { settingsStore } from '../lib/stores/settings.svelte';
+  import { BODY_FIELD_SETTING, resolveBodyFieldIds, type BodyFatSex } from '../lib/utils/health';
+  import { allPresets } from '../lib/data/presets';
+  import DataFileSection from '../lib/components/DataFileSection.svelte';
+  import SyncHistory from '../lib/components/SyncHistory.svelte';
+  import { syncStore } from '../lib/stores/sync.svelte';
+  import type { CustomFastPreset } from '../lib/data/presets';
 
   const allFields = liveQuery(() => db.fieldDefinitions.orderBy('name').toArray());
   const allTrackables = liveQuery(() => db.trackableDefinitions.toArray());
@@ -32,11 +33,31 @@
   let heightDraft = $state('');
   let goalWeightDraft = $state('');
 
+  // Fill the text boxes once the settings have loaded.
+  let filled = false;
   $effect(() => {
-    if (!open) return;
+    if (filled || !settingsStore.ready) return;
+    filled = true;
     heightDraft = settingsStore.data.heightInches?.toString() ?? '';
     goalWeightDraft = settingsStore.data.goalWeightLb?.toString() ?? '';
   });
+
+  const customFasts = $derived(settingsStore.data.customFastPresets ?? []);
+
+  /** Plain copies: the settings store's $state proxies can't be stored in IndexedDB (ARCHITECTURE.md 4.4). */
+  function removeCustomFast(id: string) {
+    const next: CustomFastPreset[] = customFasts.filter((c) => c.id !== id).map(({ id, label, targetHours }) => ({ id, label, targetHours }));
+    settingsStore.update({ customFastPresets: next.length ? next : undefined });
+  }
+
+  const SYNC_LABELS: Record<typeof syncStore.status, string> = {
+    idle: 'Synced',
+    syncing: 'Syncing...',
+    error: 'Sync error',
+    offline: 'Offline',
+    unauthenticated: 'Login expired',
+    local: 'Local only: no sync server, so data stays on this device',
+  };
 
   function saveHeight() {
     const val = heightDraft.trim() ? Number(heightDraft) : undefined;
@@ -51,13 +72,11 @@
   }
 </script>
 
-<div class="space-y-4">
-  <div class="flex items-baseline justify-between">
-    <h2 class="text-lg font-semibold text-text">Profile</h2>
-    <!-- Which build this device is running; the service worker updates on its own schedule. -->
-    <span class="text-xs text-text-muted" title="ZachTrack version">v{__APP_VERSION__}</span>
-  </div>
-  <p class="text-xs text-text-muted">Export and import are under Your data, at the bottom.</p>
+<div class="mx-auto flex w-full flex-1 flex-col gap-6 px-5 py-6 lg:max-w-3xl">
+  <h1 class="text-xl font-semibold text-text">Settings</h1>
+
+  <section class="space-y-4" aria-labelledby="settings-body">
+  <h2 id="settings-body" class="text-sm font-semibold uppercase tracking-wide text-text-muted">Body</h2>
 
   <label class="block text-sm">
     <span class="mb-1 block text-text-muted">Height (in)</span>
@@ -144,6 +163,11 @@
     {/each}
   </div>
 
+  </section>
+
+  <section class="space-y-4" aria-labelledby="settings-fasting">
+  <h2 id="settings-fasting" class="text-sm font-semibold uppercase tracking-wide text-text-muted">Fasting</h2>
+
   <label class="block text-sm">
     <span class="mb-1 block text-text-muted">Default fasting method</span>
     <select
@@ -157,6 +181,21 @@
       {/each}
     </select>
   </label>
+
+  {#if customFasts.length > 0}
+    <div class="text-sm">
+      <p class="mb-1 text-text-muted">Your fast lengths</p>
+      <ul class="flex flex-wrap gap-2">
+        {#each customFasts as c (c.id)}
+          <li class="flex items-center gap-1 rounded-full border px-3 py-1" style="border-color: var(--color-border);">
+            <span class="text-text">{c.label}</span>
+            <button class="text-text-muted" onclick={() => removeCustomFast(c.id)} aria-label="Remove {c.label}">&times;</button>
+          </li>
+        {/each}
+      </ul>
+      <p class="mt-1 text-xs text-text-muted">Add more with "+ Your own" on the Fasting tab.</p>
+    </div>
+  {/if}
 
   <label class="block text-sm">
     <span class="mb-1 block text-text-muted">Daily fast start (optional)</span>
@@ -197,11 +236,36 @@
     >{settingsStore.data.notificationsEnabled ? 'On' : 'Off'}</span>
   </button>
 
-  <DataFileSection />
+  </section>
 
-  <button
-    class="w-full rounded-xl py-2.5 text-sm font-semibold"
-    style="background: var(--color-brand); color: #06140c;"
-    onclick={() => (open = false)}
-  >Done</button>
+  <section aria-label="Your data">
+    <DataFileSection />
+  </section>
+
+  <section class="space-y-3" aria-labelledby="settings-sync">
+    <h2 id="settings-sync" class="text-sm font-semibold uppercase tracking-wide text-text-muted">Sync</h2>
+    <div class="flex items-center justify-between gap-3 text-sm">
+      <span class="text-text">{SYNC_LABELS[syncStore.status]}</span>
+      {#if syncStore.status === 'unauthenticated'}
+        <button class="rounded-lg px-3 py-1.5 text-sm font-semibold" style="background: var(--color-brand); color: #06140c;" onclick={() => syncStore.reauthenticate()}>Log in again</button>
+      {:else if syncStore.status !== 'local'}
+        <button class="rounded-lg border px-3 py-1.5 text-sm text-text-muted" style="border-color: var(--color-border);" onclick={() => syncStore.syncNow().catch(() => {})}>Sync now</button>
+      {/if}
+    </div>
+    {#if syncStore.lastError}
+      <p class="text-xs" style="color: #f87171;">{syncStore.lastError}</p>
+    {/if}
+    <div class="rounded-lg border p-1.5" style="border-color: var(--color-border); background: var(--color-surface-2);">
+      <SyncHistory />
+    </div>
+  </section>
+
+  <section class="space-y-1 text-sm" aria-labelledby="settings-about">
+    <h2 id="settings-about" class="text-sm font-semibold uppercase tracking-wide text-text-muted">About</h2>
+    <!-- Which build this device is running; the service worker updates on its own schedule. -->
+    <p class="text-text">ZachTrack v{__APP_VERSION__}</p>
+    <p class="text-xs text-text-muted">
+      The fasting zone descriptions are general information, not medical advice. Talk to a doctor before extended fasting.
+    </p>
+  </section>
 </div>
