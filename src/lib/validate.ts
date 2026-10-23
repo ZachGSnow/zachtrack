@@ -78,7 +78,12 @@ const checks: Record<Exclude<RecordKind, 'tombstones'>, Check> = {
       required(r, 'fieldIds', isStringList(MAX_FIELD_IDS), 'a list of strings'),
       required(r, 'createdAt', isNum, 'a number'),
       required(r, 'updatedAt', isNum, 'a number'),
-      optional(r, 'displayMode', (v) => v === 'occurrences' || v === 'ages', "'occurrences' or 'ages'"),
+      optional(
+        r,
+        'displayMode',
+        (v) => typeof v === 'string' && ['occurrences', 'ages', 'event', 'measurement', 'daily', 'checkin'].includes(v),
+        "'occurrences', 'ages', 'event', 'measurement', 'daily' or 'checkin'",
+      ),
     ),
   trackableEntries: (r) =>
     all(

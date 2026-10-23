@@ -8,11 +8,19 @@
     updateTrackable,
     deleteTrackable,
     type TrackableDefinition,
-    type TrackableDisplayMode,
     type FieldDefinition,
     type FieldKind,
     type FieldAggregation,
   } from '../db';
+  import {
+    autoKind,
+    KIND_DESCRIPTIONS as SUMMARY_DESCRIPTIONS,
+    KIND_LABELS as SUMMARY_LABELS,
+    resolveKind,
+    type TrackableKind,
+  } from '../utils/trackableKinds';
+
+  const KINDS: TrackableKind[] = ['event', 'measurement', 'daily', 'checkin', 'ages'];
 
   let {
     open = $bindable(false),
@@ -44,7 +52,8 @@
   let icon = $state('');
   let color = $state(PRESET_COLORS[0]);
   let fieldIds = $state<string[]>([]);
-  let displayMode = $state<TrackableDisplayMode>('occurrences');
+  /** 'auto' = picked from the fields (stored as no displayMode); anything else overrides it. */
+  let summaryMode = $state<'auto' | TrackableKind>('auto');
   let error = $state('');
 
   let showNewField = $state(false);
@@ -60,7 +69,7 @@
     icon = trackable?.icon ?? '';
     color = trackable?.color ?? PRESET_COLORS[0];
     fieldIds = trackable?.fieldIds ?? [];
-    displayMode = trackable?.displayMode ?? 'occurrences';
+    summaryMode = trackable && !resolveKind(trackable, []).auto ? resolveKind(trackable, []).kind : 'auto';
     error = '';
     editingFieldId = null;
     showNewField = false;
@@ -74,6 +83,8 @@
   const attachedFields = $derived(
     fieldIds.map((id) => ($allFields ?? []).find((f) => f.id === id)).filter((f): f is FieldDefinition => f != null),
   );
+  /** What Auto would pick for the fields as they are now in this sheet. */
+  const auto = $derived(autoKind(attachedFields));
   const availableFields = $derived(($allFields ?? []).filter((f) => !fieldIds.includes(f.id)));
 
   function removeField(id: string) {
@@ -165,7 +176,7 @@
       error = 'Please enter a name.';
       return;
     }
-    const payload = { name: trimmedName, icon: icon.trim() || '\u2b50', color, fieldIds: [...fieldIds], displayMode };
+    const payload = { name: trimmedName, icon: icon.trim() || '\u2b50', color, fieldIds: [...fieldIds], displayMode: summaryMode === 'auto' ? undefined : summaryMode };
     try {
       if (trackable) {
         await updateTrackable(trackable.id, payload);
@@ -230,32 +241,24 @@
     </div>
   </div>
 
-  <div>
-    <p class="mb-1.5 text-sm text-text-muted">Tracker type</p>
-    <div class="flex gap-2">
-      <button
-        type="button"
-        class="flex-1 rounded-lg border py-2 text-sm font-medium"
-        style={displayMode === 'occurrences'
-          ? 'background: var(--color-brand); color: #06140c; border-color: var(--color-brand);'
-          : 'border-color: var(--color-border); color: var(--color-text-muted);'}
-        onclick={() => (displayMode = 'occurrences')}
-      >Occurrences</button>
-      <button
-        type="button"
-        class="flex-1 rounded-lg border py-2 text-sm font-medium"
-        style={displayMode === 'ages'
-          ? 'background: var(--color-brand); color: #06140c; border-color: var(--color-brand);'
-          : 'border-color: var(--color-border); color: var(--color-text-muted);'}
-        onclick={() => (displayMode = 'ages')}
-      >Ages (people)</button>
-    </div>
-    <p class="mt-1 text-xs text-text-muted">
-      {displayMode === 'ages'
-        ? 'Track people by birthdate -- shows live age and upcoming-birthday countdown instead of habit stats.'
-        : 'Track how often something happens -- streaks, intervals, and charts.'}
-    </p>
-  </div>
+  <label class="block text-sm">
+    <span class="mb-1 block text-text-muted">Summary</span>
+    <select
+      bind:value={summaryMode}
+      class="w-full rounded-lg border bg-transparent p-2 text-text"
+      style="border-color: var(--color-border);"
+    >
+      <option value="auto">Auto: {SUMMARY_LABELS[auto.kind]}</option>
+      {#each KINDS as k (k)}
+        <option value={k}>{SUMMARY_LABELS[k]}</option>
+      {/each}
+    </select>
+    <span class="mt-1 block text-xs text-text-muted">
+      {summaryMode === 'auto'
+        ? `${SUMMARY_LABELS[auto.kind]}, because ${auto.reason}. ${SUMMARY_DESCRIPTIONS[auto.kind]}`
+        : SUMMARY_DESCRIPTIONS[summaryMode]}
+    </span>
+  </label>
 
   <div>
     <p class="mb-1.5 text-sm text-text-muted">Fields</p>

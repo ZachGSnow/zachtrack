@@ -53,7 +53,8 @@ export interface FieldDefinition {
   updatedAt: number;
 }
 
-export type TrackableDisplayMode = 'occurrences' | 'ages';
+/** How a trackable is summarised; 'occurrences' (or unset) = automatic from its fields. See utils/trackableKinds.ts. */
+export type TrackableDisplayMode = 'occurrences' | 'ages' | 'event' | 'measurement' | 'daily' | 'checkin';
 
 /** A user-defined "thing to track" -- an occurrence, optionally carrying values for its attached fields. */
 export interface TrackableDefinition {
@@ -640,7 +641,7 @@ export async function seedDefaultTrackablesIfEmpty(): Promise<void> {
   }
   const fid = (name: string) => fieldByName.get(name)!.id;
 
-  const trackableSpecs: Array<{ name: string; icon: string; color: string; fields: string[] }> = [
+  const trackableSpecs: Array<{ name: string; icon: string; color: string; fields: string[]; displayMode?: TrackableDisplayMode }> = [
     { name: 'Body Measurements', icon: '\u2696\ufe0f', color: '#a855f7', fields: ['Weight', 'Waist', 'Neck', 'Hip', 'Chest'] },
     { name: 'Vitals', icon: '\u2764\ufe0f', color: '#ef4444', fields: ['Systolic BP', 'Diastolic BP', 'Temperature'] },
     {
@@ -657,7 +658,8 @@ export async function seedDefaultTrackablesIfEmpty(): Promise<void> {
       fields: ['Overall Mood', 'Stress', 'Focus', 'Sickness', 'Pain', 'Bowel Movement'],
     },
     { name: 'Activity', icon: '\ud83c\udfc3', color: '#22d3ee', fields: ['Duration', 'Exertion', 'Calories Burned', 'Steps'] },
-    { name: 'Menstrual Cycle', icon: '\ud83c\udf38', color: '#ec4899', fields: ['Flow'] },
+    // Logged with a Flow rating, but the timing between cycles is what matters.
+    { name: 'Menstrual Cycle', icon: '\ud83c\udf38', color: '#ec4899', fields: ['Flow'], displayMode: 'event' },
     { name: 'Male Health', icon: '\ud83d\udca7', color: '#38bdf8', fields: [] },
   ];
 
@@ -667,6 +669,7 @@ export async function seedDefaultTrackablesIfEmpty(): Promise<void> {
       icon: spec.icon,
       color: spec.color,
       fieldIds: spec.fields.map(fid),
+      ...(spec.displayMode ? { displayMode: spec.displayMode } : {}),
     });
   }
 }

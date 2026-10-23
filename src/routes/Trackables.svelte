@@ -9,6 +9,7 @@
   import ProfileSheet from '../lib/components/ProfileSheet.svelte';
 
   const trackables = liveQuery(() => db.trackableDefinitions.orderBy('name').toArray());
+  const allFields = liveQuery(() => db.fieldDefinitions.toArray());
 
   let editOpen = $state(false);
   let editingTrackable = $state<TrackableDefinition | null>(null);
@@ -58,7 +59,7 @@
   {:else}
     <div class="flex flex-col gap-2">
       {#each $trackables as t (t.id)}
-        <TrackableCard trackable={t} onQuickLog={() => openQuickLog(t)} />
+        <TrackableCard trackable={t} fields={$allFields ?? []} onQuickLog={() => openQuickLog(t)} />
       {/each}
     </div>
   {/if}

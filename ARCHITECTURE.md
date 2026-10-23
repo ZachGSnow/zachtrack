@@ -71,7 +71,7 @@ interface FieldDefinition {
   updatedAt: number;    // added for sync; name, unit, rating max and aggregation are editable (3.14)
 }
 
-type TrackableDisplayMode = 'occurrences' | 'ages';
+type TrackableDisplayMode = 'occurrences' | 'ages' | 'event' | 'measurement' | 'daily' | 'checkin';  // 3.17
 
 interface TrackableDefinition {
   id: string; name: string; icon: string; color: string;
@@ -480,6 +480,34 @@ Since v1.6.0:
   never be live ahead of its columns.
 - **Release cadence:** features merge as they pass CI (auto-merge), and a
   batch ships as one release and one deploy.
+
+### 3.17 Trackable kinds: each trackable leads with what matters for it
+Every trackable used to lead with "time since last", a streak, an average
+interval and the occurrence charts, which fit events but not readings (Weight)
+or daily totals (Calories). `utils/trackableKinds.ts` now gives each trackable
+a kind, which decides its list subtitle, detail header, four stat cards and
+which charts appear:
+
+| Kind | Card | Stats | Charts |
+|---|---|---|---|
+| event (time since) | "12d ago, usually every 14d" | total, usual gap, longest gap, last 30 days | count, heatmap, interval |
+| measurement (latest value) | "179.6 lb, 23h ago"; header adds the change over about a week | readings, 30-day change, 90-day low/high | none (trends table/chart) |
+| daily (total) | "1,450 kcal today" | 7- and 30-day averages, days logged, streak | none |
+| checkin | "today, 4-day streak" or "Not yet today" | current/longest streak, days logged, rating average | heatmap |
+
+- **Automatic from the first field** (Apple Health's cumulative vs discrete
+  split, which `aggregation` already encodes): no fields -> event, a `sum`
+  number -> daily, any other number -> measurement, a rating or yes/no ->
+  check-in. The edit sheet's Summary setting shows what Auto picked and why,
+  and can override it. Reorder fields to change what Auto reads.
+- **Stored in the existing `displayMode`** column, so no migration:
+  unset or `occurrences` means Auto; `event`, `measurement`, `daily`,
+  `checkin` and `ages` are overrides. A device on an older version shows an
+  override it doesn't know as the old occurrence view.
+- "Usual gap" is the median, so one long break doesn't skew it. Averages for
+  daily and check-in kinds leave out today, which is still filling up.
+- The starter Menstrual Cycle trackable is set to event: it is logged with a
+  Flow rating, but the timing between cycles is what matters.
 
 ## 4. Issues hit during implementation, and how they were resolved
 
