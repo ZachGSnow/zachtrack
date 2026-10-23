@@ -1,5 +1,6 @@
 <script lang="ts">
   import { liveQuery } from 'dexie';
+  import { MediaQuery } from 'svelte/reactivity';
   import { push, link } from 'svelte-spa-router';
   import { db, type TrackableEntry, type FieldDefinition } from '../lib/db';
   import { computeFieldTodayTotal } from '../lib/utils/trackableStats';
@@ -32,6 +33,9 @@
   import TrackableFieldsChart from '../lib/components/charts/TrackableFieldsChart.svelte';
 
   let { params }: { params: { id: string } } = $props();
+
+  // Where the habit grid goes: under Log Entry on a phone, heading the right column on a laptop.
+  const wide = new MediaQuery('min-width: 1024px');
 
   const trackable = liveQuery(() => db.trackableDefinitions.get(params.id));
   const entries = liveQuery(() =>
@@ -168,13 +172,25 @@
   }
 </script>
 
+{#snippet history()}
+  {#if $trackable}
+    <HabitHistory
+      trackable={$trackable}
+      entries={$entries ?? []}
+      fields={attachedFields}
+      onAddForDay={(timestamp) => openLogNew(timestamp)}
+      onEditEntry={openLogEdit}
+    />
+  {/if}
+{/snippet}
+
 {#if !$trackable}
   <div class="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
     <p class="text-sm text-text-muted">Loading&hellip;</p>
     <a href="/trackables" use:link class="text-sm font-medium" style="color: var(--color-brand);">Back to Trackables</a>
   </div>
 {:else}
-  <div class="mx-auto flex w-full flex-1 lg:max-w-3xl flex-col gap-5 px-5 py-6">
+  <div class="mx-auto flex w-full flex-1 flex-col gap-5 px-5 py-6 {isAges ? 'lg:max-w-3xl' : ''}">
     <div class="flex items-center justify-between">
       <div class="flex items-center gap-2">
         <span class="text-2xl">{$trackable.icon}</span>
@@ -216,105 +232,110 @@
         {/if}
       </div>
     {:else}
-      <div
-        class="rounded-2xl border p-4 text-center"
-        style="border-color: {$trackable.color}40; background: linear-gradient(180deg, {$trackable.color}14, transparent);"
-      >
-        <p class="text-xs uppercase tracking-wide" style="color: {$trackable.color};">{summary.label}</p>
-        <p class="mt-1 text-3xl font-semibold text-text">{summary.value}</p>
-        {#each summary.sub as line, i (i)}
-          <p class="mt-1 text-xs text-text-muted">{line}</p>
-        {/each}
-      </div>
+      <!-- One column on a phone. On a laptop: what it is and what to do on the left, its history on the right. -->
+      <div class="flex flex-col gap-5 lg:grid lg:grid-cols-[22rem_minmax(0,1fr)] lg:items-start lg:gap-6">
+        <div class="flex flex-col gap-5">
+          <div
+            class="rounded-2xl border p-4 text-center"
+            style="border-color: {$trackable.color}40; background: linear-gradient(180deg, {$trackable.color}14, transparent);"
+          >
+            <p class="text-xs uppercase tracking-wide" style="color: {$trackable.color};">{summary.label}</p>
+            <p class="mt-1 text-3xl font-semibold text-text">{summary.value}</p>
+            {#each summary.sub as line, i (i)}
+              <p class="mt-1 text-xs text-text-muted">{line}</p>
+            {/each}
+          </div>
 
-      {#if goal && goalText}
-        <div class="rounded-xl border p-3" style="border-color: var(--color-border); background: var(--color-surface);">
-          <div class="flex items-baseline justify-between gap-2">
-            <p class="text-xs text-text-muted">Goal: {goalText}</p>
-            {#if goal.streak}
-              <p class="text-xs text-text-muted">{goal.streak}</p>
+          {#if goal && goalText}
+            <div class="rounded-xl border p-3" style="border-color: var(--color-border); background: var(--color-surface);">
+              <div class="flex items-baseline justify-between gap-2">
+                <p class="text-xs text-text-muted">Goal: {goalText}</p>
+                {#if goal.streak}
+                  <p class="text-xs text-text-muted">{goal.streak}</p>
+                {/if}
+              </div>
+              <p class="mt-1 text-base font-semibold" style="color: {GOAL_STATE_COLORS[goal.state] ?? 'var(--color-text)'};">{goal.text}</p>
+              {#if goal.progress != null}
+                <div class="mt-2 h-1.5 overflow-hidden rounded-full" style="background: var(--color-border);" role="progressbar" aria-label="Goal progress" aria-valuenow={Math.round(goal.progress * 100)} aria-valuemin="0" aria-valuemax="100">
+                  <div class="h-full rounded-full" style="width: {goal.progress * 100}%; background: {GOAL_STATE_COLORS[goal.state] ?? $trackable.color};"></div>
+                </div>
+              {/if}
+            </div>
+          {/if}
+
+          <button
+            class="w-full rounded-xl py-3 text-base font-semibold"
+            style="background: var(--color-brand); color: #06140c;"
+            onclick={() => openLogNew()}
+          >Log Entry</button>
+
+          {#if showHabitHistory && !wide.current}
+            {@render history()}
+          {/if}
+
+          {#if todayTotals.length > 0}
+            <div class="grid grid-cols-2 gap-2">
+              {#each todayTotals as t (t.field.id)}
+                <div
+                  class="rounded-xl border p-3"
+                  style="border-color: {$trackable.color}40; background: linear-gradient(180deg, {$trackable.color}14, transparent);"
+                >
+                  <p class="text-xs text-text-muted">{t.field.name} today</p>
+                  <p class="mt-1 text-lg font-semibold text-text">
+                    {t.total}{t.field.unit ? ` ${t.field.unit}` : ''}
+                  </p>
+                </div>
+              {/each}
+            </div>
+          {/if}
+
+          <div class="grid grid-cols-2 gap-2">
+            {#each stats as stat (stat.label)}
+              <div class="rounded-xl border p-3" style="border-color: var(--color-border); background: var(--color-surface);">
+                <p class="text-xs text-text-muted">{stat.label}</p>
+                <p class="mt-1 text-lg font-semibold text-text">{stat.value}</p>
+              </div>
+            {/each}
+          </div>
+        </div>
+
+        <div class="flex min-w-0 flex-col gap-5">
+          {#if showHabitHistory && wide.current}
+            {@render history()}
+          {/if}
+
+          <div class="flex flex-col gap-2">
+            <div class="flex items-center justify-between gap-2">
+              <p class="text-sm font-medium text-text-muted">Trends</p>
+              <SegmentedControl options={RANGES} bind:value={range} />
+            </div>
+            <div class="flex items-center justify-between gap-2">
+              {#if attachedFields.length > 0}
+                <SegmentedControl options={VIEWS} bind:value={trendsView} />
+              {:else}
+                <span></span>
+              {/if}
+              {#if showTrendsTable}
+                <SegmentedControl options={GRANULARITIES} bind:value={granularity} />
+              {/if}
+            </div>
+            {#if showTrendsTable}
+              <DataTable metrics={trendMetrics} {granularity} {rangeStart} />
+            {:else}
+              <TrackableFieldsChart entries={$entries ?? []} fields={attachedFields} {range} weightFieldId={bodyFieldIds.weight} bodyFatByDay={trendMetrics.find((d) => d.id.endsWith(':navy-body-fat'))?.valuesByDay} />
             {/if}
           </div>
-          <p class="mt-1 text-base font-semibold" style="color: {GOAL_STATE_COLORS[goal.state] ?? 'var(--color-text)'};">{goal.text}</p>
-          {#if goal.progress != null}
-            <div class="mt-2 h-1.5 overflow-hidden rounded-full" style="background: var(--color-border);" role="progressbar" aria-label="Goal progress" aria-valuenow={Math.round(goal.progress * 100)} aria-valuemin="0" aria-valuemax="100">
-              <div class="h-full rounded-full" style="width: {goal.progress * 100}%; background: {GOAL_STATE_COLORS[goal.state] ?? $trackable.color};"></div>
-            </div>
+
+          <!-- Charts that suit the kind: when it happens matters for events, which days for check-ins. -->
+          {#if kind === 'event'}
+            <OccurrenceBucketChart entries={$entries ?? []} {range} color={$trackable.color} />
+            <IntervalTrendChart entries={$entries ?? []} color={$trackable.color} />
           {/if}
+
+          <TagFilter items={$entries ?? []} bind:selected={tagFilter} />
+          <EntriesTable entries={listedEntries} fields={attachedFields} onSelect={openLogEdit} />
         </div>
-      {/if}
-
-      <button
-        class="w-full rounded-xl py-3 text-base font-semibold"
-        style="background: var(--color-brand); color: #06140c;"
-        onclick={() => openLogNew()}
-      >Log Entry</button>
-
-      {#if showHabitHistory}
-        <HabitHistory
-          trackable={$trackable}
-          entries={$entries ?? []}
-          fields={attachedFields}
-          onAddForDay={(timestamp) => openLogNew(timestamp)}
-          onEditEntry={openLogEdit}
-        />
-      {/if}
-
-      {#if todayTotals.length > 0}
-        <div class="grid grid-cols-2 gap-2">
-          {#each todayTotals as t (t.field.id)}
-            <div
-              class="rounded-xl border p-3"
-              style="border-color: {$trackable.color}40; background: linear-gradient(180deg, {$trackable.color}14, transparent);"
-            >
-              <p class="text-xs text-text-muted">{t.field.name} today</p>
-              <p class="mt-1 text-lg font-semibold text-text">
-                {t.total}{t.field.unit ? ` ${t.field.unit}` : ''}
-              </p>
-            </div>
-          {/each}
-        </div>
-      {/if}
-
-      <div class="grid grid-cols-2 gap-2">
-        {#each stats as stat (stat.label)}
-          <div class="rounded-xl border p-3" style="border-color: var(--color-border); background: var(--color-surface);">
-            <p class="text-xs text-text-muted">{stat.label}</p>
-            <p class="mt-1 text-lg font-semibold text-text">{stat.value}</p>
-          </div>
-        {/each}
       </div>
-
-      <div class="flex flex-col gap-2">
-        <div class="flex items-center justify-between gap-2">
-          <p class="text-sm font-medium text-text-muted">Trends</p>
-          <SegmentedControl options={RANGES} bind:value={range} />
-        </div>
-        <div class="flex items-center justify-between gap-2">
-          {#if attachedFields.length > 0}
-            <SegmentedControl options={VIEWS} bind:value={trendsView} />
-          {:else}
-            <span></span>
-          {/if}
-          {#if showTrendsTable}
-            <SegmentedControl options={GRANULARITIES} bind:value={granularity} />
-          {/if}
-        </div>
-        {#if showTrendsTable}
-          <DataTable metrics={trendMetrics} {granularity} {rangeStart} />
-        {:else}
-          <TrackableFieldsChart entries={$entries ?? []} fields={attachedFields} {range} weightFieldId={bodyFieldIds.weight} bodyFatByDay={trendMetrics.find((d) => d.id.endsWith(':navy-body-fat'))?.valuesByDay} />
-        {/if}
-      </div>
-
-      <!-- Charts that suit the kind: when it happens matters for events, which days for check-ins. -->
-      {#if kind === 'event'}
-        <OccurrenceBucketChart entries={$entries ?? []} {range} color={$trackable.color} />
-        <IntervalTrendChart entries={$entries ?? []} color={$trackable.color} />
-      {/if}
-
-      <TagFilter items={$entries ?? []} bind:selected={tagFilter} />
-      <EntriesTable entries={listedEntries} fields={attachedFields} onSelect={openLogEdit} />
     {/if}
   </div>
 {/if}

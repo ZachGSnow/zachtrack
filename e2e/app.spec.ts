@@ -435,3 +435,22 @@ test('a trackable with a goal gets a grid strip and a check button for today', a
   await expect(page.getByLabel('Date & time')).toBeVisible();
   expect(problems).toEqual([]);
 });
+
+test('on a laptop the trackable page puts its history beside the summary, and Trackables is a card grid', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockSync(page, noServer);
+  await importSampleData(page);
+  await page.goto('/#/trackables');
+  const cards = page.locator('a[href^="#/trackables/"]');
+  await expect(cards.nth(1)).toBeVisible();
+  const [a, b] = [(await cards.nth(0).boundingBox())!, (await cards.nth(1).boundingBox())!];
+  expect(Math.abs(a.y - b.y)).toBeLessThan(5); // side by side
+
+  await page.getByRole('link', { name: /Wellness Check-in/ }).click();
+  const summary = page.locator('main').getByText('Today', { exact: true });
+  const history = page.locator('main').getByText('History', { exact: true });
+  await expect(history).toBeVisible();
+  expect((await history.boundingBox())!.x).toBeGreaterThan((await summary.boundingBox())!.x + 300);
+  expect(problems).toEqual([]);
+});
