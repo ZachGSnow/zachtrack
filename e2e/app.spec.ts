@@ -660,3 +660,19 @@ test('Help opens from the header and from the question marks next to settings th
   await expect(page.getByRole('heading', { name: 'Goals', level: 2 })).toBeInViewport();
   expect(problems).toEqual([]);
 });
+
+test('Insights sums up fasting and each trackable above the compare table', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await mockSync(page, noServer);
+  await importSampleData(page);
+  await page.goto('/#/insights');
+  await expect(page.getByRole('heading', { name: 'Insights', level: 1 })).toBeVisible();
+  const overview = page.getByRole('region', { name: 'Overview' });
+  await expect(overview.getByRole('link', { name: /Fasting/ })).toContainText(/Goal met on \d+ of \d+ fasts in the last 30 days/);
+  await expect(overview.getByRole('link', { name: /Body Measurements/ })).toContainText(/Logged on \d+ of \d+ days/);
+  await expect(page.getByRole('region', { name: 'Patterns' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Compare', level: 2 })).toBeVisible();
+  await overview.getByRole('link', { name: /Body Measurements/ }).click();
+  await expect(page).toHaveURL(/#\/trackables\//);
+  expect(problems).toEqual([]);
+});

@@ -18,6 +18,7 @@
   import EChart from '../lib/components/EChart.svelte';
   import DataTable from '../lib/components/DataTable.svelte';
   import SegmentedControl from '../lib/components/SegmentedControl.svelte';
+  import InsightsSummary from '../lib/components/InsightsSummary.svelte';
 
   const fasts = liveQuery(() => db.fasts.toArray());
   const trackables = liveQuery(() => db.trackableDefinitions.orderBy('name').toArray());
@@ -202,8 +203,14 @@
 </script>
 
 <div class="mx-auto flex w-full flex-1 flex-col gap-5 px-5 py-6">
+  <h1 class="text-xl font-semibold text-text">Insights</h1>
+
+  <div class="flex flex-col gap-5 lg:grid lg:grid-cols-2 lg:items-start">
+    <InsightsSummary fasts={$fasts ?? []} trackables={$trackables ?? []} entries={$allEntries ?? []} fields={$allFields ?? []} />
+  </div>
+
   <div class="flex items-center justify-between">
-    <h1 class="text-xl font-semibold text-text">Data</h1>
+    <h2 class="text-base font-semibold text-text">Compare</h2>
     <SegmentedControl options={RANGES} bind:value={range} />
   </div>
   <p class="text-sm text-text-muted">Line up any combination of fasting and trackable data to spot correlations.</p>
