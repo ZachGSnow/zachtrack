@@ -15,6 +15,7 @@
   const options = $derived(years.map((y) => ({ id: String(y), label: String(y) })));
   const r = $derived(yearReview(Number(year), fasts, trackables, entries, now));
   const nf = new Intl.NumberFormat();
+  const days = (n: number) => `${nf.format(n)} ${n === 1 ? 'day' : 'days'}`;
 </script>
 
 <section class="rounded-2xl border p-4" style="border-color: var(--color-border); background: var(--color-surface);" aria-labelledby="year-review">
@@ -28,11 +29,11 @@
 
   <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
     {#each [
-      { label: 'Fasts', value: nf.format(r.fasting.fasts), sub: `${r.fasting.goalFasts} met their goal` },
-      { label: 'Hours fasted', value: formatHoursShort(r.fasting.hours), sub: `on ${r.fasting.daysFasted} days` },
+      { label: 'Fasts', value: nf.format(r.fasting.fasts), sub: `${r.fasting.goalFasts} met ${r.fasting.goalFasts === 1 ? 'its' : 'their'} goal` },
+      { label: 'Hours fasted', value: formatHoursShort(r.fasting.hours), sub: `on ${days(r.fasting.daysFasted)}` },
       { label: 'Longest fast', value: r.fasting.fasts ? formatHoursShort(r.fasting.longestHours) : '-', sub: '' },
-      { label: 'Longest goal streak', value: `${r.fasting.longestGoalStreak} days`, sub: '' },
-      { label: 'Entries logged', value: nf.format(r.logging.entries), sub: `on ${r.logging.daysLogged} days` },
+      { label: 'Longest goal streak', value: days(r.fasting.longestGoalStreak), sub: '' },
+      { label: 'Entries logged', value: nf.format(r.logging.entries), sub: `on ${days(r.logging.daysLogged)}` },
       { label: 'Busiest month', value: r.busiestMonth ?? '-', sub: '' },
     ] as tile (tile.label)}
       <div class="rounded-xl border p-3" style="border-color: var(--color-border);">
@@ -51,7 +52,7 @@
           <span class="w-4 text-xs text-text-muted">{i + 1}.</span>
           <span class="w-6 text-center">{t.icon}</span>
           <span class="flex-1 truncate text-text">{t.name}</span>
-          <span class="text-xs text-text-muted">{t.days} days</span>
+          <span class="text-xs text-text-muted">{days(t.days)}</span>
         </li>
       {/each}
     </ol>

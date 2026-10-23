@@ -75,11 +75,11 @@
     <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
       <div class="rounded-xl border p-3" style="border-color: var(--color-border); background: var(--color-surface);" title="Days in a row with a fast that met its goal">
         <p class="text-xs text-text-muted">Goal streak</p>
-        <p class="mt-1 text-lg font-semibold text-text">{stats.currentStreak} <span class="text-sm font-normal text-text-muted">days</span></p>
+        <p class="mt-1 text-lg font-semibold text-text">{stats.currentStreak} <span class="text-sm font-normal text-text-muted">{stats.currentStreak === 1 ? 'day' : 'days'}</span></p>
       </div>
       <div class="rounded-xl border p-3" style="border-color: var(--color-border); background: var(--color-surface);">
         <p class="text-xs text-text-muted">Longest goal streak</p>
-        <p class="mt-1 text-lg font-semibold text-text">{stats.longestStreak} <span class="text-sm font-normal text-text-muted">days</span></p>
+        <p class="mt-1 text-lg font-semibold text-text">{stats.longestStreak} <span class="text-sm font-normal text-text-muted">{stats.longestStreak === 1 ? 'day' : 'days'}</span></p>
       </div>
       <div class="rounded-xl border p-3" style="border-color: var(--color-border); background: var(--color-surface);">
         <p class="text-xs text-text-muted">Days fasted</p>
