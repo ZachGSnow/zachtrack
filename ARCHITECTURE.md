@@ -386,7 +386,7 @@ into a second local D1 and compares every table, including text with quotes,
 of the real database (all 237 rows identical).
 
 ### 3.13 Export and import are a merge, never a replace
-Profile > Your data exports every record on the device as one JSON file
+Settings > Your data exports every record on the device as one JSON file
 (`src/lib/dataFile.ts`, format `zachtrack-export` version 1; fasts without
 Dexie's local `id`). Import is deliberately not a restore:
 - **Checked first, written after a confirm.** `planImport` validates every
@@ -423,7 +423,7 @@ label: changing it never converts values already logged.
 BMI and the goal-weight line used to find the weight field by the name
 "Weight", so renaming it would have turned both off without a word, and any
 other field named Weight would have picked up BMI. They now follow
-`settings.weightFieldId`, chosen in Profile > Weight field.
+`settings.weightFieldId`, chosen in Settings > Weight field.
 `resolveWeightField` (`utils/health.ts`) falls back to the number field named
 Weight while the setting is empty, so installs from before it existed need no
 migration write (and none could carry a current `updatedAt`, see 4.13).
@@ -446,7 +446,7 @@ the fly like BMI, never stored, so changing a setting recalculates history.
   for the female formula). No carrying values forward across days.
 - **Which fields.** The same mechanism as the weight field (3.14), generalised
   in `utils/health.ts`: `resolveBodyField` per role (weight, waist, neck,
-  hip), with Profile pickers and the name fallback, and a rename pins any of
+  hip), with Settings pickers and the name fallback, and a rename pins any of
   them. `MetricDef.bodyRole` marks them in the metric catalog.
 - **Units.** Height is in inches; each tape field is converted from its unit
   label (`in`, `cm`, `mm` and spelled-out forms). A field whose unit isn't a
@@ -546,7 +546,7 @@ reload can't start another. The query doesn't match the service worker's
 `navigateFallbackDenylist`, so the shortcut opens offline like the app itself.
 
 ### 3.20 Fasting schedule, eating window and hit rate
-- **Daily schedule** (Profile > Daily fast start, `settings.fastScheduleTime`
+- **Daily schedule** (Settings > Daily fast start, `settings.fastScheduleTime`
   "HH:MM", migration `0002_fast_schedule.sql`): with no fast running, the
   Fasting tab counts down to the next start, or says in amber how late you
   are once today's time has passed and no fast has started today
@@ -706,10 +706,24 @@ built to resist over-reading small personal datasets:
   fields match existing ones by name and kind, else are created.
 - A times-per-day goal of 1 is a plain check on its card; the counting ring
   starts at 2. (The Vitamins template's first version showed "0 of 1".)
-- **CSV export** (Profile > Your data, `buildCsv` in `dataFile.ts`): every
+- **CSV export** (Settings > Your data, `buildCsv` in `dataFile.ts`): every
   entry and completed fast, one row per value (Date, Time, Trackable, Field,
   Value, Unit, Note, Tags), local time, CRLF and a byte-order mark for Excel.
   The JSON export stays the one to restore from (3.13).
+
+### 3.30 Settings page and header
+The Profile sheet (opened from a person icon on Trackables) outgrew its name
+and its sheet. It is now the **Settings** page (`/settings`,
+`routes/Settings.svelte`) in sections: Body, Fasting (now also listing your
+own fast lengths to remove), Your data, Sync (status, Sync now or Log in
+again, and the recent syncs from `SyncHistory.svelte`, the list the pill's
+double-tap shows) and About (version, health note).
+- **Phone:** a header row on every screen with the sync pill and a gear
+  linking to Settings.
+- **Laptop:** the sync pill sits under the sidebar's title and Settings at
+  the sidebar's foot, so the content has no header row.
+- The browser tests reach Settings through these links (`openSettings` in
+  `e2e/helpers.ts`), so the links themselves are covered.
 
 ## 4. Issues hit during implementation, and how they were resolved
 
@@ -947,7 +961,7 @@ read the settings row once at startup, so a height or goal weight synced from
 another device (or imported) was stored but not shown, and BMI and the goal
 line used the old values until the app was restarted. The store now follows
 the settings row with `liveQuery` too. Found by the browser test that imports
-sample data and then checks the Profile sheet (`e2e/app.spec.ts`), which fails
+sample data and then checks the Profile sheet (now the Settings page) (`e2e/app.spec.ts`), which fails
 on the old store.
 
 ### 4.15 The fasting streak read 0 every morning
@@ -986,7 +1000,7 @@ are kept out of the repo, in the git-ignored `wrangler.toml` and a local
   **direct upload** with `npm run deploy` (3.16), which runs `wrangler pages
   deploy dist --project-name=zachtrack --branch=main` after the checks. Default URL
   `zachtrack.pages.dev` (see 4.6). The build bakes `package.json`'s version
-  into the app (`__APP_VERSION__`, shown at the top of the Profile sheet), so
+  into the app (`__APP_VERSION__`, shown under Settings > About), so
   after a deploy each device shows which build its service worker is serving;
   a device still on the old number needs the app closed and reopened.
 - **Custom domain:** attached to the Pages project (dashboard-only step).

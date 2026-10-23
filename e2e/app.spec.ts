@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { importSampleData, loginExpired, mockSync, noServer, okSync, readStarterDefinitions, waitForStarterSet, watchForProblems } from './helpers';
+import { importSampleData, loginExpired, openSettings, mockSync, noServer, okSync, readStarterDefinitions, waitForStarterSet, watchForProblems } from './helpers';
 
 // Screens and sync states on sample data. The service worker is blocked here
 // so the sync responses can be faked; service-worker.spec.ts runs with it.
@@ -16,7 +16,7 @@ test('a fresh install with no sync server is local-only and creates the starter 
   expect(problems).toEqual([]);
 });
 
-test('sample data imports through the Profile sheet and shows up on every screen', async ({ page }) => {
+test('sample data imports through Settings and shows up on every screen', async ({ page }) => {
   const problems = watchForProblems(page);
   await mockSync(page, noServer);
   const file = await importSampleData(page);
@@ -47,9 +47,8 @@ test('sample data imports through the Profile sheet and shows up on every screen
   await expect(page.getByRole('table').first()).toBeVisible();
 
   // Imported settings: height drives BMI, so it must have arrived.
-  await page.getByRole('button', { name: 'Profile' }).waitFor({ state: 'detached' }).catch(() => {});
   await page.goto('/#/trackables');
-  await page.getByRole('button', { name: 'Profile' }).click();
+  await openSettings(page);
   await expect(page.getByLabel('Height (in)')).toHaveValue('70');
 
   expect(problems).toEqual([]);
@@ -143,7 +142,7 @@ test('a field can be renamed and given a new unit, and BMI follows the renamed w
   await expect(page.getByRole('columnheader', { name: /Waist\s*inch/ }).first()).toBeVisible();
 
   await page.goto('/#/trackables');
-  await page.getByRole('button', { name: 'Profile' }).click();
+  await openSettings(page);
   await expect(page.getByRole('combobox', { name: /^Weight field/ }).locator('option:checked')).toHaveText('Body weight (Body Measurements)');
   expect(problems).toEqual([]);
 });
@@ -175,7 +174,7 @@ test('Body Measurements shows a Navy body-fat estimate right after BMI', async (
   }
 
   await page.goto('/#/trackables');
-  await page.getByRole('button', { name: 'Profile' }).click();
+  await openSettings(page);
   await expect(page.getByRole('combobox', { name: /^Formula/ }).locator('option:checked')).toHaveText('Male (waist, neck)');
   await expect(page.getByRole('combobox', { name: /^Neck field/ }).locator('option:checked')).toHaveText('Neck (Body Measurements)');
   expect(problems).toEqual([]);
@@ -269,10 +268,9 @@ test('a daily fast start time shows a countdown, and Journey shows how often fas
   await mockSync(page, noServer);
   await waitForStarterSet(page);
   await page.goto('/#/trackables');
-  await page.getByRole('button', { name: 'Profile' }).click();
+  await openSettings(page);
   await page.getByLabel(/^Daily fast start/).fill('20:00');
   await page.getByLabel(/^Daily fast start/).blur();
-  await page.getByRole('button', { name: 'Done' }).click();
   await page.goto('/#/');
   await expect(page.getByText(/^(Next fast starts in .+|Your fast was due at .+ ago)$/)).toBeVisible();
 
@@ -308,7 +306,6 @@ test('trackables can be pinned, archived and reordered, and lists filter by tag'
   const sleepAt = before.findIndex((text) => text.includes('Sleep'));
   await page.getByRole('button', { name: 'Move Sleep up' }).click();
   await expect.poll(async () => (await cards.allTextContents()).findIndex((text) => text.includes('Sleep'))).toBe(sleepAt - 1);
-  await page.getByRole('button', { name: 'Done' }).click();
 
   // Archive Male Health: gone from the list, listed under archived, and restorable.
   await card('Male Health').click();
@@ -346,9 +343,12 @@ test('on a laptop-width screen the sidebar replaces the tab bar and marks the cu
     await page.goto(url);
     await expect(sidebar.locator('a.active')).toHaveText(new RegExp(label));
   }
+  // Settings is in the sidebar too.
+  await sidebar.getByRole('link', { name: 'Settings' }).click();
+  await expect(sidebar.locator('a.active')).toHaveText(/Settings/);
   // Sheets open as centered dialogs and close with Escape.
   await page.goto('/#/trackables');
-  await page.getByRole('button', { name: 'Profile' }).click();
+  await page.getByRole('button', { name: '+ New' }).click();
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
   // Once its slide-in has finished, it sits inside the window, not against the bottom edge.
@@ -507,10 +507,11 @@ test('a fast length of your own can be saved, started and removed', async ({ pag
   await page.getByRole('button', { name: 'Remove 19:5' }).click();
   await expect(page.getByRole('button', { name: '19:5', exact: true })).toHaveCount(0);
 
-  // It's offered as the default method in Profile too.
+  // It's offered as the default method in Settings too.
   await page.goto('/#/trackables');
-  await page.getByRole('button', { name: 'Profile' }).click();
+  await openSettings(page);
   await expect(page.getByLabel('Default fasting method').locator('option', { hasText: '15:9' })).toHaveCount(1);
+  await expect(page.getByRole('button', { name: 'Remove 15:9' })).toBeVisible(); // listed under Your fast lengths
   await page.keyboard.press('Escape');
 
   await page.goto('/#/');
@@ -553,11 +554,10 @@ test('a late scheduled fast puts a dot on the Fasting tab until a fast starts', 
   await mockSync(page, noServer);
   await waitForStarterSet(page);
   await page.goto('/#/trackables');
-  await page.getByRole('button', { name: 'Profile' }).click();
+  await openSettings(page);
   // Midnight has always passed, and this new install has no fast today.
   await page.getByLabel(/^Daily fast start/).fill('00:00');
   await page.getByLabel(/^Daily fast start/).blur();
-  await page.getByRole('button', { name: 'Done' }).click();
   const fastingTab = page.getByRole('navigation', { name: 'Main' }).locator('a:visible', { hasText: 'Fasting' });
   await expect(fastingTab.getByLabel('fast is late')).toBeVisible();
   await page.goto('/#/');
@@ -598,8 +598,8 @@ test('a trackable can start from a template, the list has a compact view, and da
   await expect(vitamins.getByRole('group', { name: 'Days' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Check Vitamins for today' })).toBeVisible();
 
-  // CSV export from Profile > Your data.
-  await page.getByRole('button', { name: 'Profile' }).click();
+  // CSV export from Settings > Your data.
+  await openSettings(page);
   const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Export CSV for a spreadsheet' }).click()]);
   expect(download.suggestedFilename()).toMatch(/^zachtrack-export-\d{4}-\d{2}-\d{2}\.csv$/);
   const text = await (await download.createReadStream()).toArray().then((chunks) => Buffer.concat(chunks).toString('utf8'));

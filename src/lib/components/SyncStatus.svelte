@@ -1,9 +1,12 @@
 <script lang="ts">
   import { syncStore } from '../stores/sync.svelte';
+  import SyncHistory from './SyncHistory.svelte';
+
+  // 'end' in the phone header (right-aligned), 'start' in the laptop sidebar.
+  let { align = 'end' }: { align?: 'start' | 'end' } = $props();
 
   let expanded = $state(false);
   let showHistory = $state(false);
-  let expandedEntryAt = $state<number | null>(null);
   let now = $state(Date.now());
   let lastClickAt = 0;
   let container: HTMLDivElement | undefined;
@@ -58,25 +61,6 @@
     return `${days}d ago`;
   }
 
-  function formatEntryTime(ts: number): string {
-    const date = new Date(ts);
-    const today = new Date();
-    const isToday = date.toDateString() === today.toDateString();
-    const time = date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-    return isToday ? time : `${date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}, ${time}`;
-  }
-
-  function dotColor(outcome: 'success' | 'error' | 'offline' | 'local'): string {
-    if (outcome === 'error') return '#ef4444';
-    if (outcome === 'offline') return '#eab308';
-    if (outcome === 'local') return 'var(--color-text-muted)';
-    return 'var(--color-brand-dim)';
-  }
-
-  function toggleEntryDetails(completedAt: number) {
-    expandedEntryAt = expandedEntryAt === completedAt ? null : completedAt;
-  }
-
   function handleClick() {
     const clickedAt = Date.now();
     const isDoubleClick = clickedAt - lastClickAt < DOUBLE_CLICK_MS;
@@ -103,7 +87,7 @@
   }
 </script>
 
-<div class="relative flex flex-col items-end gap-1" bind:this={container}>
+<div class="relative flex flex-col gap-1 {align === 'end' ? 'items-end' : 'items-start'}" bind:this={container}>
   <button
     type="button"
     onclick={handleClick}
@@ -158,69 +142,7 @@
       class="absolute top-full z-10 mt-1 w-64 rounded-md border p-1.5 text-right"
       style="border-color: var(--color-border); background: var(--color-surface-2);"
     >
-      <p class="px-1 pb-1 text-left text-[10px] font-semibold opacity-70" style="color: var(--color-text-muted);">
-        Recent syncs
-      </p>
-      {#if syncStore.history.length === 0}
-        <p class="px-1 py-1 text-left text-[10px]" style="color: var(--color-text-muted);">No sync history yet.</p>
-      {:else}
-        <ul class="flex flex-col gap-1">
-          {#each syncStore.history as entry (entry.completedAt)}
-            {@const hasDetails = !!entry.details?.length || !!entry.rejectedDetails?.length}
-            <li class="overflow-hidden rounded" style="background: var(--color-surface);">
-              <button
-                type="button"
-                disabled={!hasDetails}
-                onclick={() => toggleEntryDetails(entry.completedAt)}
-                class="w-full px-1.5 py-1 text-left text-[10px] leading-snug"
-                style="cursor: {hasDetails ? 'pointer' : 'default'};"
-              >
-                <span class="flex items-center gap-1.5">
-                  <span class="h-1.5 w-1.5 shrink-0 rounded-full" style="background: {dotColor(entry.outcome)};"
-                  ></span>
-                  <span class="font-medium" style="color: var(--color-text);">{formatEntryTime(entry.completedAt)}</span>
-                  {#if hasDetails}
-                    <span class="ml-auto shrink-0 opacity-60" style="color: var(--color-text-muted);"
-                      >{expandedEntryAt === entry.completedAt ? '\u25be' : '\u25b8'}</span
-                    >
-                  {/if}
-                </span>
-                <span class="mt-0.5 block break-words opacity-80" style="color: var(--color-text-muted);">
-                  {entry.outcome === 'error' ? (entry.error ?? entry.summary) : entry.summary}
-                </span>
-              </button>
-              {#if entry.rejectedCount > 0}
-                <p class="px-1.5 pb-1 text-left text-[10px] text-amber-400">
-                  &#x26A0; {entry.rejectedCount} not synced{entry.rejectedDetails?.length ? ' (tap for why)' : ''}
-                </p>
-              {/if}
-              {#if hasDetails && expandedEntryAt === entry.completedAt}
-                <ul
-                  class="flex flex-col gap-0.5 border-t px-1.5 py-1 text-left text-[10px]"
-                  style="border-color: var(--color-border);"
-                >
-                  {#each entry.rejectedDetails ?? [] as line, i (i)}
-                    <li class="break-words text-amber-400">{line}</li>
-                  {/each}
-                  {#if entry.rejectedDetails && entry.rejectedCount > entry.rejectedDetails.length}
-                    <li class="italic text-amber-400 opacity-80">
-                      +{entry.rejectedCount - entry.rejectedDetails.length} more not synced
-                    </li>
-                  {/if}
-                  {#each entry.details ?? [] as line (line)}
-                    <li class="break-words opacity-80" style="color: var(--color-text-muted);">{line}</li>
-                  {/each}
-                  {#if entry.moreDetailsCount}
-                    <li class="italic opacity-60" style="color: var(--color-text-muted);">
-                      +{entry.moreDetailsCount} more
-                    </li>
-                  {/if}
-                </ul>
-              {/if}
-            </li>
-          {/each}
-        </ul>
-      {/if}
+      <SyncHistory />
     </div>
   {/if}
 </div>

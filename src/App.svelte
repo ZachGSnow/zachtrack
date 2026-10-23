@@ -1,5 +1,5 @@
 <script lang="ts">
-  import Router from 'svelte-spa-router';
+  import Router, { link } from 'svelte-spa-router';
   import { wrap } from 'svelte-spa-router/wrap';
   import { onMount } from 'svelte';
   import BottomNav from './lib/components/BottomNav.svelte';
@@ -26,6 +26,7 @@
     '/journey': wrap({ asyncComponent: () => import('./routes/Journey.svelte') }),
     '/charting': wrap({ asyncComponent: () => import('./routes/Charting.svelte') }),
     '/history': History,
+    '/settings': wrap({ asyncComponent: () => import('./routes/Settings.svelte') }),
   };
 
   // Fasts started since yesterday: enough to tell whether today's scheduled start is done.
@@ -63,9 +64,17 @@
 <div class="flex flex-1 flex-col lg:flex-row">
   <BottomNav variant="side" />
   <div class="mx-auto flex w-full max-w-md flex-1 flex-col lg:max-w-[1400px] lg:px-6">
-    <div class="flex justify-end px-3 pt-2">
+    <!-- Phone header: sync status and Settings. On a laptop both live in the sidebar. -->
+    <header class="flex items-center justify-end gap-2 px-3 pt-2 lg:hidden">
       <SyncStatus />
-    </div>
+      <a
+        href="/settings"
+        use:link
+        class="flex h-7 w-7 items-center justify-center rounded-full border text-sm"
+        style="border-color: var(--color-border); color: var(--color-text-muted); background: var(--color-surface-2);"
+        aria-label="Settings"
+      >&#9881;</a>
+    </header>
     <main class="flex flex-1 flex-col">
       <Router {routes} />
     </main>
