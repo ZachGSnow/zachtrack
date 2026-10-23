@@ -2,6 +2,14 @@
   import { link } from 'svelte-spa-router';
   import active from 'svelte-spa-router/active';
 
+  // 'bottom': the phone tab bar (hidden on wide screens); 'side': the sidebar
+  // that replaces it from the lg breakpoint (1024px) up.
+  let { variant = 'bottom' }: { variant?: 'bottom' | 'side' } = $props();
+
+  // A tab is active on its own page and the pages under it (/trackables and /trackables/:id).
+  // A '/trackables/*' pattern missed the page itself, so no tab lit up there.
+  const activePath = (href: string) => (href === '/' ? '/' : new RegExp(`^${href}(/.*)?$`));
+
   const items = [
     { href: '/', label: 'Fasting', icon: '\u23f1' },
     { href: '/trackables', label: 'Trackables', icon: '\ud83d\udccb' },
@@ -11,22 +19,44 @@
   ];
 </script>
 
-<nav
-  class="sticky bottom-0 z-10 flex justify-around border-t bg-surface/95 backdrop-blur"
-  style="border-color: var(--color-border);"
->
-  {#each items as item (item.href)}
-    <a
-      href={item.href}
-      use:link
-      use:active={{ path: item.href === '/' ? '/' : `${item.href}/*`, className: 'active' }}
-      class="flex flex-1 flex-col items-center gap-0.5 py-2.5 text-xs font-medium"
-    >
-      <span class="text-lg leading-none">{item.icon}</span>
-      <span>{item.label}</span>
-    </a>
-  {/each}
-</nav>
+{#if variant === 'side'}
+  <nav
+    class="sticky top-0 hidden h-svh w-56 shrink-0 flex-col gap-1 border-r bg-surface px-3 py-5 lg:flex"
+    style="border-color: var(--color-border);"
+    aria-label="Main"
+  >
+    <p class="mb-4 px-3 text-lg font-semibold text-text">ZachTrack</p>
+    {#each items as item (item.href)}
+      <a
+        href={item.href}
+        use:link
+        use:active={{ path: activePath(item.href), className: 'active' }}
+        class="side flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium"
+      >
+        <span class="w-6 text-center text-lg leading-none">{item.icon}</span>
+        <span>{item.label}</span>
+      </a>
+    {/each}
+  </nav>
+{:else}
+  <nav
+    class="sticky bottom-0 z-10 flex justify-around border-t bg-surface/95 backdrop-blur lg:hidden"
+    style="border-color: var(--color-border);"
+    aria-label="Main"
+  >
+    {#each items as item (item.href)}
+      <a
+        href={item.href}
+        use:link
+        use:active={{ path: activePath(item.href), className: 'active' }}
+        class="flex flex-1 flex-col items-center gap-0.5 py-2.5 text-xs font-medium"
+      >
+        <span class="text-lg leading-none">{item.icon}</span>
+        <span>{item.label}</span>
+      </a>
+    {/each}
+  </nav>
+{/if}
 
 <style>
   a {
@@ -34,5 +64,11 @@
   }
   a:global(.active) {
     color: var(--color-brand);
+  }
+  a.side:hover {
+    background: var(--color-surface-2);
+  }
+  a.side:global(.active) {
+    background: var(--color-surface-2);
   }
 </style>

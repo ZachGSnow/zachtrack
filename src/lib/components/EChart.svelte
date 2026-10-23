@@ -35,10 +35,12 @@
   $effect(() => {
     if (!el) return;
     chartInstance = echarts.init(el, null, { renderer: 'svg' });
-    const onResize = () => chartInstance?.resize();
-    window.addEventListener('resize', onResize);
+    // Follow the container, not just the window: on a wide layout a chart's
+    // column can change size without the window resizing.
+    const observer = new ResizeObserver(() => chartInstance?.resize());
+    observer.observe(el);
     return () => {
-      window.removeEventListener('resize', onResize);
+      observer.disconnect();
       chartInstance?.dispose();
       chartInstance = null;
     };

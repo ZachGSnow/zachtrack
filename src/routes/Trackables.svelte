@@ -124,7 +124,7 @@
   }
 </script>
 
-<div class="flex flex-1 flex-col gap-3 px-5 py-6">
+<div class="mx-auto flex w-full flex-1 lg:max-w-3xl flex-col gap-3 px-5 py-6">
   <div class="flex items-center justify-between">
     <h1 class="text-xl font-semibold text-text">Trackables</h1>
     <div class="flex items-center gap-2">
@@ -186,7 +186,7 @@
 
 {#if undo}
   <div
-    class="fixed inset-x-0 bottom-20 z-30 mx-auto flex w-[calc(100%-2.5rem)] max-w-md items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm shadow-lg"
+    class="fixed inset-x-0 bottom-20 z-30 lg:bottom-6 mx-auto flex w-[calc(100%-2.5rem)] max-w-md items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm shadow-lg"
     style="border-color: var(--color-border); background: var(--color-surface);"
     role="status"
   >

@@ -52,6 +52,8 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
 - **BMI** derived from your weight field (chosen in Profile) and your height,
   and a **body-fat estimate** (US Navy method) from waist, neck and hip
   measurements logged together.
+- **Phone and laptop layouts:** a tab bar on phones; on wider screens a
+  sidebar, content that uses the width, and dialogs instead of bottom sheets.
 - **Offline and installable** (service worker, Android/Chrome PWA), with
   home-screen shortcuts (long-press the icon): Start a fast, Trackables,
   Journey.

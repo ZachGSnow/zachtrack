@@ -582,6 +582,21 @@ reload can't start another. The query doesn't match the service worker's
   (`TagFilter.svelte`) narrows only that list, not the stats or charts, and
   clears itself when the tag disappears.
 
+### 3.22 Laptop layout
+Phones keep the one-column layout with tabs at the bottom. From Tailwind's
+`lg` breakpoint (1024px) up:
+- `BottomNav` renders as a left sidebar (`variant="side"`) instead of the tab
+  bar, and the content uses the width up to 1400px (App.svelte). Each screen
+  sets its own width: a centered 48rem column by default (`lg:max-w-3xl`),
+  wider where a screen has a wide layout.
+- `BottomSheet` opens as a centered dialog instead of a bottom sheet, without
+  the drag handle, and Escape closes it.
+- `EChart` resizes with its container (a `ResizeObserver`), not only with the
+  window, since a column can change width on its own.
+- A nav item is active on its own page and the pages under it. The old
+  `/trackables/*` pattern didn't match `/trackables` itself, so no tab was
+  highlighted on Trackables, Journey or History.
+
 ## 4. Issues hit during implementation, and how they were resolved
 
 These are real bugs that shipped and got fixed during this project's build,

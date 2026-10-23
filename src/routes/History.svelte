@@ -20,7 +20,7 @@
   }
 </script>
 
-<div class="flex flex-1 flex-col gap-3 px-5 py-6">
+<div class="mx-auto flex w-full flex-1 lg:max-w-3xl flex-col gap-3 px-5 py-6">
   <h1 class="text-xl font-semibold text-text">History</h1>
 
   {#if $fasts === undefined}

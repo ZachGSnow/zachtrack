@@ -191,7 +191,8 @@ test('each trackable leads with what matters for its kind, and the kind can be c
   const card = (name: string) => page.getByRole('link', { name: new RegExp(name) });
   // Weight is a reading, Calories add up per day, ratings are a daily check-in, no fields is time since.
   await expect(card('Body Measurements')).toContainText(/\d+(\.\d)? lb \u00b7 /);
-  await expect(card('Nutrition')).toContainText(/kcal today/);
+  // Sample meals are logged later in the day, so early in the morning there are none yet.
+  await expect(card('Nutrition')).toContainText(/kcal today|Nothing today/);
   await expect(card('Wellness Check-in')).toContainText(/today|streak/);
   await expect(card('Male Health')).toContainText('No entries yet');
 
@@ -332,4 +333,39 @@ test('trackables can be pinned, archived and reordered, and lists filter by tag'
   await page.getByRole('button', { name: 'All', exact: true }).click();
   expect(await fastItems.count()).toBeGreaterThan(await page.locator('main li', { hasText: '#weekend' }).count());
   expect(problems).toEqual([]);
+});
+
+test('on a laptop-width screen the sidebar replaces the tab bar and marks the current page', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockSync(page, noServer);
+  await waitForStarterSet(page);
+  const sidebar = page.getByRole('navigation', { name: 'Main' }).filter({ hasText: 'ZachTrack' });
+  await expect(sidebar).toBeVisible();
+  for (const [url, label] of [['/#/', 'Fasting'], ['/#/trackables', 'Trackables'], ['/#/journey', 'Journey'], ['/#/history', 'History']]) {
+    await page.goto(url);
+    await expect(sidebar.locator('a.active')).toHaveText(new RegExp(label));
+  }
+  // Sheets open as centered dialogs and close with Escape.
+  await page.goto('/#/trackables');
+  await page.getByRole('button', { name: 'Profile' }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  // Once its slide-in has finished, it sits inside the window, not against the bottom edge.
+  await expect
+    .poll(async () => {
+      const box = (await dialog.boundingBox())!;
+      return box.y > 0 && box.y + box.height < 900;
+    })
+    .toBe(true);
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  expect(problems).toEqual([]);
+});
+
+test('on a phone the tab bar marks the current page', async ({ page }) => {
+  await mockSync(page, noServer);
+  await waitForStarterSet(page);
+  await page.goto('/#/journey');
+  await expect(page.getByRole('navigation', { name: 'Main' }).locator('a.active:visible')).toHaveText(/Journey/);
 });
