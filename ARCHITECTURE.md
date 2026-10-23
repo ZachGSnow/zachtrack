@@ -593,6 +593,13 @@ Phones keep the one-column layout with tabs at the bottom. From Tailwind's
   the drag handle, and Escape closes it.
 - `EChart` resizes with its container (a `ResizeObserver`), not only with the
   window, since a column can change width on its own.
+- Screens that benefit use the width: Trackables is a two-column card grid
+  (three from 1536px); a trackable's page has two columns, the summary, goal,
+  Log Entry and stats on the left and its habit grid, trends, charts and
+  entries on the right (the grid is rendered once, under Log Entry on a phone
+  and atop the right column on a laptop, via Svelte's `MediaQuery`); Fasting
+  puts the timer beside the zone reference; Journey and Data use the full
+  width with Journey's charts in two columns. History stays a centered column.
 - A nav item is active on its own page and the pages under it. The old
   `/trackables/*` pattern didn't match `/trackables` itself, so no tab was
   highlighted on Trackables, Journey or History.

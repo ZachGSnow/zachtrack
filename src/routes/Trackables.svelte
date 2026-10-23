@@ -148,7 +148,7 @@
   }
 </script>
 
-<div class="mx-auto flex w-full flex-1 lg:max-w-3xl flex-col gap-3 px-5 py-6">
+<div class="mx-auto flex w-full flex-1 flex-col gap-3 px-5 py-6">
   <div class="flex items-center justify-between">
     <h1 class="text-xl font-semibold text-text">Trackables</h1>
     <div class="flex items-center gap-2">
@@ -182,7 +182,8 @@
     {#if reordering}
       <p class="text-xs text-text-muted">Pinned trackables stay on top; the rest keep this order under "My order".</p>
     {/if}
-    <div class="flex flex-col gap-2">
+    <!-- One column on a phone, a grid of cards on wider screens. -->
+    <div class="flex flex-col gap-2 lg:grid lg:grid-cols-2 lg:items-start 2xl:grid-cols-3">
       {#each active as t (t.id)}
         <TrackableCard
           trackable={t}
@@ -199,7 +200,7 @@
         {showArchived ? 'Hide' : 'Show'} archived ({archived.length})
       </button>
       {#if showArchived}
-        <div class="flex flex-col gap-2 opacity-70">
+        <div class="flex flex-col gap-2 opacity-70 lg:grid lg:grid-cols-2 lg:items-start 2xl:grid-cols-3">
           {#each archived as t (t.id)}
             <TrackableCard trackable={t} fields={$allFields ?? []} entries={entriesByTrackable.get(t.id) ?? []} onQuickLog={() => openQuickLog(t)} />
           {/each}

@@ -42,7 +42,7 @@
   );
 </script>
 
-<div class="mx-auto flex w-full flex-1 lg:max-w-3xl flex-col gap-5 px-5 py-6">
+<div class="mx-auto flex w-full flex-1 flex-col gap-5 px-5 py-6">
   <h1 class="text-xl font-semibold text-text">Journey</h1>
 
   {#if $fasts === undefined}
@@ -50,7 +50,7 @@
   {:else if !hasData}
     <p class="mt-8 text-center text-sm text-text-muted">Complete a fast to see your journey.</p>
   {:else}
-    <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+    <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
       <div class="rounded-xl border p-3" style="border-color: var(--color-border); background: var(--color-surface);">
         <p class="text-xs text-text-muted">Current streak</p>
         <p class="mt-1 text-lg font-semibold text-text">{stats.currentStreak} <span class="text-sm font-normal text-text-muted">days</span></p>
@@ -92,9 +92,11 @@
       <DataTable {metrics} {granularity} {rangeStart} />
     </div>
 
-    <ZoneBreakdownChart fasts={$fasts ?? []} {range} />
-    <ConsistencyHeatmapChart fasts={$fasts ?? []} {range} />
-    <DurationHistogramChart fasts={$fasts ?? []} />
-    <DayOfWeekChart fasts={$fasts ?? []} />
+    <div class="flex flex-col gap-5 lg:grid lg:grid-cols-2">
+      <ZoneBreakdownChart fasts={$fasts ?? []} {range} />
+      <ConsistencyHeatmapChart fasts={$fasts ?? []} {range} />
+      <DurationHistogramChart fasts={$fasts ?? []} />
+      <DayOfWeekChart fasts={$fasts ?? []} />
+    </div>
   {/if}
 </div>

@@ -94,132 +94,135 @@
   }
 </script>
 
-<div class="mx-auto flex w-full flex-1 lg:max-w-3xl flex-col items-center gap-6 px-5 py-8">
-  {#if !fastTimer.ready}
-    <p class="mt-20 text-text-muted">Loading&hellip;</p>
-  {:else if fastTimer.activeFast}
-    <TimerRing
-      elapsedMs={fastTimer.elapsedMs}
-      elapsedHrs={fastTimer.elapsedHrs}
-      targetHours={fastTimer.activeFast.targetHours}
-      progress={fastTimer.progressToTarget}
-      color={fastTimer.zone.color}
-      onTimeClick={() => (editActiveOpen = true)}
-    />
+<!-- One column on a phone; on a laptop the timer sits beside the zone reference. -->
+<div class="mx-auto flex w-full flex-1 flex-col items-center gap-6 px-5 py-8 lg:grid lg:max-w-6xl lg:grid-cols-2 lg:items-start lg:gap-10">
+  <div class="flex w-full flex-col items-center gap-6">
+    {#if !fastTimer.ready}
+      <p class="mt-20 text-text-muted">Loading&hellip;</p>
+    {:else if fastTimer.activeFast}
+      <TimerRing
+        elapsedMs={fastTimer.elapsedMs}
+        elapsedHrs={fastTimer.elapsedHrs}
+        targetHours={fastTimer.activeFast.targetHours}
+        progress={fastTimer.progressToTarget}
+        color={fastTimer.zone.color}
+        onTimeClick={() => (editActiveOpen = true)}
+      />
 
-    {#if fastTimer.activeFast.presetLabel}
-      <p class="-mt-4 text-sm text-text-muted">Fasting method: {fastTimer.activeFast.presetLabel}</p>
-    {/if}
-    {#if eatingWindow}
-      <p class="-mt-4 text-sm text-text-muted">{eatingWindow}</p>
-    {/if}
-
-    <ZoneCard zone={fastTimer.zone} />
-
-    {#if !showStopPanel}
-      <button
-        class="w-full rounded-xl border py-3 text-base font-semibold"
-        style="border-color: #ef444460; color: #f87171; background: #ef444414;"
-        onclick={() => (showStopPanel = true)}
-      >
-        End Fast
-      </button>
-    {:else}
-      <div class="w-full space-y-4 rounded-2xl border p-4" style="border-color: var(--color-border); background: var(--color-surface);">
-        <div>
-          <p class="mb-1.5 text-sm font-medium text-text-muted">How do you feel?</p>
-          <div class="flex gap-2">
-            {#each [1, 2, 3, 4, 5] as n (n)}
-              <button
-                class="flex-1 rounded-lg border py-2 text-sm"
-                style={moodRating === n
-                  ? 'background: var(--color-brand); color: #06140c; border-color: var(--color-brand);'
-                  : 'border-color: var(--color-border); color: var(--color-text-muted);'}
-                onclick={() => (moodRating = n)}
-              >{n}</button>
-            {/each}
-          </div>
-        </div>
-        <div>
-          <p class="mb-1.5 text-sm font-medium text-text-muted">Energy level?</p>
-          <div class="flex gap-2">
-            {#each [1, 2, 3, 4, 5] as n (n)}
-              <button
-                class="flex-1 rounded-lg border py-2 text-sm"
-                style={energyRating === n
-                  ? 'background: var(--color-brand); color: #06140c; border-color: var(--color-brand);'
-                  : 'border-color: var(--color-border); color: var(--color-text-muted);'}
-                onclick={() => (energyRating = n)}
-              >{n}</button>
-            {/each}
-          </div>
-        </div>
-        <div>
-          <p class="mb-1.5 text-sm font-medium text-text-muted">Hunger level?</p>
-          <div class="flex gap-2">
-            {#each [1, 2, 3, 4, 5] as n (n)}
-              <button
-                class="flex-1 rounded-lg border py-2 text-sm"
-                style={hungerRating === n
-                  ? 'background: var(--color-brand); color: #06140c; border-color: var(--color-brand);'
-                  : 'border-color: var(--color-border); color: var(--color-text-muted);'}
-                onclick={() => (hungerRating = n)}
-              >{n}</button>
-            {/each}
-          </div>
-        </div>
-        <div>
-          <p class="mb-1.5 text-sm font-medium text-text-muted">Tags</p>
-          <TagInput bind:tags />
-        </div>
-        <textarea
-          bind:value={note}
-          placeholder="Notes (optional)"
-          rows="2"
-          class="w-full resize-none rounded-lg border bg-transparent p-2 text-sm text-text placeholder:text-text-muted"
-          style="border-color: var(--color-border);"
-        ></textarea>
-        {#if finishError}
-          <p class="text-sm" style="color: #f87171;">{finishError}</p>
-        {/if}
-        <div class="flex gap-2">
-          <button
-            class="flex-1 rounded-xl border py-2.5 text-sm font-medium text-text-muted"
-            style="border-color: var(--color-border);"
-            onclick={() => (showStopPanel = false)}
-          >Cancel</button>
-          <button
-            class="flex-1 rounded-xl py-2.5 text-sm font-semibold"
-            style="background: var(--color-brand); color: #06140c;"
-            onclick={handleFinish}
-          >Save & Finish</button>
-        </div>
-      </div>
-    {/if}
-  {:else}
-    <div class="mt-6 flex flex-col items-center gap-2 text-center">
-      <span class="text-5xl">&#x2744;&#xFE0F;</span>
-      <h1 class="text-2xl font-semibold text-text">Ready when you are</h1>
-      <p class="text-sm text-text-muted">Pick a method and start your fast.</p>
-      {#if schedule}
-        <p class="text-sm font-medium" style="color: {schedule.late ? '#fbbf24' : 'var(--color-text-muted)'};">{schedule.text}</p>
+      {#if fastTimer.activeFast.presetLabel}
+        <p class="-mt-4 text-sm text-text-muted">Fasting method: {fastTimer.activeFast.presetLabel}</p>
       {/if}
-    </div>
+      {#if eatingWindow}
+        <p class="-mt-4 text-sm text-text-muted">{eatingWindow}</p>
+      {/if}
 
-    <MethodPicker bind:selectedId={selectedPresetId} />
+      <ZoneCard zone={fastTimer.zone} />
 
-    {#if startError}
-      <p class="text-sm" style="color: #f87171;">{startError}</p>
+      {#if !showStopPanel}
+        <button
+          class="w-full rounded-xl border py-3 text-base font-semibold"
+          style="border-color: #ef444460; color: #f87171; background: #ef444414;"
+          onclick={() => (showStopPanel = true)}
+        >
+          End Fast
+        </button>
+      {:else}
+        <div class="w-full space-y-4 rounded-2xl border p-4" style="border-color: var(--color-border); background: var(--color-surface);">
+          <div>
+            <p class="mb-1.5 text-sm font-medium text-text-muted">How do you feel?</p>
+            <div class="flex gap-2">
+              {#each [1, 2, 3, 4, 5] as n (n)}
+                <button
+                  class="flex-1 rounded-lg border py-2 text-sm"
+                  style={moodRating === n
+                    ? 'background: var(--color-brand); color: #06140c; border-color: var(--color-brand);'
+                    : 'border-color: var(--color-border); color: var(--color-text-muted);'}
+                  onclick={() => (moodRating = n)}
+                >{n}</button>
+              {/each}
+            </div>
+          </div>
+          <div>
+            <p class="mb-1.5 text-sm font-medium text-text-muted">Energy level?</p>
+            <div class="flex gap-2">
+              {#each [1, 2, 3, 4, 5] as n (n)}
+                <button
+                  class="flex-1 rounded-lg border py-2 text-sm"
+                  style={energyRating === n
+                    ? 'background: var(--color-brand); color: #06140c; border-color: var(--color-brand);'
+                    : 'border-color: var(--color-border); color: var(--color-text-muted);'}
+                  onclick={() => (energyRating = n)}
+                >{n}</button>
+              {/each}
+            </div>
+          </div>
+          <div>
+            <p class="mb-1.5 text-sm font-medium text-text-muted">Hunger level?</p>
+            <div class="flex gap-2">
+              {#each [1, 2, 3, 4, 5] as n (n)}
+                <button
+                  class="flex-1 rounded-lg border py-2 text-sm"
+                  style={hungerRating === n
+                    ? 'background: var(--color-brand); color: #06140c; border-color: var(--color-brand);'
+                    : 'border-color: var(--color-border); color: var(--color-text-muted);'}
+                  onclick={() => (hungerRating = n)}
+                >{n}</button>
+              {/each}
+            </div>
+          </div>
+          <div>
+            <p class="mb-1.5 text-sm font-medium text-text-muted">Tags</p>
+            <TagInput bind:tags />
+          </div>
+          <textarea
+            bind:value={note}
+            placeholder="Notes (optional)"
+            rows="2"
+            class="w-full resize-none rounded-lg border bg-transparent p-2 text-sm text-text placeholder:text-text-muted"
+            style="border-color: var(--color-border);"
+          ></textarea>
+          {#if finishError}
+            <p class="text-sm" style="color: #f87171;">{finishError}</p>
+          {/if}
+          <div class="flex gap-2">
+            <button
+              class="flex-1 rounded-xl border py-2.5 text-sm font-medium text-text-muted"
+              style="border-color: var(--color-border);"
+              onclick={() => (showStopPanel = false)}
+            >Cancel</button>
+            <button
+              class="flex-1 rounded-xl py-2.5 text-sm font-semibold"
+              style="background: var(--color-brand); color: #06140c;"
+              onclick={handleFinish}
+            >Save & Finish</button>
+          </div>
+        </div>
+      {/if}
+    {:else}
+      <div class="mt-6 flex flex-col items-center gap-2 text-center">
+        <span class="text-5xl">&#x2744;&#xFE0F;</span>
+        <h1 class="text-2xl font-semibold text-text">Ready when you are</h1>
+        <p class="text-sm text-text-muted">Pick a method and start your fast.</p>
+        {#if schedule}
+          <p class="text-sm font-medium" style="color: {schedule.late ? '#fbbf24' : 'var(--color-text-muted)'};">{schedule.text}</p>
+        {/if}
+      </div>
+
+      <MethodPicker bind:selectedId={selectedPresetId} />
+
+      {#if startError}
+        <p class="text-sm" style="color: #f87171;">{startError}</p>
+      {/if}
+
+      <button
+        class="w-full rounded-xl py-3.5 text-base font-semibold"
+        style="background: var(--color-brand); color: #06140c;"
+        onclick={handleStart}
+      >
+        Start Fast
+      </button>
     {/if}
-
-    <button
-      class="w-full rounded-xl py-3.5 text-base font-semibold"
-      style="background: var(--color-brand); color: #06140c;"
-      onclick={handleStart}
-    >
-      Start Fast
-    </button>
-  {/if}
+  </div>
 
   <ZoneReferenceList currentZoneId={fastTimer.activeFast ? fastTimer.zone.id : null} />
 </div>
