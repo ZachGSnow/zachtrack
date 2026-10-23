@@ -1,10 +1,10 @@
 import 'fake-indexeddb/auto';
-import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { getPlatformProxy } from 'wrangler';
 import { db, getSettings, getAllSyncableRecords, updateSettings } from '../src/lib/db';
 import { handleSync } from '../functions/api/sync';
 import { AUD, OWNER, TEAM_DOMAIN, createSigner, ownerClaims, type Signer } from './helpers/access-token';
+import { resetDb } from './helpers/d1';
 
 // A new device creates default settings on first launch and pushes its whole
 // dataset on its first sync. Those defaults must not overwrite the settings
@@ -16,11 +16,7 @@ const NOW = Date.UTC(2026, 9, 22, 12);
 
 beforeAll(async () => {
   proxy = await getPlatformProxy<{ DB: D1Database }>({ configPath: 'tests/fixtures/wrangler.test.toml', persist: false });
-  const schema = readFileSync('d1/schema.sql', 'utf8').replace(/--.*$/gm, '').split(';').map((s) => s.trim()).filter(Boolean);
-  for (const t of ['fasts', 'fieldDefinitions', 'trackableDefinitions', 'trackableEntries', 'settings', 'syncSeq']) {
-    await proxy.env.DB.prepare(`DROP TABLE IF EXISTS ${t}`).run();
-  }
-  for (const s of schema) await proxy.env.DB.prepare(s).run();
+  await resetDb(proxy.env.DB);
   signer = await createSigner();
 });
 

@@ -458,6 +458,29 @@ the fly like BMI, never stored, so changing a setting recalculates history.
 Four more `settings` columns: `waistFieldId`, `neckFieldId`, `hipFieldId`,
 `bodyFatSex`, added with `ALTER TABLE` before deploying, like 3.14.
 
+### 3.16 Migrations and one deploy command
+Releases used to need hand-run `ALTER TABLE` statements before the deploy,
+and forgetting one would have failed every sync that carried the new column.
+Since v1.6.0:
+- **`d1/migrations/NNNN_name.sql`** holds every schema change after the
+  v1.5.0 baseline in `d1/schema.sql`. `wrangler d1 migrations apply` records
+  what ran in the database's `d1_migrations` table, so each runs exactly once
+  (`migrations_dir` in `wrangler.toml`). Migrations stay additive so devices
+  on the previous version keep syncing until they update.
+- **Tests use the same files.** `tests/helpers/d1.ts` builds every test
+  database from the baseline plus all migrations, so a new migration is
+  exercised by the sync, settings and backup tests.
+- **`npm run deploy`** (`scripts/deploy.mjs`) runs locally, so no Cloudflare
+  token lives in GitHub and production only ever gets tagged versions. It
+  refuses to run unless `main` is clean, matches `origin/main` and carries the
+  tag for `package.json`'s version. Then it exports the database (outside the
+  repo), applies migrations, builds, deploys, and checks that the newest
+  production deployment is this commit and that `pages.dev` and `/api/sync`
+  still redirect to the Access login. Migrations go first so a release can
+  never be live ahead of its columns.
+- **Release cadence:** features merge as they pass CI (auto-merge), and a
+  batch ships as one release and one deploy.
+
 ## 4. Issues hit during implementation, and how they were resolved
 
 These are real bugs that shipped and got fixed during this project's build,
@@ -723,15 +746,15 @@ The deployment's real values (account, database id, domains, owner email)
 are kept out of the repo, in the git-ignored `wrangler.toml` and a local
 `infra.local.md`. The shape of the deployment:
 
-- **D1 database:** `zachtrack-db`. Schema lives in `d1/schema.sql`; apply it
-  to a new database with
-  `wrangler d1 execute zachtrack-db --remote --file=./d1/schema.sql`, and use
-  `--command="ALTER TABLE ..."` for incremental additive changes (as was
-  done for the `displayMode`, `fieldDefinitions.aggregation`,
-  `settings.weightFieldId` and the body-fat settings columns).
+- **D1 database:** `zachtrack-db`. `d1/schema.sql` is the baseline (the
+  schema as of v1.5.0); every later change is a numbered file in
+  `d1/migrations/`, applied with `wrangler d1 migrations apply` (see 3.16).
+  Before that, additive changes were made by hand with `--command="ALTER
+  TABLE ..."` (the `displayMode`, `fieldDefinitions.aggregation`,
+  `settings.weightFieldId` and body-fat settings columns).
 - **Pages project:** `zachtrack`, production branch `main`, deployed via
-  **direct upload** (`npm run build`, then `wrangler pages deploy dist
-  --project-name=zachtrack --branch=main`). Default URL
+  **direct upload** with `npm run deploy` (3.16), which runs `wrangler pages
+  deploy dist --project-name=zachtrack --branch=main` after the checks. Default URL
   `zachtrack.pages.dev` (see 4.6). The build bakes `package.json`'s version
   into the app (`__APP_VERSION__`, shown at the top of the Profile sheet), so
   after a deploy each device shows which build its service worker is serving;
@@ -751,11 +774,10 @@ are kept out of the repo, in the git-ignored `wrangler.toml` and a local
   free plan (30 days on a paid plan). Beyond that, the `zachtrack-backup`
   Worker (`workers/backup/`, its own git-ignored `wrangler.toml`) writes a
   nightly restore-ready SQL file to the private R2 bucket `zachtrack-backups`,
-  kept 30 days by a lifecycle rule. See 3.12 for the format. Still take a
-  manual `wrangler d1 export zachtrack-db --remote --output=<file>` right
-  before any schema change or migration, and keep the file outside the repo
-  (it is health data; `*.sql` other than `d1/schema.sql` and
-  `d1/scrub-deleted.sql` is git-ignored).
+  kept 30 days by a lifecycle rule. See 3.12 for the format. `npm run deploy`
+  also exports the database right before applying migrations, to a file
+  outside the repo (it is health data; `*.sql` other than `d1/schema.sql`,
+  `d1/scrub-deleted.sql` and `d1/migrations/*.sql` is git-ignored).
 - **Never hard-delete rows in D1 by hand.** A row removed with `DELETE`
   leaves no `deletedAt` marker, so any device that still has the record
   pushes it straight back on its next sync. That is how a duplicate starter

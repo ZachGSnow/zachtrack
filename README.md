@@ -75,8 +75,9 @@ your data goes to your account only.
 1. **Config:** `copy wrangler.toml.example wrangler.toml` (Windows) or
    `cp wrangler.toml.example wrangler.toml`. `wrangler.toml` is git-ignored.
 2. **Database:** `npx wrangler d1 create zachtrack-db`, put the printed id in
-   `database_id`, then apply the schema:
-   `npx wrangler d1 execute zachtrack-db --remote --file=./d1/schema.sql`
+   `database_id`, then apply the baseline schema and the migrations:
+   `npx wrangler d1 execute zachtrack-db --remote --file=./d1/schema.sql`, then
+   `npx wrangler d1 migrations apply zachtrack-db --remote`
 3. **Pages project:** `npm run build`, then
    `npx wrangler pages deploy dist --project-name=zachtrack --branch=main`
    (the first run creates the project).
@@ -89,10 +90,15 @@ your data goes to your account only.
 6. **Vars:** set `OWNER_EMAIL`, `ACCESS_TEAM_DOMAIN` and (recommended)
    `ACCESS_AUD` in `wrangler.toml`, then build and deploy again.
 
-**Upgrading an existing database:** a release that adds a column says so in
-its notes. Add it before deploying that release, e.g. for v1.4.0:
-`npx wrangler d1 execute zachtrack-db --remote --command="ALTER TABLE settings ADD COLUMN weightFieldId TEXT"`.
-v1.5.0 adds `waistFieldId`, `neckFieldId`, `hipFieldId` and `bodyFatSex` (all `TEXT`) the same way.
+**Deploying a release:** from a clean, pulled `main` at the release tag, run
+`npm run deploy`. It backs up the database to a file outside the repo (your
+OS temp folder, or `--backup-dir <dir>`), applies any new migrations from
+`d1/migrations/`, builds, deploys to Pages, and checks the new deployment is
+live and still behind Access. `npm run deploy -- --dry-run` runs only the
+checks and the build. Before v1.6.0, schema changes were applied by hand:
+coming from v1.3 or older, first add the v1.4.0 and v1.5.0 columns
+(`settings.weightFieldId`, then `waistFieldId`, `neckFieldId`, `hipFieldId`,
+`bodyFatSex`, all `TEXT`) with `ALTER TABLE ... ADD COLUMN`.
 
 Install the app from your custom domain in Chrome (Add to Home screen).
 The Profile sheet (person icon on the Trackables tab) shows the version each

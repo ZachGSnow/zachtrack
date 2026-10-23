@@ -1,10 +1,10 @@
-import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { getPlatformProxy } from 'wrangler';
 import { handleSync } from '../functions/api/sync';
 import { BACKUP_TABLES, sqlLiteral } from '../server/backup';
 import { runBackup } from '../workers/backup/index';
 import { AUD, OWNER, TEAM_DOMAIN, createSigner, ownerClaims, type Signer } from './helpers/access-token';
+import { resetDb } from './helpers/d1';
 
 // Seeds a local D1 through the real sync endpoint, runs the backup Worker's
 // job into local R2, then restores the file into a second database and
@@ -16,17 +16,6 @@ let env: Bindings;
 let signer: Signer;
 let token: string;
 const NOW = Date.UTC(2026, 9, 22, 9);
-
-const schema = readFileSync('d1/schema.sql', 'utf8')
-  .replace(/--.*$/gm, '')
-  .split(';')
-  .map((s) => s.trim())
-  .filter(Boolean);
-
-async function resetDb(db: D1Database) {
-  for (const t of [...BACKUP_TABLES, 'syncSeq']) await db.prepare(`DROP TABLE IF EXISTS ${t}`).run();
-  for (const s of schema) await db.prepare(s).run();
-}
 
 /** Applies a backup file the way `wrangler d1 execute --file` would: one statement per line. */
 async function applySql(db: D1Database, sql: string) {

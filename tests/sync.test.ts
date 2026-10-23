@@ -4,6 +4,7 @@ import { getPlatformProxy } from 'wrangler';
 import { handleSync, type Env } from '../functions/api/sync';
 import { clearAccessKeyCache } from '../server/access';
 import { AUD, OWNER, TEAM_DOMAIN, createSigner, forgedToken, ownerClaims, type Signer } from './helpers/access-token';
+import { resetDb } from './helpers/d1';
 
 // Runs the real handler against a local D1 (workerd, via Wrangler) built from
 // d1/schema.sql, so the upsert SQL, partial unique index and RETURNING all run
@@ -16,12 +17,6 @@ let signer: Signer;
 let token: string;
 const NOW = Date.UTC(2026, 9, 21, 12);
 const day = (d: number) => Date.UTC(2026, 9, d, 4); // stand-in for a local start-of-day
-
-const schemaStatements = readFileSync('d1/schema.sql', 'utf8')
-  .replace(/--.*$/gm, '')
-  .split(';')
-  .map((s) => s.trim())
-  .filter(Boolean);
 
 beforeAll(async () => {
   proxy = await getPlatformProxy<{ DB: D1Database }>({ configPath: 'tests/fixtures/wrangler.test.toml', persist: false });
@@ -36,10 +31,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   clearAccessKeyCache();
-  for (const t of ['fasts', 'fieldDefinitions', 'trackableDefinitions', 'trackableEntries', 'settings', 'syncSeq']) {
-    await db.prepare(`DROP TABLE IF EXISTS ${t}`).run();
-  }
-  for (const s of schemaStatements) await db.prepare(s).run();
+  await resetDb(db);
 });
 
 const env = (overrides: Partial<Env> = {}): Env => ({
