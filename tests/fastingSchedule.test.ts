@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { FastRecord } from '../src/lib/db';
-import { eatingWindowText, formatCountdown, parseScheduleTime, scheduleStatus } from '../src/lib/utils/fastingSchedule';
+import { eatingWindowText, formatCountdown, parseScheduleTime, planForDay, scheduleStatus } from '../src/lib/utils/fastingSchedule';
 import { computeFastStats } from '../src/lib/utils/stats';
 
 // America/New_York (vitest config).
@@ -43,6 +43,38 @@ describe('schedule status while no fast runs', () => {
 
   it('has nothing to say without a schedule', () => {
     expect(scheduleStatus(undefined, [], oct(22, 12))).toBeNull();
+  });
+});
+
+describe('weekly plan', () => {
+  // Oct 22 2026 is a Thursday; the plan is Monday first.
+  const settings = {
+    defaultPresetId: '16:8',
+    fastScheduleTime: '20:00',
+    fastWeekPlan: [null, null, null, null, { rest: true }, { rest: true }, { presetId: '24h', time: '19:30' }],
+  };
+
+  it("gives each weekday its own method and time, falling back to the daily ones", () => {
+    expect(planForDay(settings, oct(22, 0))).toEqual({ time: '20:00', presetId: '16:8', rest: false });
+    expect(planForDay(settings, oct(23, 0))).toEqual({ rest: true });
+    expect(planForDay(settings, oct(25, 0))).toEqual({ time: '19:30', presetId: '24h', rest: false });
+    expect(planForDay({ defaultPresetId: '16:8' }, oct(22, 0))).toEqual({ time: undefined, presetId: '16:8', rest: false });
+  });
+
+  it("isn't late on a rest day, and counts down to the next planned day", () => {
+    const s = scheduleStatus(settings, [], oct(23, 21))!; // Friday, a rest day
+    expect(s.late).toBe(false);
+    expect(s.at).toBe(oct(25, 19, 30));
+    expect(s.text).toMatch(/^Next fast starts Sun 7:30\sPM$/);
+  });
+
+  it('uses the day\'s own time', () => {
+    const s = scheduleStatus(settings, [], oct(25, 19, 45))!; // Sunday
+    expect(s).toMatchObject({ late: true, at: oct(25, 19, 30) });
+  });
+
+  it('has nothing to say when every day rests', () => {
+    expect(scheduleStatus({ defaultPresetId: '16:8', fastWeekPlan: Array(7).fill({ rest: true }) }, [], oct(22, 12))).toBeNull();
   });
 });
 

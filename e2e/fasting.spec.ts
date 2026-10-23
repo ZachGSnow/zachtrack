@@ -114,3 +114,40 @@ test('a past fast ending in the future is refused', async ({ page }) => {
   await page.getByRole('button', { name: 'Save fast' }).click();
   await expect(page.getByText(/The end cannot be in the future/)).toBeVisible();
 });
+
+/** Today's weekday as the plan names it (Monday first). */
+const todayName = (page: Page) => page.evaluate(() => ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][(new Date().getDay() + 6) % 7]);
+
+test("the weekly plan picks today's method, and a rest day isn't late", async ({ page }) => {
+  const today = await todayName(page);
+  await openSettings(page);
+  await page.getByLabel(`${today} method`).selectOption({ label: '18:6' });
+  await page.goto('/');
+  await expect(page.getByText('Reaches mild ketosis')).toBeVisible(); // 18:6 selected
+
+  // A daily start long past, but today rests: nothing is late, and the next planned day is shown.
+  await openSettings(page);
+  const daily = page.getByLabel('Daily fast start (optional)');
+  await daily.fill('00:01');
+  await daily.dispatchEvent('change');
+  await page.getByLabel(`${today} method`).selectOption('rest');
+  await page.goto('/');
+  await expect(page.getByText(/^Next fast starts/)).toBeVisible();
+  await expect(page.getByText(/^Your fast was due/)).toHaveCount(0);
+  await expect(page.getByLabel('fast is late')).toHaveCount(0);
+});
+
+test('a long fast shows hydration and the 48-hour caution, and ending it says how to break it', async ({ page }) => {
+  await page.getByRole('button', { name: 'Custom / Count-Up' }).click();
+  await page.getByRole('button', { name: 'Pick a time' }).click();
+  await page.getByLabel('Fast started at').fill(await hoursAgo(page, 49));
+  await page.getByRole('button', { name: 'Start Fast' }).click();
+
+  const card = page.getByRole('region', { name: 'Long fast' });
+  await expect(card).toContainText('electrolytes');
+  await expect(card).toContainText('Past 48 hours');
+  await expect(card).toContainText('General information, not medical advice.');
+
+  await page.getByRole('button', { name: 'End Fast' }).click();
+  await expect(page.getByLabel('Fast summary')).toContainText('Break a fast this long gently');
+});

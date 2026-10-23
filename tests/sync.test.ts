@@ -139,7 +139,14 @@ describe('sync', () => {
         fieldDefinitions: [field],
         trackableDefinitions: [trackable],
         trackableEntries: [entry('e1', 5, 12)],
-        settings: { id: 'app-settings', defaultPresetId: '16:8', notificationsEnabled: true, heightInches: 70, updatedAt: 3 },
+        settings: {
+          id: 'app-settings',
+          defaultPresetId: '16:8',
+          notificationsEnabled: true,
+          heightInches: 70,
+          fastWeekPlan: [null, null, null, null, null, { rest: true }, { presetId: '24h-custom', time: '19:30' }],
+          updatedAt: 3,
+        },
       }),
     );
     expect(push.status).toBe(200);
@@ -161,6 +168,7 @@ describe('sync', () => {
       pausedUntil: 5,
     });
     expect(other.changes.settings).toMatchObject({ notificationsEnabled: true, heightInches: 70 });
+    expect(other.changes.settings.fastWeekPlan).toEqual([null, null, null, null, null, { rest: true }, { presetId: '24h-custom', time: '19:30' }]);
 
     const again = await sync(syncBody(push.body.cursor));
     expect(again.body.cursor).toBe(5);
@@ -245,6 +253,16 @@ describe('what a sync sends back', () => {
     await sync(syncBody(0, {}, [{ recordType: 'trackableEntries', uuid: 'e1', deletedAt: 20 }]));
     const again = await sync(syncBody(0, {}, [{ recordType: 'trackableEntries', uuid: 'e1', deletedAt: 15 }]));
     expect(again.body.appliedCounts.deletes).toBe(0);
+  });
+});
+
+describe('weekly plan', () => {
+  it('rejects a malformed plan in settings', async () => {
+    const settings = (fastWeekPlan: unknown) => ({ id: 'app-settings', defaultPresetId: '16:8', notificationsEnabled: false, fastWeekPlan, updatedAt: 5 });
+    for (const bad of [[null], Array(7).fill({ time: '25:00' }), Array(7).fill({ rest: 'yes' })]) {
+      const res = await sync(syncBody(0, { settings: settings(bad) }));
+      expect(res.body.rejected).toEqual([expect.objectContaining({ recordType: 'settings', reason: expect.stringContaining('fastWeekPlan') })]);
+    }
   });
 });
 

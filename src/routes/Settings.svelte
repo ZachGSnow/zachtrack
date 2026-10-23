@@ -8,6 +8,7 @@
   import { link } from 'svelte-spa-router';
   import SyncHistory from '../lib/components/SyncHistory.svelte';
   import SignOutSection from '../lib/components/SignOutSection.svelte';
+  import WeekPlanEditor from '../lib/components/WeekPlanEditor.svelte';
   import { syncStore } from '../lib/stores/sync.svelte';
   import type { CustomFastPreset } from '../lib/data/presets';
 
@@ -222,6 +223,8 @@
       The Fasting tab counts down to it and says when you're late.
     </span>
   </label>
+
+  <WeekPlanEditor />
 
   </section>
 

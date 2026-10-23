@@ -629,6 +629,21 @@ reload can't start another. The query doesn't match the service worker's
   end through `addFast`, so the one-fast-per-day rule applies; an end in the
   future is refused.
 
+### 3.36 Weekly plan and long fasts (v1.11.0)
+- **Weekly plan:** `settings.fastWeekPlan`, seven entries Monday first, each
+  null (the daily defaults) or `{ presetId?, time?, rest? }`. Migration
+  `0007_fast_week_plan.sql` adds the column; `validate.ts` checks the shape on
+  both sides. `planForDay` resolves a day over the defaults, and
+  `scheduleStatus` now takes the settings: a rest day or a day without a time
+  is never late, and the countdown looks up to a week ahead for the next
+  planned day. The idle Fasting tab preselects the day's method. Edited in
+  `WeekPlanEditor.svelte`, which saves plain copies (4.4).
+- **Long fasts** (`longFastGuidance`, `refeedingNote` in `utils/fastProgress.ts`):
+  from 20 hours in, or with a goal past a day, a card on the timer about water
+  and electrolytes, plus cautions at 48 and 72 hours; ending a fast of a day
+  or more shows short refeeding advice. Both say "General information, not
+  medical advice", like the zone descriptions.
+
 ### 3.21 Trackables list: pin, archive, order; tag filters
 - **Sort** (per device, `zachtrack:trackables-view`): Due first (goal
   urgency from 3.18: overdue, then due, then the rest, then trackables

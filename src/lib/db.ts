@@ -128,7 +128,19 @@ export interface SettingsRecord {
   fastScheduleTime?: string;
   /** Fast lengths you saved yourself, shown with the built-in methods (data/presets.ts). */
   customFastPresets?: CustomFastPreset[];
+  /** A plan per weekday, Monday first (utils/fastingSchedule.ts); null entries use the daily defaults. */
+  fastWeekPlan?: Array<FastDayPlan | null>;
   updatedAt: number;
+}
+
+/** One weekday of the weekly fasting plan. */
+export interface FastDayPlan {
+  /** The method that day; unset = the default method. */
+  presetId?: string;
+  /** Start time that day, "HH:MM"; unset = the daily start time. */
+  time?: string;
+  /** No fast planned that day. */
+  rest?: boolean;
 }
 
 export const DEFAULT_SETTINGS: Omit<SettingsRecord, 'updatedAt'> = {

@@ -1,11 +1,32 @@
-import type { FastRecord } from '../db';
+import type { FastDayPlan, FastRecord, SettingsRecord } from '../db';
+import { weekdayIndex } from './trackableGoals';
 import { addDays, formatClockTime, HOUR_MS, startOfDay } from './time';
 
 /**
- * An optional daily fasting schedule: the time a fast is planned to start each
- * day (settings.fastScheduleTime, "HH:MM" local time). The default method's
- * target then decides when the eating window opens.
+ * An optional fasting schedule: the time a fast is planned to start each day
+ * (settings.fastScheduleTime, "HH:MM" local time), and since v1.11.0 a plan
+ * per weekday (settings.fastWeekPlan, Monday first) that can give a day its
+ * own method and start time, or make it a rest day.
  */
+
+/** What the schedule reads: the settings, or for tests just a daily time. */
+export type ScheduleInput = string | undefined | Pick<SettingsRecord, 'fastScheduleTime' | 'fastWeekPlan' | 'defaultPresetId'>;
+
+export interface DayPlan {
+  /** Planned start "HH:MM", or undefined when no start is planned that day. */
+  time?: string;
+  /** The method that day: the plan's, else the default method. */
+  presetId?: string;
+  rest: boolean;
+}
+
+/** The plan for the day starting at `day`: its weekday's entry over the daily defaults. */
+export function planForDay(input: ScheduleInput, day: number): DayPlan {
+  if (typeof input !== 'object') return { time: input, rest: false };
+  const entry: FastDayPlan | null | undefined = input.fastWeekPlan?.[weekdayIndex(day)];
+  if (entry?.rest) return { rest: true };
+  return { time: entry?.time ?? input.fastScheduleTime, presetId: entry?.presetId ?? input.defaultPresetId, rest: false };
+}
 
 export function parseScheduleTime(value: string | undefined): { hours: number; minutes: number } | null {
   const match = value?.match(/^(\d{2}):(\d{2})$/);
@@ -32,7 +53,7 @@ export function formatCountdown(ms: number): string {
 }
 
 export interface ScheduleStatus {
-  /** e.g. "Next fast starts in 2h 15m (8:00 PM)" or "Your fast was due at 8:00 PM, 25m ago". */
+  /** e.g. "Next fast starts in 2h 15m (8:00 PM)", "Next fast starts Sun 7:30 PM" or "Your fast was due at 8:00 PM, 25m ago". */
   text: string;
   late: boolean;
   /** When the next (or missed) scheduled start is. */
@@ -45,20 +66,33 @@ export interface ScheduleStatus {
  * scheduled time, it is late.
  */
 export function scheduleStatus(
-  scheduleTime: string | undefined,
+  schedule: ScheduleInput,
   fasts: readonly Pick<FastRecord, 'startTime'>[],
   now: number = Date.now(),
 ): ScheduleStatus | null {
-  const time = parseScheduleTime(scheduleTime);
-  if (!time) return null;
   const today = startOfDay(now);
-  const todays = scheduledOn(today, time);
   const startedToday = fasts.some((f) => startOfDay(f.startTime) === today);
-  if (now < todays || startedToday) {
-    const at = now < todays && !startedToday ? todays : scheduledOn(addDays(today, 1), time);
-    return { text: `Next fast starts in ${formatCountdown(at - now)} (${formatClockTime(at)})`, late: false, at };
+  const todayTime = parseScheduleTime(planForDay(schedule, today).time);
+  if (todayTime && !startedToday) {
+    const todays = scheduledOn(today, todayTime);
+    if (now >= todays) {
+      return { text: `Your fast was due at ${formatClockTime(todays)}, ${formatCountdown(now - todays)} ago`, late: true, at: todays };
+    }
+    return { text: `Next fast starts in ${formatCountdown(todays - now)} (${formatClockTime(todays)})`, late: false, at: todays };
   }
-  return { text: `Your fast was due at ${formatClockTime(todays)}, ${formatCountdown(now - todays)} ago`, late: true, at: todays };
+  // Today's is done, a rest day or unplanned: the next planned day within a week.
+  for (let i = 1; i <= 7; i++) {
+    const day = addDays(today, i);
+    const time = parseScheduleTime(planForDay(schedule, day).time);
+    if (!time) continue;
+    const at = scheduledOn(day, time);
+    const text =
+      at - now < 24 * HOUR_MS
+        ? `Next fast starts in ${formatCountdown(at - now)} (${formatClockTime(at)})`
+        : `Next fast starts ${new Date(at).toLocaleDateString(undefined, { weekday: 'short' })} ${formatClockTime(at)}`;
+    return { text, late: false, at };
+  }
+  return null;
 }
 
 /** "Eating window opens at 12:00 PM tomorrow" while fasting toward a target; "Goal reached at ..." after it. */

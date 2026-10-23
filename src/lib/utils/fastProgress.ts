@@ -88,3 +88,26 @@ export function endSummary(fast: Fast, end: number): EndSummary {
 export function startedAgo(minutesAgo: number, now: number): number {
   return now - minutesAgo * 60_000;
 }
+
+/** A fast counts as long, and gets the guidance below, from this many hours in, or with a goal past a day. */
+export const LONG_FAST_HOURS = 20;
+
+/**
+ * General guidance shown during a long fast: hydration and electrolytes, then
+ * cautions at 48 and 72 hours. General information, not medical advice; the
+ * app says so where it shows these. Empty for an ordinary fast.
+ */
+export function longFastGuidance(fast: Pick<FastRecord, 'startTime' | 'targetHours'>, now: number): string[] {
+  const hours = (now - fast.startTime) / HOUR_MS;
+  if (hours < LONG_FAST_HOURS && !(fast.targetHours && fast.targetHours > 24)) return [];
+  const lines = ['Drink water through the fast; past a day, take electrolytes too (sodium, potassium, magnesium).'];
+  if (hours >= 48) lines.push('Past 48 hours: stop and eat if you feel dizzy, faint or confused, or your heart races.');
+  if (hours >= 72) lines.push('Fasts beyond 72 hours are best done under a doctor\'s supervision.');
+  return lines;
+}
+
+/** How to break a fast of a day or more; null for a shorter one. */
+export function refeedingNote(hours: number): string | null {
+  if (hours < 24) return null;
+  return 'Break a fast this long gently: start with a small meal with some protein, salt and water, and wait an hour or two before a large or high-carb meal.';
+}
