@@ -672,6 +672,13 @@ test('Insights sums up fasting and each trackable above the compare table', asyn
   await expect(overview.getByRole('link', { name: /Body Measurements/ })).toContainText(/Logged on \d+ of \d+ days/);
   await expect(page.getByRole('region', { name: 'Patterns' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Compare', level: 2 })).toBeVisible();
+
+  // Year in review: this year so far, with the sample's fasts and entries counted.
+  const year = page.getByRole('region', { name: 'Year in review' });
+  await expect(year).toContainText(`${new Date().getFullYear()} so far`);
+  await expect(year).toContainText(/Fasts\s*1\d/);
+  await expect(year).toContainText('Logged on the most days');
+
   await overview.getByRole('link', { name: /Body Measurements/ }).click();
   await expect(page).toHaveURL(/#\/trackables\//);
   expect(problems).toEqual([]);
