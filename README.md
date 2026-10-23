@@ -47,7 +47,9 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
 - **BMI** derived from your weight field (chosen in Profile) and your height,
   and a **body-fat estimate** (US Navy method) from waist, neck and hip
   measurements logged together.
-- **Offline and installable** (service worker, Android/Chrome PWA).
+- **Offline and installable** (service worker, Android/Chrome PWA), with
+  home-screen shortcuts (long-press the icon): Start a fast, Trackables,
+  Journey.
 - **Two-way sync** across devices: per-record last-write-wins, deletes that
   propagate, conflicts reported instead of guessed, and a sync status pill
   with a per-device history of the last 5 syncs.
