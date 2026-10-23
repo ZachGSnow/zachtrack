@@ -41,7 +41,7 @@ export function fastTimeline(fast: Fast, now: number): FastTimeline {
 export interface Milestone {
   /** Stable per fast and milestone, so a dismissed banner stays dismissed. */
   key: string;
-  /** "Goal reached: 16h" or "You reached Mild Ketosis (12h)" */
+  /** "Goal reached: 16h" or "You reached Ketones rising (16h)" */
   title: string;
   text: string;
 }

@@ -20,6 +20,7 @@
 
 <div class="w-full">
   <p class="mb-2 text-sm font-medium text-text-muted">Biological zones (first 24 hours)</p>
+  <p class="mb-2 text-xs text-text-muted">Typical times; they shift with your last meal, activity and body. General information, not medical advice.</p>
   <ul class="flex flex-col gap-2">
     {#each zones as zone (zone.id)}
       <li
@@ -43,10 +44,11 @@
         </button>
         {#if expanded.has(zone.id)}
           <div class="mt-3 space-y-2 text-sm text-text-muted">
-            <p><span class="font-semibold text-text">Energy source: </span>{zone.energySource}</p>
-            <p><span class="font-semibold text-text">The science: </span>{zone.science}</p>
-            <p><span class="font-semibold text-text">What's happening: </span>{zone.whatsHappening}</p>
-            <p><span class="font-semibold text-text">What you may feel: </span>{zone.userExperience}</p>
+            <p><span class="font-semibold text-text">Energy source:</span>{' '}{zone.energySource}</p>
+            <p><span class="font-semibold text-text">The science:</span>{' '}{zone.science}</p>
+            <p><span class="font-semibold text-text">What's happening:</span>{' '}{zone.whatsHappening}</p>
+            <p><span class="font-semibold text-text">What you may feel:</span>{' '}{zone.userExperience}</p>
+            <p><span class="font-semibold text-text">How sure is this:</span>{' '}{zone.evidence}</p>
           </div>
         {/if}
       </li>

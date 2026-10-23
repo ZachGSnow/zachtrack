@@ -185,7 +185,10 @@
         the day after a goal fast with other days, and only shows with at least 5 days on each side and a clear difference.
       </p>
       <p class="text-text-muted">
-        The zone descriptions are general information, not medical advice. Talk to a doctor before extended fasting.
+        The zones follow human research where it exists, and each says how sure the science is: the times are typical and
+        shift with your last meal, activity and body, and some popular claims (an hour when autophagy starts, an immune
+        "reset") rest mostly on animal studies. General information, not medical advice. Talk to a doctor before extended
+        fasting.
       </p>
     </section>
 
