@@ -670,6 +670,18 @@ from the settings store's `$state`, whose proxies IndexedDB can't clone, so
 saving a second preset silently failed. The picker now writes plain copies
 and shows an error if a save fails.
 
+### 3.27 In-app reminders
+No notifications by choice: reminders show inside the app.
+`stores/attention.svelte.ts` follows trackables, fields, entries, recent fasts
+and the schedule setting with one `liveQuery`, and re-checks every minute as
+time passes. `utils/attention.ts` picks the goals that are overdue or due
+today (not archived, not ages), most urgent first.
+- **Needs attention** at the top of Trackables lists them with their status;
+  each links to the trackable.
+- The **Trackables tab** (bottom bar and sidebar) shows their count, and the
+  **Fasting tab** a dot while the daily schedule's start has passed with no
+  fast started today.
+
 ## 4. Issues hit during implementation, and how they were resolved
 
 These are real bugs that shipped and got fixed during this project's build,

@@ -520,3 +520,47 @@ test('a fast length of your own can be saved, started and removed', async ({ pag
   await expect(page.getByText('Fasting method: 15:9')).toBeVisible();
   expect(problems).toEqual([]);
 });
+
+test('overdue goals are listed under Needs attention and counted on the Trackables tab', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await mockSync(page, noServer);
+  await importSampleData(page);
+  // Wellness Check-in was last logged yesterday or earlier: every day makes it due or overdue.
+  await page.goto('/#/trackables');
+  await page.getByRole('link', { name: /Wellness Check-in/ }).click();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.getByRole('combobox', { name: /^Goal/ }).selectOption('everyDays');
+  await page.getByRole('textbox', { name: /Every how many days/ }).fill('1');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+
+  await page.goto('/#/trackables');
+  const panel = page.getByRole('region', { name: 'Needs attention' });
+  await expect(panel).toContainText('Wellness Check-in');
+  await expect(panel).toContainText(/Due today|Overdue by \dd/);
+  const tab = page.getByRole('navigation', { name: 'Main' }).locator('a:visible', { hasText: 'Trackables' });
+  await expect(tab.getByLabel(/needs? attention/)).toHaveText(/^[1-9]\d*$/);
+
+  // Logging it clears the reminder.
+  await panel.getByRole('link', { name: /Wellness Check-in/ }).click();
+  await page.getByRole('button', { name: 'Log Entry' }).click();
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await page.goto('/#/trackables');
+  await expect(page.getByRole('region', { name: 'Needs attention' })).toHaveCount(0);
+  expect(problems).toEqual([]);
+});
+
+test('a late scheduled fast puts a dot on the Fasting tab until a fast starts', async ({ page }) => {
+  await mockSync(page, noServer);
+  await waitForStarterSet(page);
+  await page.goto('/#/trackables');
+  await page.getByRole('button', { name: 'Profile' }).click();
+  // Midnight has always passed, and this new install has no fast today.
+  await page.getByLabel(/^Daily fast start/).fill('00:00');
+  await page.getByLabel(/^Daily fast start/).blur();
+  await page.getByRole('button', { name: 'Done' }).click();
+  const fastingTab = page.getByRole('navigation', { name: 'Main' }).locator('a:visible', { hasText: 'Fasting' });
+  await expect(fastingTab.getByLabel('fast is late')).toBeVisible();
+  await page.goto('/#/');
+  await page.getByRole('button', { name: 'Start Fast' }).click();
+  await expect(fastingTab.getByLabel('fast is late')).toHaveCount(0);
+});
