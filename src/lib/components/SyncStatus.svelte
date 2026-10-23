@@ -111,6 +111,10 @@
     {#if syncStore.status !== 'syncing' && syncStore.status !== 'local'}
       <span class="opacity-70">&middot; {timeAgo}</span>
     {/if}
+    <!-- Only when a sync can't run: right after an edit the count would just flicker before the sync. -->
+    {#if syncStore.waiting > 0 && (syncStore.status === 'offline' || syncStore.status === 'error' || isUnauthenticated)}
+      <span class="text-amber-400">&middot; {syncStore.waiting} waiting</span>
+    {/if}
     {#if syncStore.rejected.length > 0}
       <span
         class="text-amber-400"

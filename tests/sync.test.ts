@@ -76,6 +76,11 @@ async function sync(body: unknown, e: Env = env(), jwt?: string | null) {
   return { status: res.status, body: (await res.json()) as any };
 }
 
+/** What another device would receive: everything since `cursor`, sending nothing. */
+async function pull(cursor = 0) {
+  return (await sync(syncBody(cursor))).body;
+}
+
 const fast = (uuid: string, startDay: number, updatedAt: number, extra: Record<string, unknown> = {}) => ({
   uuid,
   startTime: startDay + 20 * 3600000,
@@ -139,10 +144,13 @@ describe('sync', () => {
     );
     expect(push.status).toBe(200);
     expect(push.body.cursor).toBe(5);
-    expect(push.body.changes.fasts[0]).toMatchObject({ uuid: 'a', tags: ['test'] });
-    expect(push.body.changes.trackableEntries[0].values).toEqual({ 'f-water': 12 });
-    expect(push.body.changes.trackableDefinitions[0].fieldIds).toEqual(['f-water']);
-    expect(push.body.changes.trackableDefinitions[0]).toMatchObject({
+    expect(push.body.appliedCounts).toEqual({ fasts: 1, fieldDefinitions: 1, trackableDefinitions: 1, trackableEntries: 1, settings: 1, deletes: 0 });
+
+    const other = await pull(0);
+    expect(other.changes.fasts[0]).toMatchObject({ uuid: 'a', tags: ['test'] });
+    expect(other.changes.trackableEntries[0].values).toEqual({ 'f-water': 12 });
+    expect(other.changes.trackableDefinitions[0].fieldIds).toEqual(['f-water']);
+    expect(other.changes.trackableDefinitions[0]).toMatchObject({
       goalType: 'dailyTotal',
       goalValue: 64,
       pinned: true,
@@ -152,7 +160,7 @@ describe('sync', () => {
       skipDays: ['2026-10-20'],
       pausedUntil: 5,
     });
-    expect(push.body.changes.settings).toMatchObject({ notificationsEnabled: true, heightInches: 70 });
+    expect(other.changes.settings).toMatchObject({ notificationsEnabled: true, heightInches: 70 });
 
     const again = await sync(syncBody(push.body.cursor));
     expect(again.body.cursor).toBe(5);
@@ -162,16 +170,20 @@ describe('sync', () => {
   it('keeps the newer version of a record (last write wins)', async () => {
     await sync(syncBody(0, { trackableEntries: [entry('e1', 20, 16)] }));
     const stale = await sync(syncBody(0, { trackableEntries: [entry('e1', 10, 8)] }));
+    // Not stored, so the device gets the server's newer copy back.
+    expect(stale.body.appliedCounts.trackableEntries).toBe(0);
     expect(stale.body.changes.trackableEntries[0].values).toEqual({ 'f-water': 16 });
     const newer = await sync(syncBody(0, { trackableEntries: [entry('e1', 30, 24)] }));
-    expect(newer.body.changes.trackableEntries[0].values).toEqual({ 'f-water': 24 });
+    expect(newer.body.appliedCounts.trackableEntries).toBe(1);
+    expect((await pull(0)).changes.trackableEntries[0].values).toEqual({ 'f-water': 24 });
   });
 
   it('rejects a second fast on the same start day from another device', async () => {
     await sync(syncBody(0, { fasts: [fast('a', day(20), 10)] }));
     const res = await sync(syncBody(0, { fasts: [fast('b', day(20), 11), fast('c', day(21), 11)] }));
     expect(res.body.rejected).toEqual([expect.objectContaining({ recordType: 'fasts', uuid: 'b' })]);
-    expect(res.body.changes.fasts.map((f: { uuid: string }) => f.uuid).sort()).toEqual(['a', 'c']);
+    expect(res.body.changes.fasts.map((f: { uuid: string }) => f.uuid)).toEqual(['a']);
+    expect((await pull(0)).changes.fasts.map((f: { uuid: string }) => f.uuid).sort()).toEqual(['a', 'c']);
   });
 
   it('applies a delete, frees the day, and lets a newer edit beat an older delete', async () => {
@@ -182,8 +194,11 @@ describe('sync', () => {
         { recordType: 'trackableEntries', uuid: 'e1', deletedAt: 5 },
       ]),
     );
-    expect(del.body.changes.fasts[0]).toMatchObject({ uuid: 'a', deletedAt: 20 });
-    expect(del.body.changes.trackableEntries[0].deletedAt).toBeUndefined(); // edit at 10 is newer than delete at 5
+    expect(del.body.appliedCounts.deletes).toBe(1);
+    expect(del.body.applied).toEqual([{ recordType: 'fasts', uuid: 'a', deleted: true }]);
+    const after = await pull(0);
+    expect(after.changes.fasts[0]).toMatchObject({ uuid: 'a', deletedAt: 20 });
+    expect(after.changes.trackableEntries[0].deletedAt).toBeUndefined(); // edit at 10 is newer than delete at 5
 
     const reuse = await sync(syncBody(0, { fasts: [fast('b', day(20), 30)] }));
     expect(reuse.body.rejected).toEqual([]);
@@ -195,7 +210,41 @@ describe('sync', () => {
     const res = await sync(syncBody(0, { fieldDefinitions: fields, trackableEntries: entries }));
     expect(res.status).toBe(200);
     expect(res.body.cursor).toBe(240);
-    expect(res.body.changes.trackableEntries).toHaveLength(200);
+    expect(res.body.appliedCounts.trackableEntries).toBe(200);
+    expect(res.body.applied).toHaveLength(50); // named up to the limit, counted in full
+    expect((await pull(0)).changes.trackableEntries).toHaveLength(200);
+  });
+});
+
+describe('what a sync sends back', () => {
+  it("leaves out the device's own records but includes another device's change to them", async () => {
+    const first = await sync(syncBody(0, { trackableEntries: [entry('e1', 10, 12), entry('e2', 10, 8)] }));
+    expect(first.body.changes.trackableEntries).toEqual([]);
+    expect(first.body.cursor).toBe(2);
+
+    // Another device edits e1 after that.
+    await sync(syncBody(0, { trackableEntries: [entry('e1', 20, 16)] }));
+
+    // The first device sends a new entry and receives only the other device's edit.
+    const next = await sync(syncBody(first.body.cursor, { trackableEntries: [entry('e3', 30, 4)] }));
+    expect(next.body.changes.trackableEntries.map((e: { id: string; values: unknown }) => [e.id, e.values])).toEqual([
+      ['e1', { 'f-water': 16 }],
+    ]);
+    expect(next.body.applied).toEqual([{ recordType: 'trackableEntries', uuid: 'e3' }]);
+  });
+
+  it('counts only what changed: a copy the server already has, or an older one, is not applied', async () => {
+    await sync(syncBody(0, { fieldDefinitions: [field], trackableEntries: [entry('e1', 20, 16)] }));
+    const again = await sync(syncBody(0, { fieldDefinitions: [field], trackableEntries: [entry('e1', 10, 8)] }));
+    expect(again.body.appliedCounts).toEqual({ fasts: 0, fieldDefinitions: 0, trackableDefinitions: 0, trackableEntries: 0, settings: 0, deletes: 0 });
+    expect(again.body.applied).toEqual([]);
+  });
+
+  it('does not count a delete the server already had', async () => {
+    await sync(syncBody(0, { trackableEntries: [entry('e1', 10, 12)] }));
+    await sync(syncBody(0, {}, [{ recordType: 'trackableEntries', uuid: 'e1', deletedAt: 20 }]));
+    const again = await sync(syncBody(0, {}, [{ recordType: 'trackableEntries', uuid: 'e1', deletedAt: 15 }]));
+    expect(again.body.appliedCounts.deletes).toBe(0);
   });
 });
 
@@ -214,8 +263,9 @@ describe('hardening', () => {
       expect.objectContaining({ recordType: 'fieldDefinitions', uuid: 'f-water', reason: expect.stringContaining('kind') }),
       expect.objectContaining({ recordType: 'trackableEntries', uuid: 'e-bad', reason: expect.stringContaining('values') }),
     ]);
-    expect(res.body.changes.fasts.map((f: { uuid: string }) => f.uuid)).toEqual(['good']);
-    expect(res.body.changes.trackableEntries.map((e: { id: string }) => e.id)).toEqual(['e-good']);
+    const stored = await pull(0);
+    expect(stored.changes.fasts.map((f: { uuid: string }) => f.uuid)).toEqual(['good']);
+    expect(stored.changes.trackableEntries.map((e: { id: string }) => e.id)).toEqual(['e-good']);
   });
 
   it('keeps syncing on later requests while a bad record is still on the device', async () => {
@@ -223,7 +273,7 @@ describe('hardening', () => {
     await sync(syncBody(0, { trackableEntries: [poison] }));
     const next = await sync(syncBody(0, { trackableEntries: [poison, entry('e-new', 6, 20)] }));
     expect(next.status).toBe(200);
-    expect(next.body.changes.trackableEntries.map((e: { id: string }) => e.id)).toEqual(['e-new']);
+    expect(next.body.applied).toEqual([{ recordType: 'trackableEntries', uuid: 'e-new' }]);
   });
 
   it('accepts extra local-only properties such as the Dexie id on fasts', async () => {
@@ -253,7 +303,7 @@ describe('hardening', () => {
     );
     expect(res.status).toBe(200);
     expect(res.body.rejected).toHaveLength(3);
-    expect(res.body.changes.fasts[0].deletedAt).toBe(20);
+    expect((await pull(0)).changes.fasts[0].deletedAt).toBe(20);
   });
 
   it('clears notes, tags and values from a deleted entry and fast, but keeps the delete marker', async () => {

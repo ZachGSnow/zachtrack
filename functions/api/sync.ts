@@ -45,8 +45,19 @@ interface RejectedRecord {
 
 type WireRow<T> = T & { deletedAt?: number };
 
+/** A record the server stored from this request: new, newer than its copy, or a delete it applied. */
+export interface AppliedRecord {
+  recordType: Exclude<RecordKind, 'tombstones'>;
+  uuid: string;
+  deleted?: boolean;
+}
+
+/** At most this many applied records are named in a response; `appliedCounts` always covers all of them. */
+export const APPLIED_RECORDS_LIMIT = 50;
+
 interface SyncResponseBody {
   cursor: number;
+  /** Changes from other requests since `cursor`. What this request itself stored isn't sent back. */
   changes: {
     fasts: WireRow<FastRecord>[];
     fieldDefinitions: WireRow<FieldDefinition>[];
@@ -55,6 +66,10 @@ interface SyncResponseBody {
     settings: WireRow<SettingsRecord> | null;
   };
   rejected: RejectedRecord[];
+  /** How many records of each type this request changed on the server; `deletes` counts applied deletes. */
+  appliedCounts: Record<Exclude<RecordKind, 'tombstones'> | 'deletes', number>;
+  /** The first APPLIED_RECORDS_LIMIT of them, for the device's sync history. */
+  applied: AppliedRecord[];
 }
 
 /**
@@ -113,11 +128,27 @@ export async function handleSync(request: Request, env: Env, deps: AccessDeps = 
   const db = env.DB;
 
   try {
-    const rejected = await applyIncomingChanges(db, body);
-    const changes = await pullChangesSince(db, body.cursor);
+    const { rejected, applied, ownSeq } = await applyIncomingChanges(db, body);
+    const changes = await pullChangesSince(db, body.cursor, ownSeq);
     const cursor = await currentSeq(db);
 
-    const responseBody: SyncResponseBody = { cursor, changes, rejected };
+    const appliedCounts: SyncResponseBody['appliedCounts'] = {
+      fasts: 0,
+      fieldDefinitions: 0,
+      trackableDefinitions: 0,
+      trackableEntries: 0,
+      settings: 0,
+      deletes: 0,
+    };
+    for (const a of applied) appliedCounts[a.deleted ? 'deletes' : a.recordType]++;
+
+    const responseBody: SyncResponseBody = {
+      cursor,
+      changes,
+      rejected,
+      appliedCounts,
+      applied: applied.slice(0, APPLIED_RECORDS_LIMIT),
+    };
     return jsonResponse(responseBody);
   } catch (err) {
     // Details go to the Function log (`wrangler pages deployment tail`), not
@@ -152,8 +183,26 @@ async function currentSeq(db: D1Database): Promise<number> {
 //   4. up to 1 batched tombstone application (all deletes together)
 // ---------------------------------------------------------------------------
 
-async function applyIncomingChanges(db: D1Database, body: SyncRequestBody): Promise<RejectedRecord[]> {
+interface ApplyResult {
+  rejected: RejectedRecord[];
+  /** Records a statement actually changed (D1's `meta.changes`), so a same-age or older copy isn't counted. */
+  applied: AppliedRecord[];
+  /** The serverSeq block reserved for this request, [first, last]; the pull leaves these rows out. */
+  ownSeq: [number, number] | null;
+}
+
+/** Runs one batch and records which of its statements changed a row. */
+async function runBatch(db: D1Database, items: Array<{ statement: D1PreparedStatement; record: AppliedRecord }>, applied: AppliedRecord[]) {
+  if (items.length === 0) return;
+  const results = await db.batch(items.map((i) => i.statement));
+  results.forEach((result, i) => {
+    if ((result.meta?.changes ?? 0) > 0) applied.push(items[i].record);
+  });
+}
+
+async function applyIncomingChanges(db: D1Database, body: SyncRequestBody): Promise<ApplyResult> {
   const rejected: RejectedRecord[] = [];
+  const applied: AppliedRecord[] = [];
 
   // Drop (and report) anything that doesn't match the schema before any SQL
   // runs, so one bad record can't fail a whole batch (see src/lib/validate.ts).
@@ -179,6 +228,7 @@ async function applyIncomingChanges(db: D1Database, body: SyncRequestBody): Prom
 
   const totalSeqNeeded = fasts.length + fields.length + trackables.length + entries.length + (settings ? 1 : 0) + tombstones.length;
   let nextSeqValue = 0;
+  let ownSeq: ApplyResult['ownSeq'] = null;
   if (totalSeqNeeded > 0) {
     const row = await db
       .prepare('UPDATE syncSeq SET value = value + ? WHERE id = 1 RETURNING value')
@@ -186,11 +236,12 @@ async function applyIncomingChanges(db: D1Database, body: SyncRequestBody): Prom
       .first<{ value: number }>();
     const endValue = row!.value;
     nextSeqValue = endValue - totalSeqNeeded + 1;
+    ownSeq = [nextSeqValue, endValue];
   }
   const takeSeq = (): number => nextSeqValue++;
 
   // --- fasts: resolve one-fast-per-day conflicts in memory before batching ---
-  const fastStatements: D1PreparedStatement[] = [];
+  const fastStatements: Array<{ statement: D1PreparedStatement; record: AppliedRecord }> = [];
   if (fasts.length > 0) {
     const claims = await db
       .prepare('SELECT uuid, startDay FROM fasts WHERE deletedAt IS NULL')
@@ -210,34 +261,43 @@ async function applyIncomingChanges(db: D1Database, body: SyncRequestBody): Prom
         continue;
       }
       startDayOwner.set(fast.startDay, fast.uuid);
-      fastStatements.push(buildFastUpsert(db, fast, takeSeq()));
+      fastStatements.push({ statement: buildFastUpsert(db, fast, takeSeq()), record: { recordType: 'fasts', uuid: fast.uuid } });
     }
   }
-  if (fastStatements.length > 0) await db.batch(fastStatements);
+  await runBatch(db, fastStatements, applied);
 
   // --- fieldDefinitions / trackableDefinitions / trackableEntries / settings ---
-  if (fields.length > 0) {
-    await db.batch(fields.map((f) => buildFieldUpsert(db, f, takeSeq())));
-  }
-  if (trackables.length > 0) {
-    await db.batch(trackables.map((t) => buildTrackableUpsert(db, t, takeSeq())));
-  }
-  if (entries.length > 0) {
-    await db.batch(entries.map((e) => buildEntryUpsert(db, e, takeSeq())));
-  }
+  await runBatch(
+    db,
+    fields.map((f) => ({ statement: buildFieldUpsert(db, f, takeSeq()), record: { recordType: 'fieldDefinitions' as const, uuid: f.id } })),
+    applied,
+  );
+  await runBatch(
+    db,
+    trackables.map((t) => ({
+      statement: buildTrackableUpsert(db, t, takeSeq()),
+      record: { recordType: 'trackableDefinitions' as const, uuid: t.id },
+    })),
+    applied,
+  );
+  await runBatch(
+    db,
+    entries.map((e) => ({ statement: buildEntryUpsert(db, e, takeSeq()), record: { recordType: 'trackableEntries' as const, uuid: e.id } })),
+    applied,
+  );
   if (settings) {
-    await db.batch([buildSettingsUpsert(db, settings, takeSeq())]);
+    await runBatch(db, [{ statement: buildSettingsUpsert(db, settings, takeSeq()), record: { recordType: 'settings', uuid: settings.id } }], applied);
   }
 
   // --- tombstones (soft deletes), LWW-aware ---
-  if (tombstones.length > 0) {
-    const statements = tombstones
-      .map((t) => buildTombstoneUpdate(db, t, takeSeq()))
-      .filter((s): s is D1PreparedStatement => s != null);
-    if (statements.length > 0) await db.batch(statements);
+  const deletes: Array<{ statement: D1PreparedStatement; record: AppliedRecord }> = [];
+  for (const t of tombstones) {
+    const statement = buildTombstoneUpdate(db, t, takeSeq());
+    if (statement) deletes.push({ statement, record: { recordType: t.recordType, uuid: t.uuid, deleted: true } });
   }
+  await runBatch(db, deletes, applied);
 
-  return rejected;
+  return { rejected, applied, ownSeq };
 }
 
 // ---------------------------------------------------------------------------
@@ -411,16 +471,22 @@ function buildTombstoneUpdate(db: D1Database, tombstone: Tombstone, serverSeq: n
 }
 
 // ---------------------------------------------------------------------------
-// Pull: everything changed server-side since the client's cursor
+// Pull: everything changed server-side since the client's cursor, except the
+// rows this request wrote itself (the device already has them). A row another
+// device changed after this request wrote it has a newer serverSeq, so it
+// still comes through.
 // ---------------------------------------------------------------------------
 
-async function pullChangesSince(db: D1Database, cursor: number): Promise<SyncResponseBody['changes']> {
+async function pullChangesSince(db: D1Database, cursor: number, ownSeq: [number, number] | null): Promise<SyncResponseBody['changes']> {
+  const [first, last] = ownSeq ?? [0, -1]; // an empty range leaves nothing out
+  const since = (table: string) =>
+    db.prepare(`SELECT * FROM ${table} WHERE serverSeq > ? AND serverSeq NOT BETWEEN ? AND ?`).bind(cursor, first, last).all();
   const [fastsRes, fieldsRes, trackablesRes, entriesRes, settingsRes] = await Promise.all([
-    db.prepare('SELECT * FROM fasts WHERE serverSeq > ?').bind(cursor).all(),
-    db.prepare('SELECT * FROM fieldDefinitions WHERE serverSeq > ?').bind(cursor).all(),
-    db.prepare('SELECT * FROM trackableDefinitions WHERE serverSeq > ?').bind(cursor).all(),
-    db.prepare('SELECT * FROM trackableEntries WHERE serverSeq > ?').bind(cursor).all(),
-    db.prepare('SELECT * FROM settings WHERE serverSeq > ?').bind(cursor).all(),
+    since('fasts'),
+    since('fieldDefinitions'),
+    since('trackableDefinitions'),
+    since('trackableEntries'),
+    since('settings'),
   ]);
 
   return {
