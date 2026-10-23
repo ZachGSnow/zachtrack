@@ -86,31 +86,34 @@
   let fieldInputs = $state<Record<string, string | number | boolean>>({});
   let error = $state('');
 
-  // Guards against re-populating fieldInputs from unrelated field-definition
-  // edits while the sheet is open and being typed in, while still allowing
-  // the *initial* population to wait until the fieldDefinitions liveQuery
-  // (allFields) has actually loaded -- it starts out `undefined` on mount.
+  // The sheet fills itself once per entry (or new entry) it opens for. The
+  // date, name, note and tags straight away, so nothing typed right after it
+  // opens is overwritten; the field inputs once the fieldDefinitions liveQuery
+  // (allFields) has loaded, since it starts out `undefined`. Neither refills
+  // on unrelated edits while the sheet is open and being typed in.
   let initKey = '';
-  let initialized = false;
+  let fieldsKey = '';
 
   $effect(() => {
     if (!open || !trackable) return;
     const key = `${trackable.id}|${entry?.id ?? `new@${defaultTimestamp ?? ''}`}`;
-    if (key !== initKey) {
-      initKey = key;
-      initialized = false;
-    }
-    if (initialized) return;
-    if ($allFields === undefined) return; // wait for fields to load before snapshotting
-    initialized = true;
-
-    const fields = attachedFields;
+    if (key === initKey) return;
+    initKey = key;
     const ages = isAges;
     const when = entry?.timestamp ?? defaultTimestamp ?? Date.now();
     dateLocal = ages ? toDateInputValue(when) : toDatetimeLocal(when);
     if (ages) loadRepeat(entry?.dateRepeat ?? defaultRepeat(dateKindOf(trackable)));
     note = entry?.note ?? '';
     tags = entry?.tags ?? [];
+    error = '';
+  });
+
+  $effect(() => {
+    if (!open || !trackable || $allFields === undefined) return;
+    const key = `${trackable.id}|${entry?.id ?? `new@${defaultTimestamp ?? ''}`}`;
+    if (key === fieldsKey) return;
+    fieldsKey = key;
+    const fields = attachedFields;
     const inputs: Record<string, string | number | boolean> = {};
     for (const f of fields) {
       const raw = entry?.values?.[f.id];
@@ -119,7 +122,6 @@
       else inputs[f.id] = typeof raw === 'boolean' ? raw : false;
     }
     fieldInputs = inputs;
-    error = '';
   });
 
   function setRating(fieldId: string, value: number) {

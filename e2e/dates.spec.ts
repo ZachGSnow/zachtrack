@@ -79,8 +79,6 @@ test('a renewal repeats every few years, and a one-off date that passed moves to
   await expect(page.getByRole('list', { name: 'Upcoming' }).getByRole('button', { name: /Passport/ })).toContainText('every 10 years');
 
   await page.getByRole('button', { name: '+ Add date' }).click();
-  // The sheet fills in its defaults once it has loaded; type after that.
-  await expect(page.getByLabel('Date', { exact: true })).not.toHaveValue('');
   await page.getByRole('textbox', { name: 'What' }).fill('Beach trip');
   await page.getByLabel('Date', { exact: true }).fill(await dateFromToday(page, -3));
   await page.getByRole('button', { name: 'Save', exact: true }).click();
