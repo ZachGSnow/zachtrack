@@ -7,6 +7,7 @@
   import { bucketStart } from '../lib/utils/trackableStats';
   import { loadPrefs, oneOf, savePrefs } from '../lib/utils/prefs';
   import SegmentedControl from '../lib/components/SegmentedControl.svelte';
+  import HelpLink from '../lib/components/HelpLink.svelte';
 
   // Every dates trackable in one place (ARCHITECTURE.md 3.38): the next year
   // of birthdays, anniversaries, holidays and countdowns, as an agenda or a
@@ -97,7 +98,7 @@
 
 <div class="mx-auto flex w-full flex-1 flex-col gap-4 px-5 py-6 lg:max-w-3xl">
   <div class="flex items-center justify-between gap-2">
-    <h1 class="text-xl font-semibold text-text">Dates</h1>
+    <h1 class="flex items-center gap-2 text-xl font-semibold text-text"><span>Dates</span> <HelpLink topic="dates" label="dates" /></h1>
     <SegmentedControl options={VIEWS} bind:value={view} />
   </div>
 
