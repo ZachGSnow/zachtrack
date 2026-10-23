@@ -6,10 +6,12 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 <p>
-  <img src="docs/screenshots/fasting.png" alt="Fasting timer with a 16:8 fast in progress and the current metabolic zone" width="200">
-  <img src="docs/screenshots/trackables.png" alt="Trackables list showing when each was last logged" width="200">
-  <img src="docs/screenshots/trackable-trends.png" alt="Body Measurements trends table with weekly weight, BMI and waist" width="200">
-  <img src="docs/screenshots/journey.png" alt="Journey with fasting streaks and a weekly fasting table" width="200">
+  <img src="docs/screenshots/fasting.png" alt="Fasting timer with a 16:8 fast past its goal, its start, goal and next zone, and the current zone" width="200">
+  <img src="docs/screenshots/journey.png" alt="Journey with goal streaks, this week against last, and the fasting days grid" width="200">
+  <img src="docs/screenshots/trackables.png" alt="Trackables list showing each one's latest value or when it was last logged" width="200">
+  <img src="docs/screenshots/trackable-trends.png" alt="Body Measurements trends table with weekly weight, BMI and body fat" width="200">
+  <img src="docs/screenshots/dates.png" alt="Dates list with upcoming birthdays and US holidays and their countdowns" width="200">
+  <img src="docs/screenshots/insights.png" alt="Insights overview of fasting and each trackable over the last 30 days" width="200">
 </p>
 
 <sub>Fictional sample data, captured from the real app with <code>npm run screenshots</code>.</sub>
