@@ -19,6 +19,7 @@
   import DataTable from '../lib/components/DataTable.svelte';
   import SegmentedControl from '../lib/components/SegmentedControl.svelte';
   import InsightsSummary from '../lib/components/InsightsSummary.svelte';
+  import YearInReview from '../lib/components/YearInReview.svelte';
 
   const fasts = liveQuery(() => db.fasts.toArray());
   const trackables = liveQuery(() => db.trackableDefinitions.orderBy('name').toArray());
@@ -208,6 +209,8 @@
   <div class="flex flex-col gap-5 lg:grid lg:grid-cols-2 lg:items-start">
     <InsightsSummary fasts={$fasts ?? []} trackables={$trackables ?? []} entries={$allEntries ?? []} fields={$allFields ?? []} />
   </div>
+
+  <YearInReview fasts={$fasts ?? []} trackables={$trackables ?? []} entries={$allEntries ?? []} />
 
   <div class="flex items-center justify-between">
     <h2 class="text-base font-semibold text-text">Compare</h2>

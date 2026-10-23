@@ -70,8 +70,8 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
 - **Three tabs:** Fasting (Timer, Journey, History), Trackables (List,
   Dates) and Insights, with each tab's pages switched at the top of the page
   on a phone and listed in the sidebar on a laptop. Insights opens with an
-  overview of fasting and every trackable and the clearest patterns, then a
-  table to compare any of them.
+  overview of fasting and every trackable, the clearest patterns and a year
+  in review, then a table to compare any of them.
 - **Tables first:** Insights, Journey and each trackable show rows per
   day, week or month with a 7-day rolling average or change vs the previous
   period, an Avg / Change / Per-week trend footer, and a Copy button that puts

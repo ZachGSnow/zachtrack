@@ -719,6 +719,14 @@ logged and without a goal; Patterns gathers the first five "By weekday" and
 "On days with" lines across trackables. Each line links to its page. The
 compare table and chart follow under Compare, unchanged.
 
+Year in review (v1.14.0, `utils/yearReview.ts`, `YearInReview.svelte`) sits
+between them: for this year so far or one of the last four with data,
+finished fasts and how many met their goal, hours and days fasted, the
+longest fast and the longest run of goal days inside the year, entries and
+days logged (dates trackables left out, since their entries are dates rather
+than things done), the busiest month, and the three trackables logged on
+the most days.
+
 ### 3.21 Trackables list: pin, archive, order; tag filters
 - **Sort** (per device, `zachtrack:trackables-view`): Due first (goal
   urgency from 3.18: overdue, then due, then the rest, then trackables
