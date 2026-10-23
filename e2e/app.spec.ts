@@ -454,3 +454,39 @@ test('on a laptop the trackable page puts its history beside the summary, and Tr
   expect((await history.boundingBox())!.x).toBeGreaterThan((await summary.boundingBox())!.x + 300);
   expect(problems).toEqual([]);
 });
+
+test('times-per-day counts taps on the card, and a day can be skipped from the grid', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await mockSync(page, noServer);
+  await importSampleData(page);
+  await page.goto('/#/trackables');
+  await page.getByRole('link', { name: /Male Health/ }).click();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.getByRole('combobox', { name: /^Goal/ }).selectOption('perDay');
+  await page.getByRole('textbox', { name: 'Times per day' }).fill('2');
+  await expect(page.getByRole('group', { name: 'Goal days' })).toBeVisible();
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.getByText('Goal: 2 times a day')).toBeVisible();
+
+  await page.goto('/#/trackables');
+  await page.getByRole('button', { name: 'Log one Male Health (0 of 2 today)' }).click();
+  await page.getByRole('button', { name: 'Log one Male Health (1 of 2 today)' }).click();
+  const done = page.getByRole('button', { name: 'Uncheck Male Health for today' });
+  await expect(done).toHaveAttribute('aria-pressed', 'true');
+  await done.click();
+  await expect(page.getByRole('button', { name: 'Log one Male Health (1 of 2 today)' })).toBeVisible();
+
+  // Skip today from the grid's day panel (the trackable was created today), then unskip it.
+  await page.getByRole('link', { name: /Male Health/ }).click();
+  const panel = page.locator('div.rounded-2xl', { has: page.getByText('History', { exact: true }) }).first();
+  await panel.getByRole('button', { name: '6 mo' }).click();
+  const label = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  await page.getByRole('group', { name: 'Days' }).getByRole('button', { name: new RegExp(`^${label},`) }).click();
+  await page.getByRole('button', { name: 'Skip this day' }).click();
+  await expect(page.getByRole('button', { name: 'Unskip this day' })).toBeVisible();
+  // Today no longer needs its second time: the goal says so, and the streak won't break.
+  await expect(page.getByText('Skipped today', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Unskip this day' }).click();
+  await expect(page.getByRole('button', { name: 'Skip this day' })).toBeVisible();
+  expect(problems).toEqual([]);
+});

@@ -99,3 +99,47 @@ describe('avoid', () => {
     expect(goalCardLine(s, 'avoid', 'ignored')).toMatch(/^2d since last . best 14d$/);
   });
 });
+
+describe('times per day', () => {
+  const goal = { goalType: 'perDay' as const, goalValue: 3 };
+
+  it('counts entries today and days met in a row', () => {
+    const entries = logs(oct(19, 8), oct(19, 12), oct(19, 18), oct(20, 8), oct(20, 9), oct(20, 10), oct(21, 8));
+    const s = goalStatus(goal, entries, [], oct(21, 12))!;
+    expect(s).toMatchObject({ text: '1 of 3 today', state: 'progress', streak: '2 days met' });
+    expect(s.progress).toBeCloseTo(1 / 3);
+    expect(describeGoal(goal, [])).toBe('3 times a day');
+    expect(describeGoal({ goalType: 'perDay', goalValue: 1 }, [])).toBe('Once a day');
+  });
+});
+
+describe('schedules, skipped days and pausing', () => {
+  // Mon/Wed/Fri only. 2026-10-19 is a Monday.
+  const goal = { goalType: 'perDay' as const, goalValue: 1, scheduleDays: [0, 2, 4] };
+
+  it('says the schedule in words', () => {
+    expect(describeGoal(goal, [])).toBe('Once a day on Mon, Wed, Fri');
+  });
+
+  it("lets rest days pass without breaking the streak, and calls today a rest day", () => {
+    const s = goalStatus(goal, logs(oct(12), oct(14), oct(16), oct(19), oct(21)), [], oct(22, 12))!;
+    expect(s).toMatchObject({ text: 'Rest day', state: 'ok', streak: '5 days met' });
+  });
+
+  it('a missed scheduled day still breaks it', () => {
+    expect(goalStatus(goal, logs(oct(12), oct(16), oct(19)), [], oct(20, 12))!.streak).toBe('2 days met');
+  });
+
+  it('a skipped day keeps the streak going', () => {
+    const daily = { goalType: 'perDay' as const, goalValue: 1 };
+    const entries = logs(oct(18), oct(20), oct(21));
+    expect(goalStatus(daily, entries, [], oct(21, 20))!.streak).toBe('2 days met');
+    expect(goalStatus({ ...daily, skipDays: ['2026-10-19'] }, entries, [], oct(21, 20))!.streak).toBe('3 days met');
+  });
+
+  it('while paused nothing is due', () => {
+    const paused = { goalType: 'everyDays' as const, goalValue: 2, pausedUntil: new Date(2026, 9, 25).getTime() };
+    expect(goalStatus(paused, logs(oct(1)), [], oct(22))).toMatchObject({ text: 'Paused until Oct 25', state: 'ok' });
+    expect(goalStatus(paused, logs(oct(1)), [], oct(26))!.state).toBe('overdue');
+  });
+});

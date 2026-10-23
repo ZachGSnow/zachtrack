@@ -46,6 +46,8 @@
   function fill(d: GridDay): string {
     if (d.future) return 'transparent';
     if (d.outside) return 'color-mix(in srgb, var(--color-surface-2) 45%, transparent)';
+    // Rest, skipped and paused days aren't misses: drawn hollow.
+    if (d.off && d.level <= 0) return 'transparent';
     // An every-N-days goal fell overdue: a quiet red tint (an outline turned an every-day goal into a wall of boxes).
     if (d.level <= 0) return d.missed ? 'color-mix(in srgb, #f87171 30%, var(--color-surface-2))' : 'var(--color-surface-2)';
     return `color-mix(in srgb, ${color} ${Math.round(30 + 70 * d.level)}%, var(--color-surface-2))`;
@@ -55,6 +57,7 @@
     const parts = [formatShortDate(d.day), d.count === 0 ? 'nothing logged' : `${d.count} ${d.count === 1 ? 'entry' : 'entries'}`];
     if (d.level > 0 && d.level < 1) parts.push(`${Math.round(d.level * 100)}% of goal`);
     if (d.missed) parts.push('overdue');
+    if (d.off) parts.push(d.off === 'rest' ? 'rest day' : d.off);
     if (d.isToday) parts.push('today');
     return parts.join(', ');
   }
@@ -95,7 +98,7 @@
         <button
           type="button"
           class="cell"
-          style="background: {fill(d)}; {d.isToday ? 'outline: 1.5px solid var(--color-text-muted); outline-offset: 1px;' : ''}"
+          style="background: {fill(d)}; {d.off && d.level <= 0 && !d.outside ? 'box-shadow: inset 0 0 0 1px var(--color-border);' : ''} {d.isToday ? 'outline: 1.5px solid var(--color-text-muted); outline-offset: 1px;' : ''}"
           aria-label={describe(d)}
           title={describe(d)}
           onclick={() => onSelect(d)}
@@ -105,7 +108,7 @@
       {:else}
         <span
           class="cell"
-          style="background: {fill(d)}; {d.isToday ? 'outline: 1.5px solid var(--color-text-muted); outline-offset: 1px;' : ''}"
+          style="background: {fill(d)}; {d.off && d.level <= 0 && !d.outside ? 'box-shadow: inset 0 0 0 1px var(--color-border);' : ''} {d.isToday ? 'outline: 1.5px solid var(--color-text-muted); outline-offset: 1px;' : ''}"
           title={d.outside ? undefined : describe(d)}
         >
           {#if dayNumbers && !d.outside}<span class:dark={d.level >= 0.5}>{new Date(d.day).getDate()}</span>{/if}

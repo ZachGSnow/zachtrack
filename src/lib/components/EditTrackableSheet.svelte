@@ -21,12 +21,14 @@
     type TrackableKind,
   } from '../utils/trackableKinds';
 
-  import { GOAL_LABELS, GOAL_TYPES, goalField } from '../utils/trackableGoals';
+  import { DAILY_GOALS, GOAL_LABELS, GOAL_TYPES, goalField, WEEKDAY_NAMES } from '../utils/trackableGoals';
+  import { fromDateInputValue, toDateInputValue } from '../utils/time';
 
   const KINDS: TrackableKind[] = ['event', 'measurement', 'daily', 'checkin', 'ages'];
 
   const GOAL_HINTS: Record<TrackableGoalType, string> = {
     dailyTotal: 'Adds up the first number field each day, like Calories or Water.',
+    perDay: 'Counts each entry today; without fields, each tap of the check button is one.',
     perWeek: 'Counts the days you log it, Monday to Sunday.',
     everyDays: 'Due again that many days after the last entry; shows when it is due or overdue.',
     avoid: 'For things you want to do less: the time since it last happened is the streak.',
@@ -67,6 +69,9 @@
   let goalType = $state<TrackableGoalType | ''>('');
   let goalValueDraft = $state('');
   let pinned = $state(false);
+  /** Weekdays a daily goal applies, 0 = Monday; all seven = every day. */
+  let scheduleDays = $state<number[]>([0, 1, 2, 3, 4, 5, 6]);
+  let pausedUntilDraft = $state('');
   let error = $state('');
 
   let showNewField = $state(false);
@@ -86,6 +91,8 @@
     goalType = trackable?.goalType ?? '';
     goalValueDraft = trackable?.goalValue?.toString() ?? '';
     pinned = trackable?.pinned ?? false;
+    scheduleDays = trackable?.scheduleDays?.length ? [...trackable.scheduleDays] : [0, 1, 2, 3, 4, 5, 6];
+    pausedUntilDraft = trackable?.pausedUntil ? toDateInputValue(trackable.pausedUntil) : '';
     error = '';
     editingFieldId = null;
     showNewField = false;
@@ -101,6 +108,7 @@
   );
   const goalValueLabel = $derived.by(() => {
     if (goalType === 'perWeek') return 'Times per week';
+    if (goalType === 'perDay') return 'Times per day';
     if (goalType === 'everyDays') return 'Every how many days';
     const f = goalField(attachedFields);
     return f ? `${f.name} per day${f.unit ? ` (${f.unit})` : ''}` : 'Amount per day';
@@ -207,6 +215,10 @@
         error = wholeNumber ? 'Enter the goal as a whole number above 0.' : 'Enter the goal as a number above 0.';
         return;
       }
+      if (goalType && DAILY_GOALS.includes(goalType) && scheduleDays.length === 0) {
+        error = 'Pick at least one day the goal applies.';
+        return;
+      }
       if (goalType === 'perWeek' && goalValue > 7) {
         error = 'A week has 7 days, so the goal can be at most 7 times a week.';
         return;
@@ -225,6 +237,8 @@
       goalType: goalType || undefined,
       goalValue,
       pinned: pinned || undefined,
+      scheduleDays: goalType && DAILY_GOALS.includes(goalType) && scheduleDays.length < 7 ? [...scheduleDays].sort((a, b) => a - b) : undefined,
+      pausedUntil: goalType && pausedUntilDraft ? fromDateInputValue(pausedUntilDraft) : undefined,
     };
     try {
       if (trackable) {
@@ -349,6 +363,42 @@
       {/if}
       {#if goalType}
         <p class="text-xs text-text-muted">{GOAL_HINTS[goalType]}</p>
+      {/if}
+      {#if goalType && DAILY_GOALS.includes(goalType)}
+        <div>
+          <p class="mb-1 text-sm text-text-muted">On these days</p>
+          <div class="flex gap-1" role="group" aria-label="Goal days">
+            {#each WEEKDAY_NAMES as name, i (name)}
+              <button
+                type="button"
+                class="flex-1 rounded-lg border py-1.5 text-xs font-medium"
+                style={scheduleDays.includes(i)
+                  ? 'background: var(--color-brand); color: #06140c; border-color: var(--color-brand);'
+                  : 'border-color: var(--color-border); color: var(--color-text-muted);'}
+                aria-pressed={scheduleDays.includes(i)}
+                onclick={() => (scheduleDays = scheduleDays.includes(i) ? scheduleDays.filter((d) => d !== i) : [...scheduleDays, i])}
+              >{name}</button>
+            {/each}
+          </div>
+          <p class="mt-1 text-xs text-text-muted">Other days are rest days: they don't break the streak.</p>
+        </div>
+      {/if}
+      {#if goalType && goalType !== 'avoid'}
+        <label class="block text-sm">
+          <span class="mb-1 block text-text-muted">Paused until (optional)</span>
+          <div class="flex gap-2">
+            <input
+              type="date"
+              bind:value={pausedUntilDraft}
+              class="flex-1 rounded-lg border bg-transparent p-2 text-text"
+              style="border-color: var(--color-border); color-scheme: dark;"
+            />
+            {#if pausedUntilDraft}
+              <button type="button" class="rounded-lg border px-3 text-sm text-text-muted" style="border-color: var(--color-border);" onclick={() => (pausedUntilDraft = '')}>Clear</button>
+            {/if}
+          </div>
+          <span class="mt-1 block text-xs text-text-muted">For a holiday or a sick week: nothing is due, and the streak waits.</span>
+        </label>
       {/if}
     </div>
   {/if}

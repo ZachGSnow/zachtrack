@@ -1,5 +1,6 @@
 <script lang="ts">
-  import type { FieldDefinition, TrackableDefinition, TrackableEntry } from '../db';
+  import { updateTrackable, type FieldDefinition, type TrackableDefinition, type TrackableEntry } from '../db';
+  import { isoDay } from '../utils/trackableGoals';
   import { habitGridMonth, habitGridWeeks, type GridDay } from '../utils/habitGrid';
   import { formatClockTime, startOfDay } from '../utils/time';
   import { loadPrefs, oneOf, savePrefs } from '../utils/prefs';
@@ -73,6 +74,17 @@
     return parts.join(' \u00b7 ') || 'Logged';
   }
 
+  const selectedSkipped = $derived(selected ? (trackable.skipDays ?? []).includes(isoDay(selected.day)) : false);
+
+  /** Skipping a day keeps a streak going over it (sick, travelling); unskipping puts it back. */
+  async function toggleSkip() {
+    if (!selected) return;
+    const key = isoDay(selected.day);
+    const current = trackable.skipDays ?? [];
+    const next = current.includes(key) ? current.filter((d) => d !== key) : [...current, key];
+    await updateTrackable(trackable.id, { skipDays: next.length ? next : undefined });
+  }
+
   function addForSelected() {
     if (!selected) return;
     // Today: now. An earlier day: midday, so it lands on that date whatever the time zone does.
@@ -120,9 +132,16 @@
           {/each}
         </ul>
       {/if}
-      <button class="mt-2 text-xs font-semibold" style="color: var(--color-brand);" onclick={addForSelected}>
-        + Add an entry for this day
-      </button>
+      <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+        <button class="text-xs font-semibold" style="color: var(--color-brand);" onclick={addForSelected}>
+          + Add an entry for this day
+        </button>
+        {#if trackable.goalType && trackable.goalType !== 'avoid'}
+          <button class="text-xs text-text-muted hover:text-text" onclick={toggleSkip}>
+            {selectedSkipped ? 'Unskip this day' : 'Skip this day'}
+          </button>
+        {/if}
+      </div>
     </div>
   {/if}
 </div>

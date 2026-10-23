@@ -87,13 +87,21 @@ const checks: Record<Exclude<RecordKind, 'tombstones'>, Check> = {
       optional(
         r,
         'goalType',
-        (v) => typeof v === 'string' && ['dailyTotal', 'perWeek', 'everyDays', 'avoid'].includes(v),
-        "'dailyTotal', 'perWeek', 'everyDays' or 'avoid'",
+        (v) => typeof v === 'string' && ['dailyTotal', 'perDay', 'perWeek', 'everyDays', 'avoid'].includes(v),
+        "'dailyTotal', 'perDay', 'perWeek', 'everyDays' or 'avoid'",
       ),
       optional(r, 'goalValue', (v) => isNum(v) && v > 0, 'a positive number'),
       optional(r, 'pinned', (v) => typeof v === 'boolean', 'a boolean'),
       optional(r, 'archived', (v) => typeof v === 'boolean', 'a boolean'),
       optional(r, 'sortOrder', isNum, 'a number'),
+      optional(
+        r,
+        'scheduleDays',
+        (v) => Array.isArray(v) && v.length <= 7 && v.every((d) => Number.isInteger(d) && d >= 0 && d <= 6),
+        'a list of weekdays 0 to 6',
+      ),
+      optional(r, 'skipDays', (v) => Array.isArray(v) && v.length <= 2000 && v.every((d) => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)), 'a list of YYYY-MM-DD dates'),
+      optional(r, 'pausedUntil', isNum, 'a number'),
     ),
   trackableEntries: (r) =>
     all(
