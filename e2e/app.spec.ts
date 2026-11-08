@@ -649,7 +649,7 @@ test('Help opens from the header and from the question marks next to settings th
   await page.getByRole('link', { name: 'Help', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Help', level: 1 })).toBeVisible();
   const topics = page.getByRole('navigation', { name: 'Help topics' }).getByRole('link');
-  await expect(topics).toHaveCount(13);
+  await expect(topics).toHaveCount(14);
   for (const title of await topics.allTextContents()) {
     await expect(page.getByRole('heading', { name: title, level: 2 })).toHaveCount(1);
   }
@@ -1134,5 +1134,60 @@ test('weigh-ins import from a scale app CSV, leaving out days already logged', a
   await expect(section).toContainText('Nothing new');
   await page.goto('/#/trackables');
   await expect(page.getByRole('link', { name: /Body Measurements/ })).toContainText('191.6 lb');
+  expect(problems).toEqual([]);
+});
+
+test('on a laptop, single keys move between pages, W opens a weigh-in and ? lists them', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await mockSync(page, noServer);
+  await waitForStarterSet(page);
+  await page.goto('/#/');
+  await expect(page.getByRole('heading', { name: 'Today', level: 1 })).toBeVisible();
+
+  await page.keyboard.press('i');
+  await expect.poll(() => new URL(page.url()).hash).toBe('#/insights');
+  await page.keyboard.press('D');
+  await expect.poll(() => new URL(page.url()).hash).toBe('#/dates');
+
+  await page.keyboard.press('?');
+  const sheet = page.getByRole('dialog');
+  await expect(sheet.getByRole('heading', { name: 'Keyboard shortcuts' })).toBeVisible();
+  await expect(sheet.getByRole('list', { name: 'Keyboard shortcuts' }).getByRole('listitem')).toHaveCount(10);
+  await page.keyboard.press('Escape');
+  await expect(sheet).toHaveCount(0);
+
+  // Typing in a box isn't a shortcut.
+  await page.keyboard.press('s');
+  await expect.poll(() => new URL(page.url()).hash).toBe('#/settings');
+  const box = page.getByRole('textbox').first();
+  await box.click();
+  await page.keyboard.press('t');
+  await expect.poll(() => new URL(page.url()).hash).toBe('#/settings');
+  await box.blur();
+
+  await page.keyboard.press('w');
+  await expect.poll(() => new URL(page.url()).hash).toBe('#/');
+  await expect(page.getByRole('dialog').getByRole('heading', { name: /Body Measurements/ })).toBeVisible();
+  expect(problems).toEqual([]);
+});
+
+test('past days fill in from one table on a trackable page', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await mockSync(page, noServer);
+  await waitForStarterSet(page);
+  await page.goto('/#/trackables');
+  await page.getByRole('link', { name: /Body Measurements/ }).first().click();
+  await page.getByText('Fill in past days').click();
+  const table = page.getByRole('table', { name: 'Fill in past days for Body Measurements' });
+  // The header, then today, then yesterday and so on.
+  await expect(table.getByRole('row')).toHaveCount(8);
+  await table.getByRole('row').nth(2).getByRole('textbox', { name: /^Weight,/ }).fill('182.2');
+  await table.getByRole('row').nth(3).getByRole('textbox', { name: /^Weight,/ }).fill('182.6');
+  await table.getByRole('row').nth(4).getByRole('textbox', { name: /^Weight,/ }).fill('heavy');
+  await expect(page.getByRole('alert')).toContainText("won't be saved");
+  await page.getByRole('button', { name: 'Save 2 entries' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Added 2 entries.' })).toBeVisible();
+  await expect(table.getByRole('row').nth(2)).toContainText('1 already');
+  await expect(table.getByRole('row').nth(3)).toContainText('1 already');
   expect(problems).toEqual([]);
 });

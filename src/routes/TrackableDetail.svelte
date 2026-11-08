@@ -36,6 +36,7 @@
   import IntervalTrendChart from '../lib/components/charts/IntervalTrendChart.svelte';
   import HabitHistory from '../lib/components/HabitHistory.svelte';
   import HelpLink from '../lib/components/HelpLink.svelte';
+  import BackfillGrid from '../lib/components/BackfillGrid.svelte';
   import TrackableFieldsChart from '../lib/components/charts/TrackableFieldsChart.svelte';
 
   let { params }: { params: { id: string } } = $props();
@@ -444,6 +445,8 @@
             <OccurrenceBucketChart entries={$entries ?? []} {range} color={$trackable.color} />
             <IntervalTrendChart entries={$entries ?? []} color={$trackable.color} />
           {/if}
+
+          <BackfillGrid trackable={$trackable} fields={attachedFields} entries={$entries ?? []} />
 
           <TagFilter items={$entries ?? []} bind:selected={tagFilter} />
           <EntriesTable entries={listedEntries} fields={attachedFields} onSelect={openLogEdit} />

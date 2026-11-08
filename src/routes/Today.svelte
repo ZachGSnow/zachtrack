@@ -13,6 +13,7 @@
   import InlineLog from '../lib/components/InlineLog.svelte';
   import { takeShortcut } from '../lib/utils/shortcuts';
   import { resolveBodyFieldIds } from '../lib/utils/health';
+  import { weighInHolder } from '../lib/weighIn';
   import { loadPrefs, savePrefs } from '../lib/utils/prefs';
   import { settingsStore } from '../lib/stores/settings.svelte';
   import Button from '../lib/components/ui/Button.svelte';
@@ -117,8 +118,7 @@
     if (shortcutChecked || $trackables === undefined || $allFields === undefined || !settingsStore.ready) return;
     shortcutChecked = true;
     if (!takeShortcut('log-weight')) return;
-    const weightId = resolveBodyFieldIds($allFields, settingsStore.data).weight;
-    const holder = weightId ? $trackables.filter((t) => t.fieldIds.includes(weightId)).sort((a, b) => Number(!!a.archived) - Number(!!b.archived))[0] : undefined;
+    const holder = weighInHolder($trackables, $allFields, settingsStore.data);
     if (holder) void quickLog.log(holder);
   });
 

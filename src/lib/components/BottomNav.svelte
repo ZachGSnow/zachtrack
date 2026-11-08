@@ -79,6 +79,7 @@
       <Settings size={20} aria-hidden="true" />
       <span>Settings</span>
     </a>
+    <p class="px-3 pt-1 text-xs text-text-muted">Press <kbd class="rounded border border-border bg-surface-2 px-1 font-mono">?</kbd> for keyboard shortcuts</p>
   </nav>
 {:else}
   <nav class="sticky bottom-0 z-10 flex justify-around border-t border-border bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden" aria-label="Main">
