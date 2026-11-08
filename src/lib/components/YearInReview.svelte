@@ -9,7 +9,7 @@
   let { fasts, trackables, entries }: { fasts: FastRecord[]; trackables: TrackableDefinition[]; entries: TrackableEntry[] } = $props();
 
   const now = Date.now();
-  const years = $derived(reviewYears(fasts, entries, now).slice(0, 4));
+  const years = $derived(reviewYears(fasts, trackables, entries, now).slice(0, 4));
   // The switcher works in strings; the year is a number.
   let year = $state(String(new Date(now).getFullYear()));
   const options = $derived(years.map((y) => ({ id: String(y), label: String(y) })));

@@ -37,11 +37,21 @@ export interface YearReview {
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-/** The years with any fast or entry, newest first, always including the current year. */
-export function reviewYears(fasts: readonly Fast[], entries: readonly Entry[], now: number): number[] {
+/** The trackables whose entries count as logging. Dates trackables are left out: their entries are dates, not things done. */
+function countedTrackables(trackables: readonly Trackable[]): Set<string> {
+  return new Set(trackables.filter((t) => t.displayMode !== 'ages').map((t) => t.id));
+}
+
+/**
+ * The years with any fast or entry, newest first, always including the current
+ * year. Entries of dates trackables don't count, so a birthday in 1990 doesn't
+ * offer a 1990 review.
+ */
+export function reviewYears(fasts: readonly Fast[], trackables: readonly Trackable[], entries: readonly Entry[], now: number): number[] {
   const years = new Set<number>([new Date(now).getFullYear()]);
+  const counted = countedTrackables(trackables);
   for (const f of fasts) if (f.startTime <= now) years.add(new Date(f.startTime).getFullYear());
-  for (const e of entries) if (e.timestamp <= now) years.add(new Date(e.timestamp).getFullYear());
+  for (const e of entries) if (counted.has(e.trackableId) && e.timestamp <= now) years.add(new Date(e.timestamp).getFullYear());
   return [...years].sort((a, b) => b - a);
 }
 
@@ -73,7 +83,7 @@ export function yearReview(
   const fastDays = new Set(finished.map((f) => startOfDay(f.startTime)));
   const goalDays = new Set(goalFasts.map((f) => startOfDay(f.startTime)));
 
-  const counted = new Set(trackables.filter((t) => t.displayMode !== 'ages').map((t) => t.id));
+  const counted = countedTrackables(trackables);
   const logged = entries.filter((e) => counted.has(e.trackableId) && inYear(e.timestamp));
   const daysByTrackable = new Map<string, Set<number>>();
   for (const e of logged) {

@@ -5,6 +5,12 @@ import { defineConfig, devices } from '@playwright/test';
 // all in play. See e2e/README.md.
 const PORT = 8789;
 
+// The tests work out "today" and "yesterday" with Node's clock, and the browser
+// runs in America/New_York (below), so the runner uses the same zone. Without
+// this, CI (UTC) is a day ahead of the browser after 7 PM Eastern and the grid
+// tests look for a day the app doesn't show yet. Same as vitest.config.ts.
+process.env.TZ = 'America/New_York';
+
 export default defineConfig({
   testDir: 'e2e',
   fullyParallel: false,

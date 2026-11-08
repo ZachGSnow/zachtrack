@@ -16,8 +16,14 @@ const entry = (trackableId: string, timestamp: number) => ({ trackableId, timest
 
 describe('year in review', () => {
   it('lists years with data, newest first, with this year always there', () => {
-    expect(reviewYears([fast(d(2024, 5, 1), 16)], [entry('water', d(2025, 1, 2))], NOW)).toEqual([2026, 2025, 2024]);
-    expect(reviewYears([], [], NOW)).toEqual([2026]);
+    expect(reviewYears([fast(d(2024, 5, 1), 16)], trackables, [entry('water', d(2025, 1, 2))], NOW)).toEqual([2026, 2025, 2024]);
+    expect(reviewYears([], trackables, [], NOW)).toEqual([2026]);
+  });
+
+  it('does not list a year that only has dates, since their entries are dates rather than things done', () => {
+    // A birthday in 2010 and one in 2024, with real logging only in 2025.
+    const entries = [entry('bdays', d(2010, 3, 17)), entry('bdays', d(2024, 2, 24)), entry('water', d(2025, 1, 2))];
+    expect(reviewYears([], trackables, entries, NOW)).toEqual([2026, 2025]);
   });
 
   it('sums the fasts that started in the year, with the longest goal streak inside it', () => {
