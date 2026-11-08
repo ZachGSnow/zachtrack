@@ -14,7 +14,7 @@
   import { settingsStore } from './lib/stores/settings.svelte';
   import { syncStore } from './lib/stores/sync.svelte';
   import { attentionStore } from './lib/stores/attention.svelte';
-  import { seedDefaultTrackablesIfEmpty } from './lib/db';
+  import { starterStore } from './lib/stores/starter.svelte';
   import ZoneInfoSheet from './lib/components/ZoneInfoSheet.svelte';
   import SyncStatus from './lib/components/SyncStatus.svelte';
 
@@ -40,16 +40,16 @@
     fastTimer.init();
     settingsStore.init();
     attentionStore.init();
-    // Try an initial sync pull before seeding defaults, so a second device
-    // picks up trackables/fields another device already created and synced,
-    // instead of generating its own duplicate default set. If the server is
-    // there but unreachable right now, wait for the first successful sync.
+    // Try an initial sync pull before offering the starter set, so a second
+    // device picks up trackables/fields another device already created and
+    // synced instead of being offered a duplicate set. If the server is there
+    // but unreachable right now, wait for the first successful sync.
     (async () => {
       const outcome = await syncStore.init();
       if (outcome === 'failed') {
-        syncStore.onceSynced(() => void seedDefaultTrackablesIfEmpty());
+        syncStore.onceSynced(() => void starterStore.offer());
       } else {
-        await seedDefaultTrackablesIfEmpty();
+        await starterStore.offer();
       }
     })();
   });

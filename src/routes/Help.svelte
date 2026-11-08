@@ -35,10 +35,10 @@
 <div class="mx-auto flex w-full flex-1 flex-col gap-6 px-5 py-6 lg:max-w-3xl">
   <h1 class="text-xl font-semibold text-text">Help</h1>
 
-  <nav aria-label="Help topics" class="rounded-2xl border p-4" style="border-color: var(--color-border); background: var(--color-surface);">
+  <nav aria-label="Help topics" class="rounded-2xl border p-4 border-border bg-surface">
     <ul class="grid gap-1 text-sm sm:grid-cols-2">
       {#each TOPICS as t (t.id)}
-        <li><a href="/help/{t.id}" use:link class="hover:underline" style="color: var(--color-brand);">{t.title}</a></li>
+        <li><a href="/help/{t.id}" use:link class="hover:underline text-brand">{t.title}</a></li>
       {/each}
     </ul>
   </nav>
@@ -59,6 +59,10 @@
         <li>
           <strong>Start a fast.</strong> On Fasting, pick a method (16:8 and so on, or "+ Your own" for a length of your own) and
           tap Start Fast. Tap the time to correct when it started.
+        </li>
+        <li>
+          <strong>Pick a starting set.</strong> A fresh install offers eight starter trackables (Body Measurements, Sleep, Wellness
+          Check-in and so on). Keep the ones you will log, or start empty; "+ New" adds more any time.
         </li>
         <li>
           <strong>Track something.</strong> On Trackables, tap "+ New" and pick a template (Water, Workout, Weigh-in...) or make
@@ -234,7 +238,9 @@
       <p>
         The ring fills toward your fast's target and the markers are metabolic zones; tap one, or a zone card, to read about
         it. Under the timer: when the fast started, when the goal is and how long is left, and the next zone. One fast per
-        start day.
+        start day. This week sits under it as a dot per day: filled for a goal fast, half for one that fell short, hollow
+        for a rest day. Between fasts the zones wait behind "About the zones", and after a fortnight without a goal fast a
+        card sums up your year and offers a shorter method to come back with.
       </p>
       <ul>
         <li><strong>Forgot to start?</strong> Under Started, pick 30m, 1h or 2h ago, or a time, before Start Fast. Tap the timer to correct the start later.</li>

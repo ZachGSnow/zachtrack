@@ -73,11 +73,17 @@ export async function openSettings(page: Page) {
   await expect(page.getByRole('heading', { name: 'Settings', level: 1 })).toBeVisible();
 }
 
-/** Waits for a fresh install's starter trackables (created once the first sync attempt settles). */
+/** Takes a fresh install's whole starter set from the picker it shows once the first sync attempt settles. */
 export async function waitForStarterSet(page: Page) {
   await page.goto('/#/trackables');
-  await expect(page.getByText('Body Measurements')).toBeVisible();
-  await expect(page.getByText('Wellness Check-in')).toBeVisible();
+  // A test may already have taken the set: then the list shows it and there is no picker.
+  const add = page.getByRole('button', { name: 'Add 8 trackables' });
+  await expect(add.or(page.getByRole('link', { name: /Body Measurements/ })).first()).toBeVisible();
+  if (await add.isVisible()) await add.click();
+  // The picker names the trackables too, so wait for it to go and the list to show them.
+  await expect(page.getByRole('region', { name: 'What do you want to track?' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: /Body Measurements/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Wellness Check-in/ })).toBeVisible();
 }
 
 /** Imports fictional sample data through the real Settings > Import file flow. */

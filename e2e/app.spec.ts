@@ -5,7 +5,7 @@ import { importSampleData, loginExpired, openSettings, mockSync, noServer, okSyn
 // so the sync responses can be faked; service-worker.spec.ts runs with it.
 test.use({ serviceWorkers: 'block' });
 
-test('a fresh install with no sync server is local-only and creates the starter trackables', async ({ page }) => {
+test('a fresh install with no sync server is local-only and offers the starter trackables', async ({ page }) => {
   const problems = watchForProblems(page);
   await mockSync(page, noServer);
   await waitForStarterSet(page);
@@ -782,5 +782,76 @@ test('Today starts a fast in one tap with today\'s method', async ({ page }) => 
   await expect(fasting).toContainText('Fasting · 16:8');
   await expect(fasting.getByRole('progressbar', { name: 'Progress to goal' })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Habits' })).toContainText('No goals yet');
+  expect(problems).toEqual([]);
+});
+
+test('a fresh install offers the starter set and keeps only what you pick', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await mockSync(page, noServer);
+  await page.goto('/#/trackables');
+  const picker = page.getByRole('region', { name: 'What do you want to track?' });
+  await expect(picker.getByRole('checkbox')).toHaveCount(8);
+  for (const name of ['Body Measurements', 'Vitals', 'Nutrition', 'Wellness Check-in', 'Activity', 'Menstrual Cycle']) {
+    await picker.getByRole('checkbox', { name: new RegExp(`^${name}`) }).uncheck();
+  }
+  await picker.getByRole('button', { name: 'Add 2 trackables' }).click();
+  await expect(page.getByText('Sleep', { exact: true })).toBeVisible();
+  await expect(page.getByText('Male Health', { exact: true })).toBeVisible();
+  await expect(page.getByText('Body Measurements')).toHaveCount(0);
+  await expect(picker).toHaveCount(0);
+  // Only the fields those two need were made.
+  const defs = await readStarterDefinitions(page);
+  expect(defs.fields.map((f: { name: string }) => f.name).sort()).toEqual(['Sleep Hours', 'Sleep Quality']);
+  expect(problems).toEqual([]);
+});
+
+test('Start empty leaves a fresh install without trackables and does not ask again', async ({ page }) => {
+  await mockSync(page, noServer);
+  await page.goto('/#/trackables');
+  await page.getByRole('button', { name: 'Start empty' }).click();
+  await expect(page.getByText('No trackables yet')).toBeVisible();
+  await page.reload();
+  await expect(page.getByText('No trackables yet')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Start empty' })).toHaveCount(0);
+});
+
+test('a trackable unlogged for six weeks is offered for archiving, and Not now snoozes the offer', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await mockSync(page, noServer);
+  await waitForStarterSet(page);
+  // Nothing is quiet on day one.
+  await expect(page.getByRole('region', { name: 'Quiet trackables' })).toHaveCount(0);
+
+  // One Vitals entry, 60 days ago, and nothing since.
+  await page.getByRole('link', { name: /Vitals/ }).click();
+  await page.getByRole('button', { name: 'Log Entry' }).click();
+  const when = new Date();
+  when.setDate(when.getDate() - 60);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  await page.getByLabel('Date & time').fill(`${when.getFullYear()}-${pad(when.getMonth() + 1)}-${pad(when.getDate())}T09:00`);
+  await page.getByRole('textbox', { name: 'Systolic BP' }).fill('120');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+
+  await page.goto('/#/trackables');
+  const quiet = page.getByRole('region', { name: 'Quiet trackables' });
+  await expect(quiet).toContainText('Vitals');
+  await expect(quiet).toContainText(/last 2mo ago|last 1mo 30d ago|last 1mo 29d ago/);
+  await quiet.getByRole('button', { name: 'Archive Vitals' }).click();
+  await expect(quiet).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Show archived \(1\)/ })).toBeVisible();
+
+  // Another quiet one, snoozed with Not now, stays hidden after a reload.
+  await page.getByRole('link', { name: /Sleep/ }).click();
+  await page.getByRole('button', { name: 'Log Entry' }).click();
+  await page.getByLabel('Date & time').fill(`${when.getFullYear()}-${pad(when.getMonth() + 1)}-${pad(when.getDate())}T22:00`);
+  await page.getByRole('textbox', { name: 'Sleep Hours (hrs)' }).fill('7');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await page.goto('/#/trackables');
+  await expect(quiet).toContainText('Sleep');
+  await quiet.getByRole('button', { name: 'Not now' }).click();
+  await expect(quiet).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByText('Sleep', { exact: true })).toBeVisible();
+  await expect(quiet).toHaveCount(0);
   expect(problems).toEqual([]);
 });

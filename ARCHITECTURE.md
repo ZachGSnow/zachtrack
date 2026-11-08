@@ -859,6 +859,79 @@ was going.
   gap and slips in 30 and 90 days. Today is counted only once it's met,
   since it is still open.
 
+### 3.44 Less clutter: field pickers, unused fields, quiet trackables, the starter picker (v1.15.0)
+
+Three months of real use had left clutter the app never cleaned up: the
+Body pickers in Settings listed every number field ever made, four times
+over (fields of deleted trackables included); four of the eight starter
+trackables had not been logged in months but still filled the list; and a
+fresh install created all eight whether wanted or not.
+
+- **Field pickers** (`bodyFieldOptions` in `utils/health.ts`): a picker
+  lists the number fields a trackable still uses that fit the role by unit
+  (lb or kg for weight; in, cm or mm for the tape roles) or by name, plus
+  whatever is chosen now even when it doesn't fit, and every number field
+  in use when nothing fits. The name fallback in `resolveBodyField` (3.14)
+  is unchanged.
+- **Unused fields** (`unusedFields`): Settings > Fields lists the fields no
+  trackable uses, with Delete. `deleteFieldDefinition` already tombstones
+  the field for sync; values logged under it stay in their entries, unseen.
+- **Quiet trackables** (`quietTrackables` in `utils/trackableList.ts`):
+  the Trackables list offers to archive active, unpinned, goal-less
+  trackables with nothing logged for 42 days (or never, once that old).
+  Archiving keeps every entry (3.21). "Not now" snoozes the offer for 30
+  days on that device. Habits are left alone: their goal says whether they
+  are being kept.
+- **Starter picker** (`StarterPicker.svelte`, `stores/starter.svelte.ts`):
+  once the first sync has settled with no trackables on the device, the
+  Trackables list offers the eight starter trackables with every box
+  ticked; Add makes the chosen ones (and only the fields they need,
+  `seedStarterTrackables` in `db.ts`), Start empty is remembered per
+  device. The browser tests take the whole set through the picker
+  (`waitForStarterSet`), so the sample data still finds its fields.
+
+### 3.45 Coming back to fasting: the week strip and the restart card (v1.15.0)
+
+The timer was the most complete part of the app and the least used: daily
+18:6 fasts through August, then one in October. Its idle page was a long
+form with the zone reference always open, it showed nothing of the week,
+and nothing eased a restart.
+
+- **This week** (`weekStrip` in `utils/fastingJourney.ts`,
+  `WeekStrip.svelte`): Monday to Sunday under the header, idle or running:
+  a dot per day, filled for a goal fast, half for one that fell short, a
+  ring for the running one, hollow for a rest day in the weekly plan
+  (3.36), faint for a day missed, outlined for today. A day with several
+  fasts takes its best.
+- **Zones** (`ZoneReferenceList`): behind "About the zones" while nothing
+  runs; open as before, with the current zone marked, during a fast.
+- **Pick it back up** (`restartSuggestion`): after RESTART_AFTER_DAYS (14)
+  days without a goal fast, with at least MIN_RESTART_FASTS (3) finished
+  fasts in the last year, a card says how long it has been and what the
+  year looked like (fasts, goal fasts, average length), and offers the
+  longest built-in method at least two hours shorter than the usual one
+  (the median target), or the shortest when the usual one is already
+  short. Its button starts that method now; the picker below is unchanged.
+  Nothing shows while a fast runs or while fasting is going.
+
+### 3.46 The polish pass (v1.15.0)
+
+With the structure settled, the last step of the one-app rework went over
+every screen with the design system from 3.40:
+
+- Inline token styles (the card border and background, the brand button,
+  brand and danger text) became classes (`border-border bg-surface`,
+  `bg-brand text-brand-fg`, `text-brand`), so a screen reads as one system
+  and the theme switch covers it. The few styles that mix a token with a
+  runtime value stay inline.
+- Every colour drawn as text that comes from data (a trackable's colour on
+  its page and the Dates list, a zone's colour on the zone cards and the
+  reference list, the field pills on the chart) goes through
+  `readableText` (3.40), so the light theme never shows pale green on
+  white.
+- Empty states use `EmptyState`, the undo toast slides in, and the README
+  screenshots are recaptured with a Today shot first.
+
 ### 3.21 Trackables list: pin, archive, order; tag filters
 - **Sort** (per device, `zachtrack:trackables-view`): Due first (goal
   urgency from 3.18: overdue, then due, then the rest, then trackables

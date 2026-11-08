@@ -6,6 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 <p>
+  <img src="docs/screenshots/today.png" alt="Today with the running fast, a habit to check, the last seven days and what has been logged" width="200">
   <img src="docs/screenshots/fasting.png" alt="Fasting timer with a 16:8 fast past its goal, its start, goal and next zone, and the current zone" width="200">
   <img src="docs/screenshots/journey.png" alt="Journey with goal streaks, this week against last, and the fasting days grid" width="200">
   <img src="docs/screenshots/trackables.png" alt="Trackables list showing each one's latest value or when it was last logged" width="200">
@@ -35,7 +36,9 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
   notifications. Between fasts the tab shows the eating window, and History
   logs a fast you didn't time. An optional daily start time counts down to
   your next fast, and a weekly plan gives each weekday its own method and
-  time or a rest day. Long fasts get hydration and electrolyte prompts,
+  time or a rest day, and the timer shows this week as a dot per day. After
+  a fortnight without a goal fast, a card sums up the year and offers a
+  shorter method to come back with. Long fasts get hydration and electrolyte prompts,
   cautions at 48 and 72 hours, and refeeding advice when they end. Journey has a goal streak (days a fast met its goal), this
   week against last, a habit grid of fasting days, and a weight-after-fasting
   insight next to the table and charts.
@@ -64,7 +67,7 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
   differs on days with your other trackables, or the day after them (a
   late meal in the next morning's weight).
   A starter set (Body Measurements, Vitals, Nutrition, Sleep, Wellness,
-  Activity, Menstrual Cycle, Male Health) is created on a new install and is
+  Activity, Menstrual Cycle, Male Health) is offered on a new install and is
   fully editable, including each field's name, unit and rating scale.
 - **Dates:** birthdays with live ages, anniversaries, holidays (including
   rules like the 4th Thursday of November, and Easter), and countdowns or
@@ -122,8 +125,8 @@ npm run dev
 ```
 
 Open the printed URL. Without a sync backend the app runs local-only: data
-stays in the browser's IndexedDB, the starter trackables are created on first
-launch, and the sync pill reads "Local only" instead of an error. Export and
+stays in the browser's IndexedDB, the first launch offers a starter set to pick
+from, and the sync pill reads "Local only" instead of an error. Export and
 import (Settings > Your data) move data between local-only installs.
 
 ## Deploy your own (Cloudflare)

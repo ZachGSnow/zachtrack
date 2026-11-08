@@ -140,3 +140,46 @@ export function computeNavyBodyFatByDay(
   }
   return byDay;
 }
+
+// ---------------------------------------------------------------------------
+// The field pickers under Settings > Body (3.44): only fields that could be
+// the role, and only ones a trackable still uses, so a picker lists three or
+// four fields rather than every number field ever made.
+// ---------------------------------------------------------------------------
+
+/** Units that mark a field as a weight, or a length. */
+const WEIGHT_UNITS = new Set(['lb', 'lbs', 'kg', 'kgs', 'pounds', 'kilograms', 'st', 'stone']);
+const LENGTH_UNITS = new Set(['in', 'inch', 'inches', 'cm', 'centimeters', 'centimetres', 'mm']);
+
+/** Whether a number field could serve as `role`, by its unit or its name. */
+export function fitsBodyRole<T extends { name: string; kind: string; unit?: string }>(field: T, role: BodyFieldRole): boolean {
+  if (field.kind !== 'number') return false;
+  const unit = field.unit?.trim().toLowerCase() ?? '';
+  const name = field.name.trim().toLowerCase();
+  if (role === 'weight') return WEIGHT_UNITS.has(unit) || name.includes('weight');
+  return LENGTH_UNITS.has(unit) || name.includes(role);
+}
+
+/**
+ * The fields a picker offers for `role`: number fields a trackable uses that
+ * fit the role by unit or name, plus the one chosen now even when it doesn't.
+ * With none fitting, every number field in use, so a field with an unusual
+ * unit can still be picked.
+ */
+export function bodyFieldOptions<T extends { id: string; name: string; kind: string; unit?: string }>(
+  fields: readonly T[],
+  trackables: readonly { fieldIds: readonly string[]; archived?: boolean }[],
+  role: BodyFieldRole,
+  chosenId: string | undefined,
+): T[] {
+  const used = new Set(trackables.flatMap((t) => t.fieldIds));
+  const inUse = fields.filter((f) => f.kind === 'number' && (used.has(f.id) || f.id === chosenId));
+  const fitting = inUse.filter((f) => fitsBodyRole(f, role) || f.id === chosenId);
+  return fitting.length ? fitting : inUse;
+}
+
+/** Fields no trackable uses, archived ones included: candidates for deleting under Settings. */
+export function unusedFields<T extends { id: string }>(fields: readonly T[], trackables: readonly { fieldIds: readonly string[] }[]): T[] {
+  const used = new Set(trackables.flatMap((t) => t.fieldIds));
+  return fields.filter((f) => !used.has(f.id));
+}
