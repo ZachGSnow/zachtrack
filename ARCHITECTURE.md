@@ -669,8 +669,8 @@ shows in Needs attention (defaults 7, 7, 3 and 30 days).
 `utils/dates.ts` turns that into the next occurrence (`nextOccurrence`, with
 Feb 29 on Feb 28 and month ends clamped), the words for it (`describeDate`:
 "Turns 61", "12th anniversary", "Every 10 years", "in 12 days"), and the
-upcoming list across trackables (`upcomingDates`, with 1,000-day milestones
-for birthdays and anniversaries). Migration `0008_dates.sql` adds the three
+upcoming list across trackables (`upcomingDates`; the 1,000-day milestones it
+once added were removed in v1.18.1 as noise). Migration `0008_dates.sql` adds the three
 columns; `validate.ts` checks each rule's exact shape.
 
 Where dates show:

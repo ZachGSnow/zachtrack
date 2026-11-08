@@ -201,8 +201,6 @@ export interface DateItem {
   detail: string;
   /** How long since the date began: "60 years 11 months" (birthdays and anniversaries). */
   since?: string;
-  /** A round number of days (every 1,000), not the date itself. */
-  milestone?: boolean;
   /** The entry's notes (gift ideas, sizes), when it has any. */
   details?: string;
 }
@@ -243,31 +241,6 @@ export function describeDate(trackable: DatesTrackable, entry: DateEntry, now: n
   };
 }
 
-/** Every 1,000 days of a birthday or anniversary falling within `withinDays`: "10,000 days old". */
-function milestones(trackable: DatesTrackable, entry: DateEntry, now: number, withinDays: number): DateItem[] {
-  const kind = dateKindOf(trackable);
-  if (kind !== 'birthday' && kind !== 'anniversary') return [];
-  const start = startOfDay(entry.timestamp);
-  const lived = daysBetween(start, now);
-  if (lived < 0) return [];
-  const out: DateItem[] = [];
-  for (let n = Math.ceil(Math.max(lived, 1) / 1000) * 1000; daysBetween(now, start + n * DAY_MS) <= withinDays; n += 1000) {
-    const at = startOfDay(new Date(start).setDate(new Date(start).getDate() + n));
-    const daysUntil = daysBetween(now, at);
-    if (daysUntil < 0) continue;
-    const base = describeDate(trackable, entry, now);
-    out.push({
-      ...base,
-      at,
-      daysUntil,
-      countdown: formatDaysUntil(daysUntil),
-      detail: `${n.toLocaleString('en-US')} days ${kind === 'birthday' ? 'old' : 'since'}`,
-      milestone: true,
-    });
-  }
-  return out;
-}
-
 /** "Turns 61 in 3 days", "12th anniversary tomorrow", "Today": a date as a reminder line. */
 export function dateReminderText(item: DateItem): string {
   const when = item.daysUntil <= 1 ? item.countdown.toLowerCase() : item.countdown;
@@ -289,15 +262,15 @@ export function datesDueSoon(
     .sort((a, b) => a.daysUntil - b.daysUntil || a.name.localeCompare(b.name));
 }
 
-/** A stable key for a listed date (an entry's date, or one of its milestones). */
+/** A stable key for a listed date. */
 export function dateItemKey(item: DateItem): string {
-  return `${item.trackableId}:${item.entryId}${item.milestone ? `:${item.at}` : ''}`;
+  return `${item.trackableId}:${item.entryId}`;
 }
 
 /**
  * Dates coming up across these trackables, soonest first: every entry whose
- * next occurrence is within `withinDays` (today included), plus 1,000-day
- * milestones. Past one-off dates are left out.
+ * next occurrence is within `withinDays` (today included). Past one-off
+ * dates are left out.
  */
 export function upcomingDates(
   trackables: readonly DatesTrackable[],
@@ -312,7 +285,6 @@ export function upcomingDates(
     if (!t) continue;
     const item = describeDate(t, e, now);
     if (item.daysUntil >= 0 && item.daysUntil <= withinDays) items.push(item);
-    items.push(...milestones(t, e, now, withinDays));
   }
   return items.sort((a, b) => a.daysUntil - b.daysUntil || a.name.localeCompare(b.name));
 }
