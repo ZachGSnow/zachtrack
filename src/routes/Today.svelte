@@ -148,15 +148,25 @@
           {/if}
         {/snippet}
       </SectionHeading>
-      {#each suggestions as s (s.trackable.id)}
-        <Card tone="brand" padding="p-3" label="Suggested goal for {s.trackable.name}">
-          <p class="text-sm text-text"><span aria-hidden="true">{s.trackable.icon}</span> Make <strong>{s.trackable.name}</strong> a habit? {s.reason}.</p>
-          <div class="mt-2 flex flex-wrap items-center gap-3">
-            <Button variant="primary" size="sm" onclick={() => adopt(s)}>Goal: {s.label.toLowerCase()}</Button>
-            <button class="text-xs text-text-muted" onclick={() => snooze(s.trackable.id)}>Not now</button>
-          </div>
+      {#if suggestions.length > 0}
+        <!-- At most three, the most regular first, so they don't push the habits themselves down. -->
+        <Card tone="brand" padding="px-3 py-2" label="Suggested goals">
+          <p class="text-xs font-semibold tracking-wide text-brand uppercase">Make these habits?</p>
+          <ul class="divide-y divide-border">
+            {#each suggestions.slice(0, 3) as s (s.trackable.id)}
+              <li class="flex items-center gap-3 py-2" aria-label="Suggested goal for {s.trackable.name}">
+                <span class="text-lg" aria-hidden="true">{s.trackable.icon}</span>
+                <span class="min-w-0 flex-1">
+                  <span class="block truncate text-sm font-medium text-text">{s.trackable.name}</span>
+                  <span class="block truncate text-xs text-text-muted">{s.reason}</span>
+                </span>
+                <Button variant="primary" size="sm" class="shrink-0 whitespace-nowrap" onclick={() => adopt(s)}>{s.label}</Button>
+                <button class="shrink-0 text-xs text-text-muted" onclick={() => snooze(s.trackable.id)} aria-label="Not now: {s.trackable.name}">Not now</button>
+              </li>
+            {/each}
+          </ul>
         </Card>
-      {/each}
+      {/if}
       {#if $trackables === undefined}
         <p class="text-sm text-text-muted">Loading&hellip;</p>
       {:else if habits.length === 0 && suggestions.length > 0}

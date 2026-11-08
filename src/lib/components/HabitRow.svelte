@@ -21,7 +21,8 @@
   // How established it is (utils/trackableGoals.ts habitStrength), next to the streak.
   const strength = $derived(habitStrength(t, habit.entries, habit.fields, now));
   const extras = $derived(
-    habit.offDay ? [] : [habit.goal?.streak, strength != null ? `${Math.round(strength * 100)}% strong` : undefined].filter(Boolean),
+    // Strength once there's something logged; a brand-new habit at 0% would only discourage.
+    habit.offDay ? [] : [habit.goal?.streak, strength != null && habit.entries.length > 0 ? `${Math.round(strength * 100)}% strong` : undefined].filter(Boolean),
   );
 </script>
 

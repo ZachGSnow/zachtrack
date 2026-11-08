@@ -108,7 +108,7 @@ describe('goal suggestions', () => {
       ['check', 'perDay', 1, 'Once a day'],
       ['weigh', 'everyDays', 2, 'Every 2 days'],
     ]);
-    expect(s[0].reason).toBe('Logged on 12 of the last 14 days');
+    expect(s[0].reason).toBe('12 of the last 14 days');
   });
 
   it('leaves out rare ones, ones with a goal, dates and archived ones', () => {

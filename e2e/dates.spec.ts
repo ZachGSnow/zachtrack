@@ -123,7 +123,7 @@ test('dates due soon go under Needs attention, the next two weeks under Coming u
   await expect(page.getByRole('link', { name: /22,000 days old/ }).first()).toBeVisible();
 
   // The calendar marks Dad's day; tapping it lists him.
-  await page.getByRole('button', { name: 'Calendar' }).click();
+  await page.getByRole('button', { name: 'Calendar', exact: true }).click();
   const dadDay = await page.evaluate(() => {
     const t = new Date();
     t.setDate(t.getDate() + 10);

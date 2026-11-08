@@ -119,9 +119,9 @@
     <SegmentedControl options={VIEWS} bind:value={view} />
   </div>
   {#if datesTrackables.length > 0}
-    <div class="-mt-1 flex items-center gap-2 text-xs text-text-muted">
-      <button class="font-semibold text-brand" onclick={exportCalendar}>Export to calendar</button>
-      <span>An .ics file for Google Calendar or any calendar app.</span>
+    <div class="-mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-text-muted">
+      <button class="whitespace-nowrap font-semibold text-brand" onclick={exportCalendar}>Export to calendar</button>
+      <span>for Google Calendar or any calendar app</span>
     </div>
   {/if}
 

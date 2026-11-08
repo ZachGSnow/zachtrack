@@ -122,8 +122,10 @@ export interface GoalSuggestion {
   goalValue: number;
   /** "Once a day", "Every 3 days". */
   label: string;
-  /** "Logged on 9 of the last 14 days". */
+  /** "9 of the last 14 days": how often it was logged. */
   reason: string;
+  /** Days logged in the window, for ranking. */
+  days: number;
 }
 
 /** Days logged in the last SUGGEST_WINDOW days before a suggestion is made. */
@@ -146,21 +148,22 @@ export function suggestGoals(
     const days = [...new Set((byId.get(t.id) ?? []).filter((e) => e.timestamp <= now).map((e) => startOfDay(e.timestamp)))].sort((a, b) => a - b);
     const recent = days.filter((d) => d >= windowStart);
     if (recent.length < SUGGEST_MIN_DAYS) continue;
-    const reason = `Logged on ${recent.length} of the last ${SUGGEST_WINDOW} days`;
+    const reason = `${recent.length} of the last ${SUGGEST_WINDOW} days`;
     if (recent.length >= DAILY_DAYS) {
       out.push(
         t.fieldIds.length === 0
-          ? { trackable: t, goalType: 'perDay', goalValue: 1, label: 'Once a day', reason }
-          : { trackable: t, goalType: 'everyDays', goalValue: 1, label: 'Every day', reason },
+          ? { trackable: t, goalType: 'perDay', goalValue: 1, label: 'Once a day', reason, days: recent.length }
+          : { trackable: t, goalType: 'everyDays', goalValue: 1, label: 'Every day', reason, days: recent.length },
       );
       continue;
     }
     // The usual gap between logged days over the window, rounded: every N days.
     const gaps = recent.slice(1).map((d, i) => Math.round((d - recent[i]) / DAY_MS)).sort((a, b) => a - b);
     const n = Math.max(2, Math.min(14, gaps[Math.floor(gaps.length / 2)] ?? 2));
-    out.push({ trackable: t, goalType: 'everyDays', goalValue: n, label: `Every ${n} days`, reason });
+    out.push({ trackable: t, goalType: 'everyDays', goalValue: n, label: `Every ${n} days`, reason, days: recent.length });
   }
-  return out.sort((a, b) => a.trackable.name.localeCompare(b.trackable.name));
+  // The most regular first.
+  return out.sort((a, b) => b.days - a.days || a.trackable.name.localeCompare(b.trackable.name));
 }
 
 // ---------------------------------------------------------------------------

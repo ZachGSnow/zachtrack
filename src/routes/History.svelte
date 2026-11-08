@@ -82,7 +82,7 @@
       <p class="mt-2 text-xs text-text-muted">Full: the fast met its goal. Right: goal fasts of fasts, and hours, each week. Tap a day to open its fast.</p>
     </section>
     <TagFilter items={$fasts} bind:selected={tagFilter} />
-    <ul class="flex flex-col gap-2">
+    <ul class="flex flex-col gap-2" aria-label="Fasts">
       {#each shown as fast (fast.id)}
         <li>
           <button

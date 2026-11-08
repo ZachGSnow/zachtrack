@@ -325,11 +325,11 @@ test('trackables can be pinned, archived and reordered, and lists filter by tag'
   for (const text of await rows.allTextContents()) expect(text).toContain('#gym');
   await page.goto('/#/history');
   await page.getByRole('button', { name: /^#weekend/ }).click();
-  const fastItems = page.locator('main li');
+  const fastItems = page.getByRole('list', { name: 'Fasts' }).getByRole('listitem');
   await expect(fastItems.first()).toContainText('#weekend');
   for (const text of await fastItems.allTextContents()) expect(text).toContain('#weekend');
   await page.getByRole('button', { name: 'All', exact: true }).click();
-  expect(await fastItems.count()).toBeGreaterThan(await page.locator('main li', { hasText: '#weekend' }).count());
+  expect(await fastItems.count()).toBeGreaterThan(await fastItems.filter({ hasText: '#weekend' }).count());
   expect(problems).toEqual([]);
 });
 
@@ -735,11 +735,12 @@ test('Today shows the fast, habits with a goal and recent logs, and checks a hab
   const habits = page.getByRole('region', { name: 'Habits' });
   await expect(habits).toContainText('Male Health');
   await expect(habits).toContainText('0 of 1 done');
-  await expect(habits).toContainText(/\d+% strong/);
+  // Strength shows once there's something logged: here after the check below.
   await habits.getByRole('button', { name: 'Check Male Health for today' }).click();
   await expect(page.getByRole('status')).toContainText('Logged Male Health');
   await expect(habits).toContainText('1 of 1 done');
   await expect(habits.getByRole('button', { name: 'Uncheck Male Health for today' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(habits).toContainText(/\d+% strong/);
 
   // Last 7 days: one cell per day; a tap on an earlier day fills it in, a second tap takes it back.
   const week = page.getByRole('region', { name: 'Last 7 days' });
@@ -888,15 +889,18 @@ test('the Log weight shortcut opens the weigh-in sheet from the last reading, an
   await page.keyboard.press('Escape');
 
   // The sample data logs Sleep every day without a goal: Today offers one, and one tap sets it.
-  const sleep = page.getByRole('region', { name: 'Suggested goal for Sleep' });
-  await expect(sleep).toContainText(/Logged on 1[0-4] of the last 14 days/);
-  await sleep.getByRole('button', { name: 'Goal: every day' }).click();
+  const suggested = page.getByRole('region', { name: 'Suggested goals' });
+  // At most three at a time, the most regular first.
+  await expect(suggested.getByRole('listitem')).toHaveCount(3);
+  const sleep = suggested.getByRole('listitem', { name: 'Suggested goal for Sleep' });
+  await expect(sleep).toContainText(/1[0-4] of the last 14 days/);
+  await sleep.getByRole('button', { name: 'Every day' }).click();
   await expect(sleep).toHaveCount(0);
   await expect(page.getByRole('region', { name: 'Habits' }).getByRole('link', { name: /Sleep/ }).first()).toBeVisible();
 
   // Not now hides an offer on this device.
-  const nutrition = page.getByRole('region', { name: 'Suggested goal for Nutrition' });
-  await nutrition.getByRole('button', { name: 'Not now' }).click();
+  const nutrition = suggested.getByRole('listitem', { name: 'Suggested goal for Nutrition' });
+  await nutrition.getByRole('button', { name: /^Not now/ }).click();
   await expect(nutrition).toHaveCount(0);
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Today', level: 1 })).toBeVisible();
