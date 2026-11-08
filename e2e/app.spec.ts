@@ -730,7 +730,8 @@ test('Today shows the fast, habits with a goal and recent logs, and checks a hab
   const fasting = page.getByRole('region', { name: 'Fasting' });
   await expect(fasting).toContainText('Fasting \u00b7 16:8');
   await expect(fasting.getByRole('progressbar', { name: 'Progress to goal' })).toBeVisible();
-  await expect(fasting).toContainText(/Goal reached at/);
+  // Past its goal or still on its way, depending on the hour the test runs.
+  await expect(fasting).toContainText(/Goal reached at|left/);
 
   const habits = page.getByRole('region', { name: 'Habits' });
   await expect(habits).toContainText('Male Health');
@@ -842,7 +843,8 @@ test('a trackable unlogged for six weeks is offered for archiving, and Not now s
   await page.goto('/#/trackables');
   const quiet = page.getByRole('region', { name: 'Quiet trackables' });
   await expect(quiet).toContainText('Vitals');
-  await expect(quiet).toContainText(/last 2mo ago|last 1mo 30d ago|last 1mo 29d ago/);
+  // Sixty days ago at 9 AM reads as 59 or 60 days, depending on the hour the test runs.
+  await expect(quiet).toContainText(/last (59d|60d|2mo|1mo \d+d) ago/);
   await quiet.getByRole('button', { name: 'Archive Vitals' }).click();
   await expect(quiet).toHaveCount(0);
   await expect(page.getByRole('button', { name: /Show archived \(1\)/ })).toBeVisible();
