@@ -720,7 +720,8 @@ logged and without a goal; Patterns gathers the first five "By weekday" and
 compare table and chart follow under Compare, unchanged.
 
 Year in review (v1.14.0, `utils/yearReview.ts`, `YearInReview.svelte`) sits
-between them: for this year so far or one of the last four with data,
+between them: for this year so far or one of the last four with fasts or
+logged entries (a year with only dates is not offered),
 finished fasts and how many met their goal, hours and days fasted, the
 longest fast and the longest run of goal days inside the year, entries and
 days logged (dates trackables left out, since their entries are dates rather
