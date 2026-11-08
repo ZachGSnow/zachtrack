@@ -2,6 +2,7 @@
   import {
     computeMetricTable,
     formatMetricDelta,
+    metricDeltaTone,
     formatMetricValue,
     metricTableToTsv,
     PERIOD_HEADERS,
@@ -14,6 +15,7 @@
   let { metrics, granularity, rangeStart }: { metrics: MetricDef[]; granularity: Granularity; rangeStart: number } = $props();
 
   const table = $derived(computeMetricTable(metrics, granularity, rangeStart));
+  const TONE_CLASS = { good: 'text-brand', bad: 'text-warn', none: '' } as const;
   const isDay = $derived(granularity === 'day');
   const hint = $derived(
     isDay ? `Gray: ${ROLLING_WINDOW_DAYS}-day average` : `Gray: change vs previous ${granularity === 'month' ? 'month' : 'week'}`,
@@ -97,7 +99,10 @@
                     {#if isDay}
                       {cell.secondary != null ? formatMetricValue(metrics[i], cell.secondary) : ''}
                     {:else}
-                      {cell.secondary != null ? formatMetricDelta(metrics[i], cell.secondary) : ''}
+                      {#if cell.secondary != null}
+                        <!-- Coloured only when a goal says which way is good (the weight field and BMI, body fat). -->
+                        <span class={TONE_CLASS[metricDeltaTone(metrics[i], cell.secondary) ?? 'none']}>{formatMetricDelta(metrics[i], cell.secondary)}</span>
+                      {/if}
                     {/if}
                   </span>
                 </td>

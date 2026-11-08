@@ -855,3 +855,16 @@ test('a trackable unlogged for six weeks is offered for archiving, and Not now s
   await expect(quiet).toHaveCount(0);
   expect(problems).toEqual([]);
 });
+
+test('the weight chart draws its 7-day average, and changes are coloured toward the goal weight', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await mockSync(page, noServer);
+  await importSampleData(page);
+  await page.goto('/#/trackables');
+  await page.getByRole('link', { name: /Body Measurements/ }).click();
+  // The sample settings have a goal weight below the sample weights, so a change is good or bad, not neutral.
+  await expect(page.getByText(/^7-day average \d/)).toHaveClass(/text-(brand|warn)/);
+  await page.getByRole('button', { name: 'Chart', exact: true }).click();
+  await expect(page.locator('[_echarts_instance_] svg').first()).toContainText('Weight 7-day avg');
+  expect(problems).toEqual([]);
+});

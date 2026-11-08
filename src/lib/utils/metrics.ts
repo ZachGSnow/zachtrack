@@ -44,6 +44,8 @@ export interface MetricDef {
   isWeightField?: boolean;
   /** Which body measurement this field holds, if any (BMI, Navy body fat). */
   bodyRole?: BodyFieldRole;
+  /** Which way a change is good, when a goal says so (the weight field and what follows it); unset = neutral. */
+  better?: 'up' | 'down';
 }
 
 export const ROLLING_WINDOW_DAYS = 7;
@@ -528,4 +530,10 @@ export function metricTableToTsv(metrics: MetricDef[], table: MetricTable): stri
     lines.push([toIsoDate(row.start), ...row.cells.flatMap((c) => [tsvNumber(c.value), tsvNumber(c.secondary)])].join('\t'));
   }
   return lines.join('\n');
+}
+
+/** A change's tone for a metric with a good direction: toward it (`good`), away (`bad`), or neither. */
+export function metricDeltaTone(m: Pick<MetricDef, 'better'>, d: number | null): 'good' | 'bad' | null {
+  if (d == null || !m.better || Math.abs(d) < 0.05) return null;
+  return (d < 0) === (m.better === 'down') ? 'good' : 'bad';
 }

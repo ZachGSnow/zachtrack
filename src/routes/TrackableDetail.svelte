@@ -4,7 +4,7 @@
   import { push, link } from 'svelte-spa-router';
   import { db, type TrackableEntry, type FieldDefinition } from '../lib/db';
   import { computeFieldTodayTotal, computeFieldValuesByDay } from '../lib/utils/trackableStats';
-  import { describeProjection, projectGoal, trendPerWeek, weeklyAverages } from '../lib/utils/measurement';
+  import { changeTone, describeProjection, goalDirection, projectGoal, rollingAverage, trendPerWeek, weeklyAverages } from '../lib/utils/measurement';
   import { kindStats, resolveKind, summarize } from '../lib/utils/trackableKinds';
   import { describeGoal, GOAL_STATE_COLORS, goalStats, goalStatus } from '../lib/utils/trackableGoals';
   import { trackableInsights } from '../lib/utils/insights';
@@ -122,6 +122,9 @@
       const anchors = [defs.findIndex((d) => d.id.endsWith(':bmi')), defs.findIndex((d) => d.isWeightField), defs.findIndex((d) => d.bodyRole === 'waist')];
       defs.splice((anchors.find((i) => i >= 0) ?? defs.length - 1) + 1, 0, bodyFat);
     }
+    // With a goal weight, the weight column's changes (and BMI's and body fat's, which follow it) are coloured.
+    const better = goodDirection;
+    if (better) return defs.map((d) => (d.isWeightField || d.id.endsWith(':bmi') || d === bodyFat ? { ...d, better } : d));
     return defs;
   });
 
@@ -142,6 +145,18 @@
 
   // The weight field's page: where the 7-day average is heading against the
   // goal weight in Settings (utils/measurement.ts).
+  // Which way the weight field should move: toward the goal weight from its 7-day average.
+  const goodDirection = $derived.by(() => {
+    const field = bodyFieldIds.weight ? attachedFields.find((f) => f.id === bodyFieldIds.weight) : undefined;
+    if (kind !== 'measurement' || !field) return null;
+    return goalDirection(rollingAverage(computeFieldValuesByDay($entries ?? [], field), now), settingsStore.data.goalWeightLb);
+  });
+  const TONE = { good: 'text-brand', bad: 'text-warn' } as const;
+  function toneClass(change: number | null | undefined): string {
+    const tone = changeTone(change, goodDirection);
+    return tone ? TONE[tone] : '';
+  }
+
   const projection = $derived.by(() => {
     const goalWeight = settingsStore.data.goalWeightLb;
     const field = bodyFieldIds.weight ? attachedFields.find((f) => f.id === bodyFieldIds.weight) : undefined;
@@ -286,7 +301,7 @@
             <p class="text-xs uppercase tracking-wide" style="color: {ink};">{summary.label}</p>
             <p class="mt-1 text-3xl font-semibold text-text">{summary.value}</p>
             {#each summary.sub as line, i (i)}
-              <p class="mt-1 text-xs text-text-muted">{line}</p>
+              <p class="mt-1 text-xs {toneClass(summary.subChanges?.[i]) || 'text-text-muted'}">{line}</p>
             {/each}
             {#if projection}
               <p class="mt-2 text-xs font-medium" style="color: {ink};">{projection}</p>
@@ -339,7 +354,7 @@
             {#each stats as stat (stat.label)}
               <div class="rounded-xl border p-3 border-border bg-surface">
                 <p class="text-xs text-text-muted">{stat.label}</p>
-                <p class="mt-1 text-lg font-semibold text-text">{stat.value}</p>
+                <p class="mt-1 text-lg font-semibold {toneClass(stat.change) || 'text-text'}">{stat.value}</p>
               </div>
             {/each}
           </div>

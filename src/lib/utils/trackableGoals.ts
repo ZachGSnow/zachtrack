@@ -233,6 +233,8 @@ export const GOAL_STATE_COLORS: Record<GoalState, string | undefined> = {
 export interface GoalStat {
   label: string;
   value: string;
+  /** Unused for goals; shared shape with a kind's stat tile (trackableKinds.KindStat). */
+  change?: number;
 }
 
 const plural = (n: number, word: string) => `${n} ${n === 1 ? word : `${word}s`}`;

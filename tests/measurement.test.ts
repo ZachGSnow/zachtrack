@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { describeProjection, describeTrend, projectGoal, rollingAverage, trendPerWeek, weeklyAverages } from '../src/lib/utils/measurement';
+import { changeTone, describeProjection, describeTrend, goalDirection, projectGoal, rollingAverage, rollingSeries, trendPerWeek, weeklyAverages } from '../src/lib/utils/measurement';
 import { addDays, startOfDay } from '../src/lib/utils/time';
 
 // America/New_York (vitest config).
@@ -59,5 +59,26 @@ describe('measurement', () => {
     expect(describeProjection({ kind: 'toward', at: addDays(TODAY, 3), weeks: 0.4 }, 176, 'lb')).toBe('At this rate, 176 lb within the week');
     expect(describeProjection({ kind: 'toward', at: addDays(TODAY, 140), weeks: 20 }, 176, 'lb')).toMatch(/^At this rate, 176 lb around /);
     expect(describeProjection(null, 176, 'lb')).toBeNull();
+  });
+});
+
+describe('goal direction', () => {
+  it('says which way is good, and whether a change goes that way', () => {
+    expect(goalDirection(192, 176)).toBe('down');
+    expect(goalDirection(150, 160)).toBe('up');
+    expect(goalDirection(176.1, 176)).toBeNull();
+    expect(goalDirection(null, 176)).toBeNull();
+    expect(changeTone(-0.7, 'down')).toBe('good');
+    expect(changeTone(0.5, 'down')).toBe('bad');
+    expect(changeTone(0.5, 'up')).toBe('good');
+    expect(changeTone(0.01, 'down')).toBeNull();
+    expect(changeTone(-1, null)).toBeNull();
+  });
+
+  it('builds a 7-day average series over given days', () => {
+    const byDay = series(14, (ago) => (ago < 7 ? 190 : 194));
+    const days = [day(13), day(7), day(6), day(0)];
+    // Six days ago the window runs back over six 194 days and one 190 day.
+    expect(rollingSeries(byDay, days)).toEqual([194, 194, Math.round(((190 + 194 * 6) / 7) * 100) / 100, 190]);
   });
 });

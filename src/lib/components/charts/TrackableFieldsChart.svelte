@@ -1,7 +1,8 @@
 <script lang="ts">
   import type { EChartsOption } from 'echarts';
   import type { FieldDefinition, TrackableEntry } from '../../db';
-  import { computeFieldSeries, fieldSeriesDays } from '../../utils/trackableStats';
+  import { computeFieldSeries, computeFieldValuesByDay, fieldSeriesDays } from '../../utils/trackableStats';
+  import { rollingSeries } from '../../utils/measurement';
   import type { ChartRange } from '../../utils/stats';
   import { computeBMI } from '../../utils/health';
   import { BODY_FAT_COLOR } from '../../utils/metrics';
@@ -73,6 +74,12 @@
       : null,
   );
 
+  // The weight field draws its 7-day average as a line through the day's readings (dots), so
+  // one heavy morning reads as noise against the trend (utils/measurement.ts).
+  const weightAverage = $derived(
+    weightField ? rollingSeries(computeFieldValuesByDay(entries, weightField), fieldSeriesDays(entries, weightField, range)) : null,
+  );
+
   const categories = $derived(fields.length ? (fieldSeriesById.get(fields[0].id)?.categories ?? []) : []);
   const anyVisible = $derived(Object.values(visible).some(Boolean));
 
@@ -91,16 +98,19 @@
     series: [
       ...fields
         .filter((f) => visible[f.id])
-        .map((f) => ({
+        .flatMap((f) => {
+          const isWeight = f.id === weightField?.id && weightAverage != null;
+          const base = {
           name: f.name,
           type: 'line' as const,
           data: fieldSeriesById.get(f.id)?.values ?? [],
           smooth: false,
           connectNulls: true,
           showSymbol: true,
-          symbolSize: 5,
+          symbolSize: isWeight ? 6 : 5,
           itemStyle: { color: colorFor(f) },
-          lineStyle: { color: colorFor(f), width: 2 },
+          // The weight field's readings are dots on a faint line; its average is the bold line.
+          lineStyle: { color: colorFor(f), width: isWeight ? 1 : 2, opacity: isWeight ? 0.25 : 1 },
           ...(f.id === weightField?.id && settingsStore.data.goalWeightLb
             ? {
                 markLine: {
@@ -111,7 +121,22 @@
                 },
               }
             : {}),
-        })),
+          };
+          if (!isWeight) return [base];
+          return [
+            base,
+            {
+              name: `${f.name} 7-day avg`,
+              type: 'line' as const,
+              data: weightAverage,
+              smooth: true,
+              connectNulls: true,
+              showSymbol: false,
+              itemStyle: { color: colorFor(f) },
+              lineStyle: { color: colorFor(f), width: 3 },
+            },
+          ];
+        }),
       ...(visible['__bmi'] && bmiValues
         ? [
             {
