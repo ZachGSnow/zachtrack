@@ -6,7 +6,9 @@ import {
   fastingWeightInsight,
   goalDays,
   goalMet,
+  restartSuggestion,
   weekComparison,
+  weekStrip,
 } from '../src/lib/utils/fastingJourney';
 import { computeFastStats } from '../src/lib/utils/stats';
 import { addDays, startOfDay } from '../src/lib/utils/time';
@@ -119,5 +121,56 @@ describe('weight after goal fasts', () => {
     const values = Array.from({ length: 20 }, (_, i) => 180 + (i % 3) * 0.2);
     const fasts = Array.from({ length: 10 }, (_, k) => fast(oct(1 + 2 * k, 8), 16, 16));
     expect(fastingWeightInsight(fasts, weights(values), 'lb', oct(30, 12))).toBeNull();
+  });
+});
+
+describe('the week strip', () => {
+  it('states each day of this week against the plan', () => {
+    const now = oct(22, 12); // Thursday
+    const fasts = [fast(oct(19, 20), 16, 16), fast(oct(20, 20), 10, 16), fast(oct(22, 8), null, 16)];
+    const plan = { defaultPresetId: '16:8', fastScheduleTime: '20:00', fastWeekPlan: [null, null, { rest: true }, null, null, null, { rest: true }] };
+    const days = weekStrip(fasts, plan, now);
+    expect(days.map((d) => d.state)).toEqual(['goal', 'short', 'rest', 'running', 'upcoming', 'upcoming', 'rest']);
+    expect(days[3].isToday).toBe(true);
+    // Without a plan: a day with nothing is missed, today is open.
+    expect(weekStrip([], undefined, now).map((d) => d.state)).toEqual(['missed', 'missed', 'missed', 'open', 'upcoming', 'upcoming', 'upcoming']);
+  });
+});
+
+describe('the restart suggestion', () => {
+  const presets = [
+    { id: '12:12', targetHours: 12 },
+    { id: '14:10', targetHours: 14 },
+    { id: '16:8', targetHours: 16 },
+    { id: '18:6', targetHours: 18 },
+    { id: 'custom' },
+  ];
+  const sept = (d: number, h: number) => new Date(2026, 8, d, h).getTime();
+
+  it('after a fortnight without a goal fast, sums the year and picks a gentler method', () => {
+    const now = oct(22, 12);
+    const fasts = [fast(sept(1, 20), 18, 18), fast(sept(2, 20), 19, 18), fast(sept(3, 20), 12, 18), fast(sept(4, 20), 17, 18)];
+    const s = restartSuggestion(fasts, presets, now)!;
+    // Sep 3 and 4 fell short of 18h, so the last goal fast was Sep 2.
+    expect(s.daysSince).toBe(50);
+    expect(s).toMatchObject({ fasts: 4, goalFasts: 2, usualHours: 18, presetId: '16:8', presetHours: 16 });
+    expect(s.averageHours).toBeCloseTo(16.5);
+  });
+
+  it('says nothing while fasting is going, with too little history, or with a fast running', () => {
+    const now = oct(22, 12);
+    const recent = [fast(oct(10, 20), 16, 16), fast(oct(11, 20), 16, 16), fast(oct(12, 20), 16, 16)];
+    expect(restartSuggestion(recent, presets, now)).toBeNull();
+    expect(restartSuggestion([fast(sept(1, 20), 16, 16), fast(sept(2, 20), 16, 16)], presets, now)).toBeNull();
+    const running = [fast(sept(1, 20), 16, 16), fast(sept(2, 20), 16, 16), fast(sept(3, 20), 16, 16), fast(oct(22, 8), null, 16)];
+    expect(restartSuggestion(running, presets, now)).toBeNull();
+  });
+
+  it('falls back to the shortest method when the usual one is already short, and counts fasts that never met a goal', () => {
+    const now = oct(22, 12);
+    const short = [fast(sept(1, 20), 10, 12), fast(sept(2, 20), 11, 12), fast(sept(3, 20), 9, 12)];
+    const s = restartSuggestion(short, presets, now)!;
+    expect(s.daysSince).toBeNull();
+    expect(s).toMatchObject({ goalFasts: 0, usualHours: 12, presetId: '12:12' });
   });
 });

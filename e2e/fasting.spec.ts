@@ -151,3 +151,31 @@ test('a long fast shows hydration and the 48-hour caution, and ending it says ho
   await page.getByRole('button', { name: 'End Fast' }).click();
   await expect(page.getByLabel('Fast summary')).toContainText('Break a fast this long gently');
 });
+
+test('between fasts the week strip shows the plan, the zones hide behind a link, and a lapse offers a gentler restart', async ({ page }) => {
+  await page.goto('/#/fasting');
+  await expect(page.getByRole('list', { name: 'This week' }).getByRole('listitem')).toHaveCount(7);
+  await expect(page.getByText('Biological zones (first 24 hours)')).toHaveCount(0);
+  await page.getByRole('button', { name: 'About the zones' }).click();
+  await expect(page.getByText('Biological zones (first 24 hours)')).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Pick it back up' })).toHaveCount(0);
+
+  // Three 18:6 goal fasts three weeks ago and nothing since: the card sums them up and suggests 16:8.
+  for (const daysAgo of [21, 22, 23]) {
+    await page.goto('/#/history');
+    await page.getByRole('button', { name: '+ Log a past fast' }).click();
+    await page.getByRole('button', { name: '18:6', exact: true }).click();
+    await page.getByLabel('Started', { exact: true }).fill(await hoursAgo(page, daysAgo * 24 + 20));
+    await page.getByLabel('Ended', { exact: true }).fill(await hoursAgo(page, daysAgo * 24 + 2));
+    await page.getByRole('button', { name: 'Save fast' }).click();
+    await expect(page.getByText('Duration: 18h').first()).toBeVisible();
+  }
+  await page.goto('/#/fasting');
+  const card = page.getByRole('region', { name: 'Pick it back up' });
+  await expect(card).toContainText(/2\d days since your last goal fast\. This year:\s+3 fasts, 3 to goal, averaging 18h/);
+  await expect(card).toContainText('Ease back in with 16:8 rather than 18h');
+  await card.getByRole('button', { name: 'Start 16:8 now' }).click();
+  await expect(page.getByRole('button', { name: 'End Fast' })).toBeVisible();
+  await expect(page.getByText('Biological zones (first 24 hours)')).toBeVisible();
+  await expect(page.getByRole('list', { name: 'This week' }).getByRole('listitem', { name: /fasting now, today$/ })).toBeVisible();
+});
