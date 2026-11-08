@@ -9,6 +9,7 @@
   import HabitGrid from './HabitGrid.svelte';
   import CheckButton from './CheckButton.svelte';
   import { themeStore } from '../stores/theme.svelte';
+  import { measurementView } from '../stores/measurementView.svelte';
   import { readableGraphic } from '../utils/color';
 
   let {
@@ -82,8 +83,8 @@
           ? 'Nothing coming up'
           : 'Nothing added yet'
       : goal && trackable.goalType
-        ? goalCardLine(goal, trackable.goalType, summarize(kind, entries, attachedFields, now).card, entries.length ? habitStrength(trackable, entries, attachedFields, now) : null)
-        : summarize(kind, entries, attachedFields, now).card,
+        ? goalCardLine(goal, trackable.goalType, summarize(kind, entries, attachedFields, now, measurementView.view).card, entries.length ? habitStrength(trackable, entries, attachedFields, now) : null)
+        : summarize(kind, entries, attachedFields, now, measurementView.view).card,
   );
 </script>
 

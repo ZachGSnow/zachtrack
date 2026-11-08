@@ -1,7 +1,7 @@
 import type { FieldDefinition, TrackableDefinition, TrackableEntry } from '../db';
 import { goalField, goalStatus, offDayReason, type GoalStatus } from './trackableGoals';
 import { computeFieldValuesByDay } from './trackableStats';
-import { resolveKind, summarize, type TrackableKind } from './trackableKinds';
+import { resolveKind, summarize, type MeasurementView, type TrackableKind } from './trackableKinds';
 import { upcomingDates, type DateItem } from './dates';
 import { addDays, DAY_MS, startOfDay } from './time';
 
@@ -89,6 +89,7 @@ export function todayLogs(
   entries: readonly TrackableEntry[],
   now: number,
   days: number = LOG_RECENT_DAYS,
+  view?: MeasurementView,
 ): TodayLog[] {
   const byId = entriesByTrackable(entries);
   const since = now - days * DAY_MS;
@@ -101,7 +102,7 @@ export function todayLogs(
     const own = (byId.get(t.id) ?? []).filter((e) => e.timestamp <= now);
     const lastAt = own.reduce((max, e) => Math.max(max, e.timestamp), 0);
     if (lastAt < since) continue;
-    logs.push({ trackable: t, fields: attached, entries: own, kind, summary: summarize(kind, own, attached, now).card, lastAt });
+    logs.push({ trackable: t, fields: attached, entries: own, kind, summary: summarize(kind, own, attached, now, view).card, lastAt });
   }
   return logs.sort((a, b) => b.lastAt - a.lastAt || a.trackable.name.localeCompare(b.trackable.name));
 }

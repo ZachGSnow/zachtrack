@@ -1066,3 +1066,26 @@ test('a habit that slipped after going well gets a gentle card on Today, and Pau
   await expect(card).toHaveCount(0);
   expect(problems).toEqual([]);
 });
+
+test('a measurement can read a smoothed trend and lead with it instead of the scale reading', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await mockSync(page, noServer);
+  await importSampleData(page);
+  await page.goto('/#/trackables');
+  await page.getByRole('link', { name: /Body Measurements/ }).click();
+  const trend = page.getByRole('group', { name: 'Trend' });
+  await trend.getByRole('button', { name: 'Smoothed' }).click();
+  await expect(page.getByText(/^Smoothed trend \d/)).toBeVisible();
+  await page.getByRole('button', { name: 'Chart', exact: true }).click();
+  await expect(page.locator('[_echarts_instance_] svg').first()).toContainText('Weight trend');
+
+  await trend.getByRole('checkbox', { name: 'Lead with the trend' }).check();
+  await expect(page.getByText('Weight trend', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText(/^Latest reading \d/)).toBeVisible();
+  // A device preference: it sticks, and the lists follow it.
+  await page.reload();
+  await expect(page.getByText('Weight trend', { exact: true }).first()).toBeVisible();
+  await page.goto('/#/');
+  await expect(page.getByRole('region', { name: 'Log' })).toContainText(/Body Measurements\s+trend \d/);
+  expect(problems).toEqual([]);
+});

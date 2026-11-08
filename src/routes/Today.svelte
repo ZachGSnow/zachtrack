@@ -6,6 +6,7 @@
   import { weeklyReview } from '../lib/utils/weeklyReview';
   import { sinceLastVisit } from '../lib/utils/sinceLastVisit';
   import { visitStore } from '../lib/stores/visit.svelte';
+  import { measurementView } from '../lib/stores/measurementView.svelte';
   import DataSafetyCard from '../lib/components/DataSafetyCard.svelte';
   import AwayCard from '../lib/components/AwayCard.svelte';
   import LapsedHabitCard from '../lib/components/LapsedHabitCard.svelte';
@@ -41,7 +42,7 @@
   });
 
   const habits = $derived(todayHabits($trackables ?? [], $allFields ?? [], $allEntries ?? [], now));
-  const logs = $derived(todayLogs($trackables ?? [], $allFields ?? [], $allEntries ?? [], now));
+  const logs = $derived(todayLogs($trackables ?? [], $allFields ?? [], $allEntries ?? [], now, undefined, measurementView.view));
   const dates = $derived(todayDates($trackables ?? [], $allEntries ?? [], now));
   const hasDates = $derived(($trackables ?? []).some((t) => !t.archived && t.displayMode === 'ages'));
   const groups = $derived(groupByTimeOfDay(habits, now));

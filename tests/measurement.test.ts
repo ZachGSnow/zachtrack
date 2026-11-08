@@ -1,5 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { changeTone, describeProjection, describeTrend, goalDirection, projectGoal, rollingAverage, rollingSeries, trendPerWeek, weeklyAverages } from '../src/lib/utils/measurement';
+import {
+  changeTone,
+  describeProjection,
+  describeRange,
+  describeTrend,
+  goalDirection,
+  projectGoal,
+  projectGoalRange,
+  rollingAverage,
+  rollingSeries,
+  smoothedNow,
+  smoothedSeries,
+  trendFit,
+  trendNow,
+  trendPerWeek,
+  weeklyAverages,
+} from '../src/lib/utils/measurement';
 import { addDays, startOfDay } from '../src/lib/utils/time';
 
 // America/New_York (vitest config).
@@ -80,5 +96,47 @@ describe('goal direction', () => {
     const days = [day(13), day(7), day(6), day(0)];
     // Six days ago the window runs back over six 194 days and one 190 day.
     expect(rollingSeries(byDay, days)).toEqual([194, 194, Math.round(((190 + 194 * 6) / 7) * 100) / 100, 190]);
+  });
+});
+
+describe('smoothed trend and goal range', () => {
+  it('moves a tenth of the way toward each reading and carries over days without one', () => {
+    const byDay = new Map([
+      [day(3), 200],
+      [day(2), 210],
+      [day(0), 190],
+    ]);
+    // 200, then 200 + 0.1 * 10 = 201, carried through day 1, then 201 + 0.1 * (190 - 201) = 199.9.
+    expect(smoothedSeries(byDay, [day(4), day(3), day(2), day(1), day(0)])).toEqual([null, 200, 201, 201, 199.9]);
+    expect(smoothedNow(byDay, NOW)).toBe(199.9);
+    // A single heavy morning barely moves it.
+    const steady = series(14, (ago) => (ago === 0 ? 195 : 190));
+    expect(smoothedNow(steady, NOW)).toBeCloseTo(190.5, 5);
+  });
+
+  it('gives the trend now and a week earlier in either mode', () => {
+    const byDay = series(14, (ago) => 190 + ago * 0.1);
+    expect(trendNow(byDay, NOW, 'average')!.current).toBeCloseTo(190.3, 5);
+    const s = trendNow(byDay, NOW, 'smoothed')!;
+    expect(s.current).toBeLessThan(s.weekAgo!);
+    expect(trendNow(new Map(), NOW, 'smoothed')).toBeNull();
+  });
+
+  it("turns the fit's uncertainty into a date range", () => {
+    // Losing about 0.1 a day with some noise.
+    const byDay = series(30, (ago) => 200 + ago * 0.1 + (ago % 3 === 0 ? 0.4 : ago % 3 === 1 ? -0.4 : 0));
+    const fit = trendFit(byDay, NOW)!;
+    expect(fit.perWeek).toBeCloseTo(-0.7, 1);
+    expect(fit.sePerWeek).toBeGreaterThan(0);
+    const p = projectGoalRange(200, 186, fit, NOW)!;
+    if (p.kind !== 'toward') throw new Error('expected toward');
+    expect(p.earliest!).toBeLessThan(p.at);
+    expect(p.latest!).toBeGreaterThan(p.at);
+    expect(describeRange(p)).toMatch(/^ \(.+ to .+\)$/);
+    // Noise-free: no uncertainty, so the range collapses onto the date and isn't shown.
+    const clean = projectGoalRange(200, 186, trendFit(series(30, (ago) => 200 + ago * 0.1), NOW), NOW)!;
+    if (clean.kind !== 'toward') throw new Error('expected toward');
+    expect(clean.earliest).toBe(clean.at);
+    expect(describeRange(clean)).toBe('');
   });
 });
