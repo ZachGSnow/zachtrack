@@ -3,7 +3,8 @@
   import { MediaQuery } from 'svelte/reactivity';
   import { push, link } from 'svelte-spa-router';
   import { db, type TrackableEntry, type FieldDefinition } from '../lib/db';
-  import { computeFieldTodayTotal } from '../lib/utils/trackableStats';
+  import { computeFieldTodayTotal, computeFieldValuesByDay } from '../lib/utils/trackableStats';
+  import { describeProjection, projectGoal, trendPerWeek, weeklyAverages } from '../lib/utils/measurement';
   import { kindStats, resolveKind, summarize } from '../lib/utils/trackableKinds';
   import { describeGoal, GOAL_STATE_COLORS, goalStatus } from '../lib/utils/trackableGoals';
   import { trackableInsights } from '../lib/utils/insights';
@@ -133,6 +134,18 @@
   const stats = $derived(kindStats(kind, $entries ?? [], attachedFields, now));
   const goal = $derived($trackable && !isAges ? goalStatus($trackable, $entries ?? [], attachedFields, now) : null);
   const goalText = $derived($trackable ? describeGoal($trackable, attachedFields) : null);
+
+  // The weight field's page: where the 7-day average is heading against the
+  // goal weight in Settings (utils/measurement.ts).
+  const projection = $derived.by(() => {
+    const goalWeight = settingsStore.data.goalWeightLb;
+    const field = bodyFieldIds.weight ? attachedFields.find((f) => f.id === bodyFieldIds.weight) : undefined;
+    if (kind !== 'measurement' || !goalWeight || !field) return null;
+    const byDay = computeFieldValuesByDay($entries ?? [], field);
+    const averages = weeklyAverages(byDay, now);
+    if (!averages) return null;
+    return describeProjection(projectGoal(averages.current, goalWeight, trendPerWeek(byDay, now), now), goalWeight, field.unit);
+  });
 
   const insights = $derived.by(() => {
     const t = $trackable;
@@ -272,6 +285,9 @@
             {#each summary.sub as line, i (i)}
               <p class="mt-1 text-xs text-text-muted">{line}</p>
             {/each}
+            {#if projection}
+              <p class="mt-2 text-xs font-medium" style="color: {$trackable.color};">{projection}</p>
+            {/if}
           </div>
 
           {#if goal && goalText}

@@ -10,7 +10,7 @@
     type FieldDefinition,
     type DateRepeat,
   } from '../db';
-  import { toDatetimeLocal, fromDatetimeLocal, toDateInputValue, fromDateInputValue } from '../utils/time';
+  import { toDatetimeLocal, fromDatetimeLocal, toDateInputValue, fromDateInputValue, formatDateTime } from '../utils/time';
   import { DATE_KIND_ITEM, dateKindOf, defaultRepeat, describeRepeat, ordinal } from '../utils/dates';
   import { WEEKDAY_NAMES } from '../utils/trackableGoals';
   import TagInput from './TagInput.svelte';
@@ -108,6 +108,9 @@
     error = '';
   });
 
+  /** When a new entry's number fields were filled from the last entry, that entry's time. */
+  let prefilledFrom = $state<number | null>(null);
+
   $effect(() => {
     if (!open || !trackable || $allFields === undefined) return;
     const key = `${trackable.id}|${entry?.id ?? `new@${defaultTimestamp ?? ''}`}`;
@@ -122,7 +125,31 @@
       else inputs[f.id] = typeof raw === 'boolean' ? raw : false;
     }
     fieldInputs = inputs;
+    prefilledFrom = null;
+    // A new entry starts from the last one for readings (number fields that
+    // keep their latest value, like Weight or Waist), since the next reading
+    // is usually close and a tape measurement means four numbers. Totals
+    // (sum) and averages start empty: each entry is its own amount.
+    if (!entry) void prefillFromLast(trackable.id, fields.filter((f) => f.kind === 'number' && (f.aggregation ?? 'last') === 'last'), key);
   });
+
+  async function prefillFromLast(trackableId: string, readings: FieldDefinition[], key: string) {
+    if (readings.length === 0) return;
+    const own = await db.trackableEntries.where('trackableId').equals(trackableId).toArray();
+    // The sheet may have moved on to another entry while the query ran.
+    if (key !== fieldsKey) return;
+    const filled: Record<string, string> = {};
+    let from = 0;
+    for (const f of readings) {
+      const last = own.filter((e) => e.values?.[f.id] != null).sort((a, b) => b.timestamp - a.timestamp)[0];
+      if (!last || fieldInputs[f.id]) continue;
+      filled[f.id] = String(last.values![f.id]);
+      from = Math.max(from, last.timestamp);
+    }
+    if (!from) return;
+    fieldInputs = { ...fieldInputs, ...filled };
+    prefilledFrom = from;
+  }
 
   function setRating(fieldId: string, value: number) {
     fieldInputs = { ...fieldInputs, [fieldId]: fieldInputs[fieldId] === value ? 0 : value };
@@ -338,6 +365,9 @@
         </button>
       {/if}
     {/each}
+    {#if prefilledFrom}
+      <p class="-mt-2 text-xs text-text-muted">Readings start from your last entry ({formatDateTime(prefilledFrom)}); change what moved.</p>
+    {/if}
 
     {#if !isAges}
       <div>

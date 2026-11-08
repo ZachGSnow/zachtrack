@@ -744,6 +744,12 @@ test('Today shows the fast, habits with a goal and recent logs, and checks a hab
   await expect(sheet).toContainText('Readings start from your last entry');
   await page.keyboard.press('Escape');
 
+  // Its page says where the 7-day average is heading against the goal weight (176 lb in the sample settings).
+  await log.getByRole('link', { name: /Body Measurements/ }).click();
+  await expect(page.getByText(/^(At this rate, 176 lb|Moving away from your goal of 176 lb|Holding steady; your goal is 176 lb|At your goal of 176 lb)/)).toBeVisible();
+  await expect(page.getByText(/^7-day average \d/)).toBeVisible();
+  await page.goto('/#/');
+
   // No dates trackable in the sample data, so no Coming up.
   await expect(page.getByRole('region', { name: 'Coming up' })).toHaveCount(0);
 

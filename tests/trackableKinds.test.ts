@@ -53,7 +53,7 @@ describe('summaries', () => {
     expect(s.value).toBe('1d');
   });
 
-  it('measurement: the latest reading and its change over about a week', () => {
+  it('measurement: the latest reading, the 7-day average against the week before, and the trend', () => {
     const entries: TimestampedValues[] = [
       { timestamp: oct(10), values: { 'f-w': 181 } },
       { timestamp: oct(14), values: { 'f-w': 180.4 } },
@@ -63,8 +63,16 @@ describe('summaries', () => {
     const s = summarize('measurement', entries, [weight], oct(20, 18));
     expect(s.value).toBe('179.6 lb');
     expect(s.label).toBe('Latest Weight');
-    expect(s.sub[0]).toBe('\u25bc0.8 since Oct 14');
-    expect(s.card).toMatch(/^179\.6 lb \u00b7 6h ago$/);
+    // Oct 14 to 20 average 180; the week before (Oct 7 to 13) had the 181 reading.
+    expect(s.sub[0]).toBe('7-day average 180 lb, \u25bc1 vs the week before');
+    // Three readings are too few for a 30-day trend, so the date comes next.
+    expect(s.sub).toHaveLength(2);
+    expect(s.card).toMatch(/^179\.6 lb \u00b7 avg 180 \u00b7 6h ago$/);
+
+    // Daily readings losing 0.1 a day: the trend line shows.
+    const daily: TimestampedValues[] = Array.from({ length: 20 }, (_, i) => ({ timestamp: oct(1 + i), values: { 'f-w': 185 - i * 0.1 } }));
+    const d = summarize('measurement', daily, [weight], oct(20, 18));
+    expect(d.sub[1]).toBe('\u25bc0.7 lb/wk over the last 30 days');
   });
 
   it("daily: today's total and the average of earlier days", () => {
@@ -107,7 +115,9 @@ describe('stat cards', () => {
     const events = [oct(1), oct(15), oct(29)].map((timestamp) => ({ timestamp }));
     expect(kindStats('event', events, [], oct(30)).map((s) => s.label)).toEqual(['Total', 'Usual gap', 'Longest gap', 'Last 30 days']);
     expect(kindStats('event', events, [], oct(30))[1].value).toBe('14d');
-    expect(kindStats('measurement', [], [weight], oct(30)).map((s) => s.label)).toEqual(['Readings', '30-day change', '90-day low', '90-day high']);
+    expect(kindStats('measurement', [], [weight], oct(30)).map((s) => s.label)).toEqual(['7-day avg', 'Per week (30d)', '90-day low', '90-day high']);
+    const daily: TimestampedValues[] = Array.from({ length: 20 }, (_, i) => ({ timestamp: oct(1 + i), values: { 'f-w': 185 - i * 0.1 } }));
+    expect(kindStats('measurement', daily, [weight], oct(20, 18)).map((s) => s.value)).toEqual(['183.4 lb', '−0.7 lb', '183.1 lb', '185 lb']);
     expect(kindStats('checkin', events, [mood], oct(30))[0].label).toBe('Current streak');
   });
 });

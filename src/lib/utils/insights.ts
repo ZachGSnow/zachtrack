@@ -110,10 +110,17 @@ export function trackableInsights(
     ? last90.filter((d) => metric.byDay!.has(d)).map((d) => ({ day: d, v: metric.byDay!.get(d)! }))
     : last90.map((d) => ({ day: d, v: loggedDays.has(d) ? 1 : 0 }));
   const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
-  const comparisons: { text: string; size: number }[] = [];
+  const comparisons: { label: string; text: string; size: number }[] = [];
+  // Two comparisons per other trackable: the same day, and the day after it
+  // was logged (a late meal shows in the next morning's weight).
+  const shifts: Array<{ label: string; days: number }> = [
+    { label: 'On days with', days: 0 },
+    { label: 'On days after', days: 1 },
+  ];
   for (const other of others) {
     if (other.trackable.id === trackable.id) continue;
-    const otherDays = new Set(other.entries.map((e) => startOfDay(e.timestamp)));
+    for (const shift of shifts) {
+    const otherDays = new Set(other.entries.map((e) => addDays(startOfDay(e.timestamp), shift.days)));
     const withIt = samples.filter((s) => otherDays.has(s.day)).map((s) => s.v);
     const without = samples.filter((s) => !otherDays.has(s.day)).map((s) => s.v);
     if (withIt.length < MIN_DAYS || without.length < MIN_DAYS) continue;
@@ -128,12 +135,15 @@ export function trackableInsights(
     if (size < (metric.byDay ? 0.6 : 0.2)) continue;
     const subject = metric.byDay ? `${metric.name} averages` : 'Logged on';
     const tail = metric.byDay ? '' : ' of days';
+    const joiner = shift.days ? 'after' : 'with';
     comparisons.push({
-      text: `${subject} ${metric.describe(a)}${tail} with ${other.trackable.name} (${withIt.length} days), ${metric.describe(b)}${tail} without (${without.length})`,
+      label: shift.label,
+      text: `${subject} ${metric.describe(a)}${tail} ${joiner} ${other.trackable.name} (${withIt.length} days), ${metric.describe(b)}${tail} ${shift.days ? 'otherwise' : 'without'} (${without.length})`,
       size,
     });
+    }
   }
-  for (const c of comparisons.sort((x, y) => y.size - x.size).slice(0, 3)) insights.push({ label: 'On days with', text: c.text });
+  for (const c of comparisons.sort((x, y) => y.size - x.size).slice(0, 3)) insights.push({ label: c.label, text: c.text });
 
   return insights;
 }

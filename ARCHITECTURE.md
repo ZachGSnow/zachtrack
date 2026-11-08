@@ -803,6 +803,36 @@ uncheck and undo out of `Trackables.svelte` into `stores/quickLog.svelte.ts`
 with `QuickLogHost.svelte` for the sheet and the toast, so Today and the
 list share one implementation.
 
+### 3.42 Reading a measurement through its noise (v1.15.0)
+
+The Body Measurements header read "up 1 since last week": one reading
+minus another, which a late meal or a glass of water swings by a pound,
+and the owner was already discounting single mornings by hand in the
+entry notes.
+
+- **`utils/measurement.ts`**: `weeklyAverages` (the 7-day mean and the 7
+  days before it), `trendPerWeek` (a least-squares slope over the last 30
+  days, in units per week, needing five readings), and `projectGoal` (at
+  that rate, when the average reaches a goal: toward with a date, away,
+  flat, or there). Days are counted whole, so a DST change doesn't tilt the
+  slope.
+- **Headline** (3.17, `summarize`): the latest reading stays the big
+  number, since it is what was logged; under it come the 7-day average
+  against the week before and the trend. The card line adds the average.
+  The stat tiles become 7-day avg, per week over 30 days, 90-day low and
+  high; the old "30-day change" (one reading minus one reading) goes.
+- **Goal weight**: the weight field's page (the one BMI follows, 3.14)
+  adds "At this rate, 176 lb around Mar 14" from the average and the
+  trend, or that it is moving away, holding, or there.
+- **Prefill**: a new entry starts from the last entry's readings (number
+  fields with `last` aggregation), with a note saying so. Totals and
+  averages start empty, since each entry is its own amount. Four tape
+  measurements no longer mean retyping four numbers.
+- **On days after** (3.28): the comparisons on a trackable's page also
+  shift the other trackable by a day, so a Late meal logged at night shows
+  in the next morning's weight. The new Late meal template is a one-tap
+  trackable for exactly that.
+
 ### 3.21 Trackables list: pin, archive, order; tag filters
 - **Sort** (per device, `zachtrack:trackables-view`): Due first (goal
   urgency from 3.18: overdue, then due, then the rest, then trackables
