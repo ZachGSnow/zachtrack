@@ -980,3 +980,42 @@ test('a comparison can be hidden and brought back in Settings, and a trackable k
   await expect(hide).toHaveCount(0);
   expect(problems).toEqual([]);
 });
+
+test('Today says whether your data is safe, and an export from the card settles it', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await mockSync(page, noServer);
+  await waitForStarterSet(page);
+  await page.goto('/#/');
+  const card = page.getByRole('region', { name: 'Your data' });
+  // Local only and never exported: this device holds the only copy.
+  await expect(card).toContainText('Your data needs a look');
+  await expect(card).toContainText('Local only: this device holds the only copy');
+  await expect(card).toContainText('Never exported from this device');
+  const [download] = await Promise.all([page.waitForEvent('download'), card.getByRole('button', { name: 'Export a backup file' }).click()]);
+  expect(download.suggestedFilename()).toMatch(/\.json$/);
+  await expect(card).toContainText('Your data is safe');
+  await card.getByRole('button', { name: /Your data is safe/ }).click();
+  await expect(card).toContainText('Exported here just now');
+  expect(problems).toEqual([]);
+});
+
+test('after a long gap, Today says what happened since you were last here', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await mockSync(page, noServer);
+  await importSampleData(page);
+  // Pretend the app was last open three days ago.
+  await page.evaluate(() => localStorage.setItem('zachtrack:last-active', JSON.stringify({ at: Date.now() - 3 * 24 * 3600_000 })));
+  await page.goto('/#/');
+  await page.reload();
+  const away = page.getByRole('region', { name: 'Since you were last here' });
+  await expect(away).toContainText('(3 days ago)');
+  // The sample data's fasts reached their goals while "away".
+  await expect(away).toContainText(/fast reached its goal/);
+  await away.getByRole('button', { name: 'Dismiss' }).click();
+  await expect(away).toHaveCount(0);
+  // The next visit, moments later, has nothing to say.
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Today', level: 1 })).toBeVisible();
+  await expect(away).toHaveCount(0);
+  expect(problems).toEqual([]);
+});

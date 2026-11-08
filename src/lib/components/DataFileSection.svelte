@@ -1,6 +1,7 @@
 <script lang="ts">
   import { getAllSyncableRecords, importRecords } from '../db';
-  import { buildCsv, buildExport, csvFileName, exportFileName, planImport, type ImportPlan } from '../dataFile';
+  import { buildCsv, csvFileName, planImport, type ImportPlan } from '../dataFile';
+  import { download, downloadBackupFile } from '../exportData';
 
   // $state.raw, not $state: the plan's records go straight into IndexedDB,
   // which can't clone Svelte's deep proxies (ARCHITECTURE.md 4.4). The plan is
@@ -13,27 +14,11 @@
 
   const pluralize = (n: number, singular: string, plural = `${singular}s`) => `${n} ${n === 1 ? singular : plural}`;
 
-  /** Hands text to the browser as a file download. */
-  function download(text: string, name: string, type: string): void {
-    const blob = new Blob([text], { type });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = name;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    // Give the browser a moment to start the download before freeing the blob.
-    setTimeout(() => URL.revokeObjectURL(url), 10_000);
-  }
-
   async function exportData() {
     error = undefined;
     message = undefined;
     try {
-      const now = new Date();
-      const file = buildExport(await getAllSyncableRecords(), now);
-      download(JSON.stringify(file, null, 2), exportFileName(now), 'application/json');
+      const file = await downloadBackupFile();
       const d = file.data;
       message = `Exported ${pluralize(d.fasts.length, 'fast')}, ${pluralize(d.trackableEntries.length, 'entry', 'entries')} and ${pluralize(d.trackableDefinitions.length, 'trackable')}.`;
     } catch (err) {

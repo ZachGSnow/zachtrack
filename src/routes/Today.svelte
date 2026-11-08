@@ -4,6 +4,10 @@
   import { db, updateTrackable } from '../lib/db';
   import { DATES_WITHIN_DAYS, LOG_RECENT_DAYS, groupByTimeOfDay, suggestGoals, TIME_OF_DAY_LABEL, todayDates, todayHabits, todayLogs, type GoalSuggestion } from '../lib/utils/today';
   import { weeklyReview } from '../lib/utils/weeklyReview';
+  import { sinceLastVisit } from '../lib/utils/sinceLastVisit';
+  import { visitStore } from '../lib/stores/visit.svelte';
+  import DataSafetyCard from '../lib/components/DataSafetyCard.svelte';
+  import AwayCard from '../lib/components/AwayCard.svelte';
   import { takeShortcut } from '../lib/utils/shortcuts';
   import { resolveBodyFieldIds } from '../lib/utils/health';
   import { loadPrefs, savePrefs } from '../lib/utils/prefs';
@@ -56,6 +60,22 @@
       now,
     ),
   );
+  // Since you were last here (utils/sinceLastVisit.ts): needs the sync log from the gap.
+  const syncLog = liveQuery(() => db.syncLog.toArray());
+  const awayLines = $derived(
+    visitStore.previous == null || visitStore.dismissed
+      ? []
+      : sinceLastVisit({
+          lastActive: visitStore.previous,
+          now,
+          trackables: $trackables ?? [],
+          fields: $allFields ?? [],
+          entries: $allEntries ?? [],
+          fasts: $recentFasts ?? [],
+          syncLog: $syncLog ?? [],
+        }),
+  );
+
   const showReview = $derived(review != null && review.weekStart !== reviewDismissed && (review.habits || review.weight || review.fasts.count));
   function dismissReview() {
     if (!review) return;
@@ -99,6 +119,12 @@
     <h1 class="text-xl font-semibold text-text">Today</h1>
     <p class="text-sm text-text-muted">{dateLine}</p>
   </div>
+
+  {#if awayLines.length > 0 && visitStore.previous != null}
+    <div class="lg:col-span-2">
+      <AwayCard lines={awayLines} since={visitStore.previous} />
+    </div>
+  {/if}
 
   {#if showReview && review}
     <div class="lg:col-span-2">
@@ -262,6 +288,9 @@
         </Card>
       </section>
     {/if}
+
+    <!-- Synced, backed up, exported: the app says where your data is (utils/dataSafety.ts). -->
+    <DataSafetyCard {now} />
   </div>
 </div>
 
