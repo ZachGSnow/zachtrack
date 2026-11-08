@@ -5,6 +5,7 @@
   import { BODY_FIELD_SETTING, bodyFieldOptions, resolveBodyFieldIds, unusedFields, type BodyFatSex, type BodyFieldRole } from '../lib/utils/health';
   import { allPresets } from '../lib/data/presets';
   import DataFileSection from '../lib/components/DataFileSection.svelte';
+  import ScaleImportSection from '../lib/components/ScaleImportSection.svelte';
   import { link } from 'svelte-spa-router';
   import HelpLink from '../lib/components/HelpLink.svelte';
   import SyncHistory from '../lib/components/SyncHistory.svelte';
@@ -297,6 +298,7 @@
 
   <section aria-label="Your data">
     <DataFileSection />
+    <ScaleImportSection />
   </section>
 
   <section class="space-y-3" aria-labelledby="settings-sync">

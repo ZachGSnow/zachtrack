@@ -1109,3 +1109,30 @@ test('Today logs a reading or a rating without opening the sheet', async ({ page
   await expect(page.getByRole('status').filter({ hasText: 'Logged Overall Mood 4' })).toBeVisible();
   expect(problems).toEqual([]);
 });
+
+test('weigh-ins import from a scale app CSV, leaving out days already logged', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await mockSync(page, noServer);
+  await waitForStarterSet(page);
+  await openSettings(page);
+  const section = page.getByRole('group', { name: 'Weigh-ins from a scale app' });
+  // A Withings-style export in kg, three readings a few days back.
+  const day = (n: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() - n);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+  const csv = `Date,Weight (kg),Fat mass (kg)\n${day(3)} 07:10:00,87.3,19.1\n${day(2)} 07:05:00,87.1,19.0\n${day(1)} 07:02:00,86.9,18.9\n`;
+  await section.getByLabel('Scale CSV file').setInputFiles({ name: 'withings.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
+  await expect(section).toContainText('3 new weigh-ins');
+  await expect(section).toContainText('converted to lb');
+  await section.getByRole('button', { name: 'Import 3 weigh-ins' }).click();
+  await expect(section.getByRole('status')).toContainText('Imported 3 weigh-ins into Body Measurements.');
+
+  // The same file again: nothing new.
+  await section.getByLabel('Scale CSV file').setInputFiles({ name: 'withings.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
+  await expect(section).toContainText('Nothing new');
+  await page.goto('/#/trackables');
+  await expect(page.getByRole('link', { name: /Body Measurements/ })).toContainText('191.6 lb');
+  expect(problems).toEqual([]);
+});
