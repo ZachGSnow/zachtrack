@@ -43,8 +43,9 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
   rating (custom scale) or yes/no fields. Each field chooses how several
   entries on one day combine (`sum` for Water, `last` for Weight, `average`).
   Each trackable leads with what matters for its kind, picked automatically
-  from its fields and changeable: time since (events), latest value and
-  change (readings like Weight), today's total (Calories, Water) or logged
+  from its fields and changeable: time since (events), latest value with its
+  7-day average and weekly trend (readings like Weight, and a goal-weight
+  date at that rate), today's total (Calories, Water) or logged
   today with a streak (check-ins). Optional goals: a daily total, N times a
   week, every N days (with due and overdue) or avoid, each with its own
   streak; times per day too, and daily goals can apply on chosen weekdays,
@@ -69,7 +70,8 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
   Dates show under Needs attention a few days ahead, the next two weeks
   under Coming up, and the next year on a Dates page with a list and a
   month calendar.
-- **Three tabs:** Fasting (Timer, Journey, History), Trackables (List,
+- **Four tabs:** Today (what to do now: the fast, habits due, what to log
+  and dates coming up), Fasting (Timer, Journey, History), Trackables (List,
   Dates) and Insights, with each tab's pages switched at the top of the page
   on a phone and listed in the sidebar on a laptop. Insights opens with an
   overview of fasting and every trackable, the clearest patterns and a year

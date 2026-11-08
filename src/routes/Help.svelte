@@ -9,6 +9,7 @@
 
   const TOPICS = [
     { id: 'getting-started', title: 'Getting started' },
+    { id: 'today', title: 'Today' },
     { id: 'trackables', title: 'Trackables and what they show' },
     { id: 'dates', title: 'Dates: birthdays, holidays and countdowns' },
     { id: 'goals', title: 'Goals' },
@@ -46,9 +47,9 @@
     <section id="help-getting-started">
       <h2>Getting started</h2>
       <p class="mb-2">
-        Three tabs: <strong>Fasting</strong> (the timer, Journey with your stats, and History of past fasts),
-        <strong>Trackables</strong> (the list, and Dates), and <strong>Insights</strong>. Switch a tab's pages with the buttons at
-        the top of the page; on a laptop they're listed in the sidebar.
+        Four tabs: <strong>Today</strong> (what to do now), <strong>Fasting</strong> (the timer, Journey with your stats, and
+        History of past fasts), <strong>Trackables</strong> (the list, and Dates), and <strong>Insights</strong>. Switch a tab's
+        pages with the buttons at the top of the page; on a laptop they're listed in the sidebar.
       </p>
       <ol>
         <li>
@@ -75,6 +76,29 @@
       </ol>
     </section>
 
+    <section id="help-today">
+      <h2>Today</h2>
+      <p class="mb-2">
+        The app opens on Today: what to do now, gathered from every part of it. Each row links to where the rest lives.
+      </p>
+      <ul>
+        <li>
+          <strong>Fasting:</strong> the running fast with its goal progress and zone, or, between fasts, your eating window and
+          when the next fast is due, with one tap to start today's method (from your weekly plan, else the default). "More
+          options" opens the timer for starting earlier or picking another method.
+        </li>
+        <li>
+          <strong>Habits:</strong> every trackable with a goal, most urgent first, each with where it stands and its check button.
+          Done ones sink to the bottom; rest, skipped and paused days are greyed out and don't count.
+        </li>
+        <li>
+          <strong>Log:</strong> the trackables without a goal that you've logged in the last 30 days, with their latest reading
+          and a "+". Anything quieter than that stays on the Trackables list.
+        </li>
+        <li><strong>Coming up:</strong> the next two weeks of birthdays, anniversaries, holidays and countdowns.</li>
+      </ul>
+    </section>
+
     <section id="help-trackables">
       <h2>Trackables and what they show</h2>
       <p>
@@ -83,7 +107,11 @@
       </p>
       <ul>
         <li><strong>Time since:</strong> no fields, so when it happens is the point. Shows how long ago and the usual gap.</li>
-        <li><strong>Latest value:</strong> a reading like Weight. Shows the latest value and how it changed over about a week.</li>
+        <li>
+          <strong>Latest value:</strong> a reading like Weight. Shows the latest value, then its 7-day average against the week
+          before and the trend per week over 30 days, so one high morning doesn't read as a gain. A new entry starts from your
+          last readings: change what moved.
+        </li>
         <li><strong>Daily total:</strong> a field that adds up, like Calories or Water. Shows today's total and your daily average.</li>
         <li><strong>Check-in:</strong> a rating or yes/no. Shows whether you logged today and your streak.</li>
         <li>

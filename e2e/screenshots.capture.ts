@@ -18,7 +18,7 @@ test('capture README screenshots', async ({ page }) => {
   await mockSync(page, okSync());
   await importSampleData(page);
   // The fasting timer reads the running fast at startup.
-  await page.goto('/');
+  await page.goto('/#/fasting');
   await page.reload();
 
   await expect(page.getByRole('button', { name: /Synced/ }).locator('visible=true')).toBeVisible();

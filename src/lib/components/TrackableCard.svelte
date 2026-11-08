@@ -2,11 +2,12 @@
   import { link } from 'svelte-spa-router';
   import type { FieldDefinition, TrackableDefinition, TrackableEntry } from '../db';
   import { resolveKind, summarize } from '../utils/trackableKinds';
-  import { GOAL_STATE_COLORS, goalCardLine, goalStatus } from '../utils/trackableGoals';
+  import { GOAL_STATE_COLORS, goalCardLine } from '../utils/trackableGoals';
+  import { checkState } from '../utils/quickCheck';
   import { describeDate } from '../utils/dates';
   import { habitGridWeeks } from '../utils/habitGrid';
-  import { startOfDay } from '../utils/time';
   import HabitGrid from './HabitGrid.svelte';
+  import CheckButton from './CheckButton.svelte';
   import { themeStore } from '../stores/theme.svelte';
   import { readableGraphic } from '../utils/color';
 
@@ -57,41 +58,21 @@
       : [],
   );
 
-  const goal = $derived(kind === 'ages' ? null : goalStatus(trackable, entries, attachedFields, now));
-
   // A trackable with a goal (other than avoid, where logging means you slipped)
   // gets the habit-tracker card: a check button for today and a strip of its grid.
-  const goalCard = $derived(!!trackable.goalType && trackable.goalType !== 'avoid' && kind !== 'ages');
-  const noFields = $derived(trackable.fieldIds.length === 0);
-  const loggedToday = $derived(entries.some((e) => startOfDay(e.timestamp) === startOfDay(now)));
-  // Counting (a ring) from two times a day up; once a day is a plain check.
-  const multiple = $derived(trackable.goalType === 'perDay' && (trackable.goalValue ?? 1) > 1);
-  const counted = $derived(trackable.goalType === 'dailyTotal' || multiple);
-  const todayCount = $derived(entries.filter((e) => startOfDay(e.timestamp) === startOfDay(now)).length);
-  const doneToday = $derived(counted ? goal?.state === 'done' : loggedToday);
-  // Daily totals and times-per-day show a ring filling toward today's goal until it's met.
-  const ring = $derived(counted && !doneToday ? (goal?.progress ?? 0) : null);
+  const check = $derived(checkState(trackable, kind, entries, attachedFields, now));
+  const goal = $derived(check.goal);
 
   // As many whole weeks as fit the card at about 14px a cell.
   let stripWidth = $state(0);
   const stripWeeks = $derived(Math.max(8, Math.min(53, Math.floor((stripWidth + 3) / 17))));
-  const strip = $derived(goalCard ? habitGridWeeks(trackable, entries, attachedFields, stripWeeks, now) : []);
+  const strip = $derived(check.goalCard ? habitGridWeeks(trackable, entries, attachedFields, stripWeeks, now) : []);
 
   // Without fields a tap logs one more until today is done; then it takes the last one back off.
-  function check() {
-    if (noFields && doneToday && onUncheck) onUncheck();
+  function tapCheck() {
+    if (check.noFields && check.doneToday && onUncheck) onUncheck();
     else onQuickLog();
   }
-
-  const checkLabel = $derived(
-    !noFields
-      ? `Log ${trackable.name}`
-      : doneToday
-        ? `Uncheck ${trackable.name} for today`
-        : multiple
-          ? `Log one ${trackable.name} (${todayCount} of ${trackable.goalValue} today)`
-          : `Check ${trackable.name} for today`,
-  );
 
   const subtitle = $derived(
     kind === 'ages'
@@ -106,7 +87,7 @@
   );
 </script>
 
-<div class="rounded-2xl border p-3" style="border-color: var(--color-border); background: var(--color-surface);">
+<div class="rounded-2xl border border-border bg-surface p-3">
   <div class="flex items-center gap-3">
     <a href="/trackables/{trackable.id}" use:link class="flex flex-1 items-center gap-3 overflow-hidden">
       <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xl" style="background: {trackable.color}22;">
@@ -124,40 +105,18 @@
     {#if onMove}
       <div class="flex shrink-0 gap-1">
         <button
-          class="flex h-9 w-9 items-center justify-center rounded-full border text-sm text-text-muted"
-          style="border-color: var(--color-border);"
+          class="flex h-9 w-9 items-center justify-center rounded-full border border-border text-sm text-text-muted"
           onclick={() => onMove(-1)}
           aria-label="Move {trackable.name} up"
         >&uarr;</button>
         <button
-          class="flex h-9 w-9 items-center justify-center rounded-full border text-sm text-text-muted"
-          style="border-color: var(--color-border);"
+          class="flex h-9 w-9 items-center justify-center rounded-full border border-border text-sm text-text-muted"
           onclick={() => onMove(1)}
           aria-label="Move {trackable.name} down"
         >&darr;</button>
       </div>
-    {:else if goalCard}
-      <button
-        class="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-lg font-bold"
-        style={doneToday
-          ? `background: ${trackable.color}; color: var(--color-brand-fg);`
-          : `box-shadow: inset 0 0 0 2px ${ring != null ? `${ink}33` : `${ink}99`}; color: ${ink};`}
-        onclick={check}
-        aria-label={checkLabel}
-        aria-pressed={noFields ? doneToday : undefined}
-      >
-        {#if ring != null}
-          <!-- Progress toward today's total. -->
-          <svg class="absolute inset-0 -rotate-90" viewBox="0 0 40 40" aria-hidden="true">
-            <circle cx="20" cy="20" r="19" fill="none" stroke={ink} stroke-width="2" stroke-linecap="round" pathLength="100" stroke-dasharray="{ring * 100} 100" />
-          </svg>
-          <span class="text-sm">{multiple && noFields ? todayCount : '+'}</span>
-        {:else if doneToday}
-          &#10003;
-        {:else if !noFields}
-          <span class="text-base">+</span>
-        {/if}
-      </button>
+    {:else if check.goalCard}
+      <CheckButton state={check} color={ink} onclick={tapCheck} />
     {:else}
       <button
         class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-lg font-semibold"
@@ -167,7 +126,7 @@
       >+</button>
     {/if}
   </div>
-  {#if goalCard && !compact}
+  {#if check.goalCard && !compact}
     <div class="mt-2.5" bind:clientWidth={stripWidth}>
       <HabitGrid weeks={strip} color={ink} labels={false} maxCell={16} />
     </div>

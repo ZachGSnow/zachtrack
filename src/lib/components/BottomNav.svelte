@@ -22,8 +22,8 @@
       const n = attentionStore.items.length;
       return { text: String(n), label: `${n} need${n === 1 ? 's' : ''} attention` };
     }
-    if (href === '/' && attentionStore.fastingLate) return { text: '', label: 'fast is late' };
-    if (href === '/' && fastTimer.milestone) return { text: '', label: 'new fasting milestone' };
+    if (href === '/fasting' && attentionStore.fastingLate) return { text: '', label: 'fast is late' };
+    if (href === '/fasting' && fastTimer.milestone) return { text: '', label: 'new fasting milestone' };
     return null;
   };
 

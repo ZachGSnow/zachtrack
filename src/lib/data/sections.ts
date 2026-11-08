@@ -1,8 +1,10 @@
-// The app's sections (ARCHITECTURE.md 3.39): the tab bar on a phone, the
-// sidebar on a laptop, and each section's own pages, switched with the tabs at
-// the top of the page (SectionTabs.svelte) or the sidebar's indented links.
+// The app's sections (ARCHITECTURE.md 3.39 and 3.41): the tab bar on a phone,
+// the sidebar on a laptop, and each section's own pages, switched with the
+// tabs at the top of the page (SectionTabs.svelte) or the sidebar's indented
+// links.
 
 import type { LucideIcon } from '@lucide/svelte';
+import House from '@lucide/svelte/icons/house';
 import Timer from '@lucide/svelte/icons/timer';
 import ListChecks from '@lucide/svelte/icons/list-checks';
 import Lightbulb from '@lucide/svelte/icons/lightbulb';
@@ -24,13 +26,15 @@ export interface Section {
 }
 
 export const SECTIONS: Section[] = [
+  // Today is the home: what to do now, from every part of the app.
+  { href: '/', label: 'Today', icon: House, match: /^\/$/ },
   {
-    href: '/',
+    href: '/fasting',
     label: 'Fasting',
     icon: Timer,
-    match: /^\/(journey|history)?$/,
+    match: /^\/(fasting|journey|history)$/,
     pages: [
-      { href: '/', label: 'Timer' },
+      { href: '/fasting', label: 'Timer' },
       { href: '/journey', label: 'Journey' },
       { href: '/history', label: 'History' },
     ],

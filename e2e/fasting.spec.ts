@@ -9,7 +9,7 @@ test.use({ serviceWorkers: 'block' });
 test.beforeEach(async ({ page }) => {
   await mockSync(page, noServer);
   await waitForStarterSet(page);
-  await page.goto('/');
+  await page.goto('/#/fasting');
   await expect(page.getByRole('heading', { name: 'Ready when you are' })).toBeVisible();
 });
 
@@ -122,7 +122,7 @@ test("the weekly plan picks today's method, and a rest day isn't late", async ({
   const today = await todayName(page);
   await openSettings(page);
   await page.getByLabel(`${today} method`).selectOption({ label: '18:6' });
-  await page.goto('/');
+  await page.goto('/#/fasting');
   await expect(page.getByText('Into the metabolic switch, with ketones starting to rise')).toBeVisible(); // 18:6 selected
 
   // A daily start long past, but today rests: nothing is late, and the next planned day is shown.
@@ -131,7 +131,7 @@ test("the weekly plan picks today's method, and a rest day isn't late", async ({
   await daily.fill('00:01');
   await daily.dispatchEvent('change');
   await page.getByLabel(`${today} method`).selectOption('rest');
-  await page.goto('/');
+  await page.goto('/#/fasting');
   await expect(page.getByText(/^Next fast starts/)).toBeVisible();
   await expect(page.getByText(/^Your fast was due/)).toHaveCount(0);
   await expect(page.getByLabel('fast is late')).toHaveCount(0);

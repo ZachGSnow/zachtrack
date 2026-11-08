@@ -6,6 +6,7 @@
   import Settings from '@lucide/svelte/icons/settings';
   import BottomNav from './lib/components/BottomNav.svelte';
   import SectionTabs from './lib/components/SectionTabs.svelte';
+  import Today from './routes/Today.svelte';
   import Fasting from './routes/Fasting.svelte';
   import Trackables from './routes/Trackables.svelte';
   import History from './routes/History.svelte';
@@ -18,7 +19,9 @@
   import SyncStatus from './lib/components/SyncStatus.svelte';
 
   const routes = {
-    '/': Fasting,
+    '/': Today,
+    // The timer, which was the home until Today arrived (v1.15.0).
+    '/fasting': Fasting,
     '/trackables': Trackables,
     // Lazy-loaded: these pull in ECharts, so keep them out of the initial bundle.
     '/trackables/:id': wrap({ asyncComponent: () => import('./routes/TrackableDetail.svelte') }),

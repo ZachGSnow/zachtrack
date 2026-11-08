@@ -1,15 +1,7 @@
 <script lang="ts">
   import { liveQuery } from 'dexie';
   import { push } from 'svelte-spa-router';
-  import {
-    addTrackableEntry,
-    db,
-    deleteTrackableEntry,
-    updateTrackable,
-    type FieldDefinition,
-    type TrackableDefinition,
-    type TrackableEntry,
-  } from '../lib/db';
+  import { db, updateTrackable, type FieldDefinition, type TrackableDefinition, type TrackableEntry } from '../lib/db';
   import { resolveKind } from '../lib/utils/trackableKinds';
   import { goalStatus } from '../lib/utils/trackableGoals';
   import { LIST_SORTS, moveInOrder, orderTrackables, type ListSort } from '../lib/utils/trackableList';
@@ -23,7 +15,8 @@
   import ComingUp from '../lib/components/ComingUp.svelte';
   import BottomSheet from '../lib/components/BottomSheet.svelte';
   import EditTrackableSheet from '../lib/components/EditTrackableSheet.svelte';
-  import LogTrackableEntrySheet from '../lib/components/LogTrackableEntrySheet.svelte';
+  import QuickLogHost from '../lib/components/QuickLogHost.svelte';
+  import { quickLog } from '../lib/stores/quickLog.svelte';
 
   const trackables = liveQuery(() => db.trackableDefinitions.orderBy('name').toArray());
   const allFields = liveQuery(() => db.fieldDefinitions.toArray());
@@ -84,68 +77,14 @@
   let editOpen = $state(false);
   let editingTrackable = $state<TrackableDefinition | null>(null);
 
-  let logOpen = $state(false);
-  let loggingTrackable = $state<TrackableDefinition | null>(null);
-
-
   function openCreate() {
     editingTrackable = null;
     editOpen = true;
   }
 
-  // A trackable with no fields has nothing to fill in, so "+" (or its check
-  // button) logs it right away, the "I just did it" of a days-since app, and
-  // checking it again takes today's entry back off. Either way there are a few
-  // seconds to undo.
-  let undo = $state<{ message: string; revert: () => Promise<unknown> } | null>(null);
-
-  function offerUndo(message: string, revert: () => Promise<unknown>) {
-    clearTimeout(undoTimer);
-    undo = { message, revert };
-    undoTimer = setTimeout(() => (undo = null), 6000);
-  }
-  let undoTimer: ReturnType<typeof setTimeout> | undefined;
-  let quickLogError = $state('');
-
-  async function openQuickLog(t: TrackableDefinition) {
-    if (t.fieldIds.length > 0 || t.displayMode === 'ages') {
-      loggingTrackable = t;
-      logOpen = true;
-      return;
-    }
-    quickLogError = '';
-    try {
-      const entry = await addTrackableEntry({ trackableId: t.id, timestamp: Date.now() });
-      offerUndo(`Logged ${t.name}`, () => deleteTrackableEntry(entry.id));
-    } catch (e) {
-      quickLogError = e instanceof Error ? e.message : 'Could not log it. Please try again.';
-    }
-  }
-
-  /** Unchecks today: removes today's latest entry; Undo puts it back. */
-  async function uncheckToday(t: TrackableDefinition) {
-    const today = startOfDay(Date.now());
-    const latest = (entriesByTrackable.get(t.id) ?? [])
-      .filter((e) => startOfDay(e.timestamp) === today)
-      .sort((a, b) => b.timestamp - a.timestamp)[0];
-    if (!latest) return;
-    quickLogError = '';
-    try {
-      await deleteTrackableEntry(latest.id);
-      const { timestamp, note, tags, values } = latest;
-      offerUndo(`Unchecked ${t.name}`, () => addTrackableEntry({ trackableId: t.id, timestamp, note, tags, values }));
-    } catch (e) {
-      quickLogError = e instanceof Error ? e.message : 'Could not uncheck it. Please try again.';
-    }
-  }
-
-  async function undoQuickLog() {
-    if (!undo) return;
-    const { revert } = undo;
-    undo = null;
-    clearTimeout(undoTimer);
-    await revert();
-  }
+  // "+" and the check buttons log through the shared quick-log store
+  // (stores/quickLog.svelte.ts): a sheet for a trackable with fields, one tap
+  // with undo for one without. QuickLogHost renders the sheet and the toast.
 
   function handleCreated(id: string) {
     push(`/trackables/${id}`);
@@ -206,8 +145,8 @@
           trackable={t}
           fields={$allFields ?? []}
           entries={entriesByTrackable.get(t.id) ?? []}
-          onQuickLog={() => openQuickLog(t)}
-          onUncheck={() => uncheckToday(t)}
+          onQuickLog={() => quickLog.log(t)}
+          onUncheck={() => quickLog.uncheck(t, entriesByTrackable.get(t.id) ?? [])}
           onMove={reordering ? (direction) => move(t, direction) : undefined}
           {compact}
         />
@@ -220,7 +159,7 @@
       {#if showArchived}
         <div class="flex flex-col gap-2 opacity-70 lg:grid lg:grid-cols-2 lg:items-start 2xl:grid-cols-3">
           {#each archived as t (t.id)}
-            <TrackableCard trackable={t} fields={$allFields ?? []} entries={entriesByTrackable.get(t.id) ?? []} onQuickLog={() => openQuickLog(t)} />
+            <TrackableCard trackable={t} fields={$allFields ?? []} entries={entriesByTrackable.get(t.id) ?? []} onQuickLog={() => quickLog.log(t)} />
           {/each}
         </div>
       {/if}
@@ -228,25 +167,9 @@
   {/if}
 </div>
 
-{#if undo}
-  <div
-    class="fixed inset-x-0 bottom-20 z-30 lg:bottom-6 mx-auto flex w-[calc(100%-2.5rem)] max-w-md items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm shadow-lg"
-    style="border-color: var(--color-border); background: var(--color-surface);"
-    role="status"
-  >
-    <span class="truncate text-text">{undo.message}</span>
-    <button class="shrink-0 font-semibold" style="color: var(--color-brand);" onclick={undoQuickLog}>Undo</button>
-  </div>
-{/if}
-{#if quickLogError}
-  <p class="px-5 text-sm" style="color: var(--color-danger);">{quickLogError}</p>
-{/if}
+<QuickLogHost />
 
 <BottomSheet bind:open={editOpen}>
   <EditTrackableSheet bind:open={editOpen} trackable={editingTrackable} onSaved={handleCreated} />
-</BottomSheet>
-
-<BottomSheet bind:open={logOpen}>
-  <LogTrackableEntrySheet bind:open={logOpen} trackable={loggingTrackable} />
 </BottomSheet>
 

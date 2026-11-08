@@ -33,7 +33,9 @@ test('a fast started and then ended on another device shows up without a restart
 
   let next: SyncMock = okSync();
   await mockSync(page, () => next);
-  await page.goto('/');
+  // A hash change alone wouldn't reload the app, and it has to start again to pick up the new server.
+  await page.goto('/#/fasting');
+  await page.reload();
   await expect(page.getByRole('heading', { name: 'Ready when you are' })).toBeVisible();
 
   // The phone started a fast three hours ago; this device pulls it.
@@ -55,7 +57,7 @@ test('a fast started and then ended on another device shows up without a restart
 test('starting and ending a fast on this device still works', async ({ page }) => {
   await mockSync(page, noServer);
   await waitForStarterSet(page);
-  await page.goto('/');
+  await page.goto('/#/fasting');
   await page.getByRole('button', { name: 'Start Fast' }).click();
   await expect(page.getByRole('button', { name: 'End Fast' })).toBeVisible();
   await expect(page.getByText(/^00:00:\d\d$/)).toBeVisible();

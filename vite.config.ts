@@ -52,7 +52,7 @@ export default defineConfig({
             name: 'Start a fast',
             short_name: 'Start fast',
             description: 'Start a fast with your default method',
-            url: '/?shortcut=start-fast#/',
+            url: '/?shortcut=start-fast#/fasting',
             icons: [{ src: '/pwa-192.png', sizes: '192x192', type: 'image/png' }],
           },
           {

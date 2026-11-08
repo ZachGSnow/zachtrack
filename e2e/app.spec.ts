@@ -250,11 +250,11 @@ test('a goal shows progress and due dates, and a trackable without fields logs i
 test('the home-screen shortcuts are in the manifest, and Start fast starts the default method once', async ({ page, request }) => {
   const problems = watchForProblems(page);
   const manifest = await (await request.get('/manifest.webmanifest')).json();
-  expect(manifest.shortcuts.map((s: { url: string }) => s.url)).toEqual(['/?shortcut=start-fast#/', '/#/trackables', '/#/journey']);
+  expect(manifest.shortcuts.map((s: { url: string }) => s.url)).toEqual(['/?shortcut=start-fast#/fasting', '/#/trackables', '/#/journey']);
 
   await mockSync(page, noServer);
   await waitForStarterSet(page);
-  await page.goto('/?shortcut=start-fast#/');
+  await page.goto('/?shortcut=start-fast#/fasting');
   await expect(page.getByRole('button', { name: 'End Fast' })).toBeVisible();
   // The marker is removed, so reloading doesn't start another fast.
   await expect.poll(() => new URL(page.url()).search).toBe('');
@@ -271,7 +271,7 @@ test('a daily fast start time shows a countdown, and Journey shows how often fas
   await openSettings(page);
   await page.getByLabel(/^Daily fast start/).fill('20:00');
   await page.getByLabel(/^Daily fast start/).blur();
-  await page.goto('/#/');
+  await page.goto('/#/fasting');
   await expect(page.getByText(/^(Next fast starts in .+|Your fast was due at .+ ago)$/)).toBeVisible();
 
   await importSampleData(page);
@@ -339,9 +339,10 @@ test('on a laptop-width screen the sidebar replaces the tab bar and marks the cu
   await waitForStarterSet(page);
   const sidebar = page.getByRole('navigation', { name: 'Main' }).filter({ hasText: 'ZachTrack' });
   await expect(sidebar).toBeVisible();
-  // Three sections, each lit on any of its pages; the current page is marked under it.
+  // Four sections, each lit on any of its pages; the current page is marked under it.
   for (const [url, section, current] of [
-    ['/#/', 'Fasting', 'Timer'],
+    ['/#/', 'Today', null],
+    ['/#/fasting', 'Fasting', 'Timer'],
     ['/#/journey', 'Fasting', 'Journey'],
     ['/#/history', 'Fasting', 'History'],
     ['/#/trackables', 'Trackables', 'List'],
@@ -376,11 +377,11 @@ test('on a laptop-width screen the sidebar replaces the tab bar and marks the cu
   expect(problems).toEqual([]);
 });
 
-test('on a phone three tabs mark the section, and tabs at the top switch its pages', async ({ page }) => {
+test('on a phone four tabs mark the section, and tabs at the top switch its pages', async ({ page }) => {
   await mockSync(page, noServer);
   await waitForStarterSet(page);
   const tabs = page.getByRole('navigation', { name: 'Main' });
-  await expect(tabs.getByRole('link')).toHaveText([/Fasting/, /Trackables/, /Insights/]);
+  await expect(tabs.getByRole('link')).toHaveText([/Today/, /Fasting/, /Trackables/, /Insights/]);
 
   await page.goto('/#/journey');
   await expect(tabs.locator('a.active:visible')).toHaveText(/Fasting/);
@@ -526,7 +527,7 @@ test('a fast length of your own can be saved, started and removed', async ({ pag
   const problems = watchForProblems(page);
   await mockSync(page, noServer);
   await waitForStarterSet(page);
-  await page.goto('/#/');
+  await page.goto('/#/fasting');
   await page.getByRole('button', { name: '+ Your own' }).click();
   await page.getByRole('textbox', { name: 'Hours' }).fill('15');
   await page.getByRole('button', { name: 'Save', exact: true }).click();
@@ -545,7 +546,7 @@ test('a fast length of your own can be saved, started and removed', async ({ pag
   await expect(page.getByRole('button', { name: 'Remove 15:9' })).toBeVisible(); // listed under Your fast lengths
   await page.keyboard.press('Escape');
 
-  await page.goto('/#/');
+  await page.goto('/#/fasting');
   await page.getByRole('button', { name: '15:9', exact: true }).click();
   await page.getByRole('button', { name: 'Start Fast' }).click();
   await expect(page.getByText('of 15h goal')).toBeVisible();
@@ -592,7 +593,7 @@ test('a late scheduled fast puts a dot on the Fasting tab until a fast starts', 
   await page.getByLabel(/^Daily fast start/).blur();
   const fastingTab = page.getByRole('navigation', { name: 'Main' }).locator('a:visible', { hasText: 'Fasting' });
   await expect(fastingTab.getByLabel('fast is late')).toBeVisible();
-  await page.goto('/#/');
+  await page.goto('/#/fasting');
   await page.getByRole('button', { name: 'Start Fast' }).click();
   await expect(fastingTab.getByLabel('fast is late')).toHaveCount(0);
 });
@@ -647,7 +648,7 @@ test('Help opens from the header and from the question marks next to settings th
   await page.getByRole('link', { name: 'Help', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Help', level: 1 })).toBeVisible();
   const topics = page.getByRole('navigation', { name: 'Help topics' }).getByRole('link');
-  await expect(topics).toHaveCount(12);
+  await expect(topics).toHaveCount(13);
   for (const title of await topics.allTextContents()) {
     await expect(page.getByRole('heading', { name: title, level: 2 })).toHaveCount(1);
   }
@@ -701,5 +702,66 @@ test('Settings > Appearance switches the theme, which sticks on this device', as
   await page.getByRole('button', { name: 'Dark', exact: true }).click();
   await expect(html).toHaveAttribute('data-theme', 'dark');
   await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#0b0f0e');
+  expect(problems).toEqual([]);
+});
+test('Today shows the fast, habits with a goal and recent logs, and checks a habit in one tap', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await mockSync(page, noServer);
+  await importSampleData(page);
+
+  // A habit: Male Health once a day.
+  await page.goto('/#/trackables');
+  await page.getByRole('link', { name: /Male Health/ }).click();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.getByRole('combobox', { name: /^Goal/ }).selectOption('perDay');
+  await page.getByRole('textbox', { name: 'Times per day' }).fill('1');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.getByText('Goal: Once a day')).toBeVisible();
+
+  await page.goto('/#/');
+  await expect(page.getByRole('heading', { name: 'Today', level: 1 })).toBeVisible();
+  // The sample data has a 16:8 fast running past its goal.
+  const fasting = page.getByRole('region', { name: 'Fasting' });
+  await expect(fasting).toContainText('Fasting · 16:8');
+  await expect(fasting.getByRole('progressbar', { name: 'Progress to goal' })).toBeVisible();
+  await expect(fasting).toContainText(/Goal reached at/);
+
+  const habits = page.getByRole('region', { name: 'Habits' });
+  await expect(habits).toContainText('Male Health');
+  await expect(habits).toContainText('0 of 1 done');
+  await habits.getByRole('button', { name: 'Check Male Health for today' }).click();
+  await expect(page.getByRole('status')).toContainText('Logged Male Health');
+  await expect(habits).toContainText('1 of 1 done');
+  await expect(habits.getByRole('button', { name: 'Uncheck Male Health for today' })).toHaveAttribute('aria-pressed', 'true');
+
+  // The sample data weighs in most mornings: Body Measurements is under Log with its latest reading and 7-day average,
+  // and a new entry starts from the last readings.
+  const log = page.getByRole('region', { name: 'Log' });
+  await expect(log).toContainText(/Body Measurements\s+\d+(\.\d+)? lb · avg \d+(\.\d+)?/);
+  await log.getByRole('button', { name: 'Log Body Measurements' }).click();
+  const sheet = page.getByRole('dialog');
+  await expect(sheet.getByRole('textbox', { name: 'Weight (lb)' })).not.toHaveValue('');
+  await expect(sheet).toContainText('Readings start from your last entry');
+  await page.keyboard.press('Escape');
+
+  // No dates trackable in the sample data, so no Coming up.
+  await expect(page.getByRole('region', { name: 'Coming up' })).toHaveCount(0);
+
+  await fasting.getByRole('link', { name: 'Open timer' }).click();
+  await expect(page.getByRole('button', { name: 'End Fast' })).toBeVisible();
+  expect(problems).toEqual([]);
+});
+
+test('Today starts a fast in one tap with today\'s method', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await mockSync(page, noServer);
+  await waitForStarterSet(page);
+  await page.goto('/#/');
+  const fasting = page.getByRole('region', { name: 'Fasting' });
+  await expect(fasting).toContainText('No fast running');
+  await fasting.getByRole('button', { name: 'Start 16:8' }).click();
+  await expect(fasting).toContainText('Fasting · 16:8');
+  await expect(fasting.getByRole('progressbar', { name: 'Progress to goal' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Habits' })).toContainText('No goals yet');
   expect(problems).toEqual([]);
 });

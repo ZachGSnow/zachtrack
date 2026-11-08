@@ -765,6 +765,44 @@ typed inline (`#f87171` for overdue in thirty places). The one-app rework
   background rules. `SegmentedControl` gained an `onchange` for the cases
   where a pick does something rather than just binding.
 
+### 3.41 Today, the home (v1.15.0)
+
+By v1.14.0 the app was three apps stapled together: a fasting timer at `/`,
+a habit list under Trackables and dates beside it, each with its own idea of
+"what now". The timer opened first although fasting had lapsed for months
+while weigh-ins and check-ins carried on daily. 3.39 had turned a Today tab
+down because Needs attention and the badges covered it; they covered what
+was overdue, not what the day looks like.
+
+Today (`routes/Today.svelte`) is now `/`, the first of four tabs, and the
+timer moved to `/fasting` (the Start fast shortcut and the nav's fasting
+badges follow it; `/journey` and `/history` are unchanged). It only reads;
+every row links to where the rest lives. `utils/today.ts` picks what it
+shows, so the choices are unit tested:
+
+- **Fasting** (`FastNow.svelte`): the running fast's elapsed time, goal
+  progress in the zone's colour, zone and milestone, with Open timer; or,
+  between fasts, the eating window (3.35), the schedule (3.20) or a rest
+  day, and one tap to start today's method from the weekly plan (3.36),
+  else the default. Starting earlier, ending and details stay on the timer.
+- **Habits**: every trackable with a goal other than avoid
+  (`todayHabits`), most urgent first by the goal's urgency (3.18), done
+  ones after, rest, skipped and paused days last and greyed out. Each row
+  (`HabitRow.svelte`) has the goal's text and streak and the same check
+  button as the list card.
+- **Log**: trackables without a goal logged in the last 30 days
+  (`todayLogs`), latest first, with the kind's card line (3.17) and a "+".
+  Anything quieter stays on the Trackables list, so the dormant starter
+  trackables don't crowd the day.
+- **Coming up**: the next 14 days of dates (`todayDates`), only when there
+  is a dates trackable.
+
+The check button and its state moved out of `TrackableCard.svelte` into
+`utils/quickCheck.ts` and `CheckButton.svelte`, and the one-tap logging,
+uncheck and undo out of `Trackables.svelte` into `stores/quickLog.svelte.ts`
+with `QuickLogHost.svelte` for the sheet and the toast, so Today and the
+list share one implementation.
+
 ### 3.21 Trackables list: pin, archive, order; tag filters
 - **Sort** (per device, `zachtrack:trackables-view`): Due first (goal
   urgency from 3.18: overdue, then due, then the rest, then trackables
