@@ -190,7 +190,7 @@
         <li><strong>Coming up</strong> on Trackables: the next two weeks, apart from what Needs attention already shows.</li>
         <li>
           <strong>Dates</strong> (Trackables > Dates): the next year from every dates trackable, as a list by week and month or
-          as a month calendar; tap a day to see its dates. Birthdays and anniversaries add every 1,000 days ("10,000 days old").
+          as a month calendar; tap a day to see its dates.
         </li>
         <li>Each trackable's own page lists its dates, and its card the next three.</li>
         <li>

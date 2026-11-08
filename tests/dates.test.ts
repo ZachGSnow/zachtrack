@@ -111,7 +111,7 @@ describe('in words', () => {
 });
 
 describe('upcoming', () => {
-  it('lists dates within the window soonest first, leaves past one-offs out, and adds 1,000-day milestones', () => {
+  it('lists dates within the window soonest first, leaves past one-offs out, and adds no day-count milestones', () => {
     const t = trackable('birthday');
     const entries = [
       { ...entry(d(1965, 11, 4), 'Mom'), trackableId: 't' },
@@ -121,7 +121,6 @@ describe('upcoming', () => {
     ];
     const items = upcomingDates([t], entries, NOW, 14);
     expect(items.map((i) => [i.name, i.daysUntil, i.detail])).toEqual([
-      ['Kid', 9, '9,000 days old'],
       ['Mom', 12, 'Turns 61'],
     ]);
   });

@@ -128,12 +128,12 @@ test('dates due soon go under Needs attention, the next two weeks under Coming u
   await expect(comingUp.getByRole('link', { name: /Dad: Turns 60/ })).toContainText('in 10 days');
   await expect(comingUp.getByRole('link', { name: /Mom/ })).toHaveCount(0);
 
-  // The Dates page lists both birthdays soonest first (plus 1,000-day milestones later in the year).
+  // The Dates page lists both birthdays soonest first, and nothing else for them.
   await comingUp.getByRole('link', { name: 'See all dates' }).click();
   await expect(page.getByRole('heading', { name: 'Dates', level: 1 })).toBeVisible();
   const birthdays = await page.getByRole('link', { name: /turns 60/ }).allTextContents();
   expect(birthdays.map((n) => (n.includes('Mom') ? 'Mom' : 'Dad'))).toEqual(['Mom', 'Dad']);
-  await expect(page.getByRole('link', { name: /22,000 days old/ }).first()).toBeVisible();
+  await expect(page.getByRole('link', { name: /days old/ })).toHaveCount(0);
 
   // The calendar marks Dad's day; tapping it lists him.
   await page.getByRole('button', { name: 'Calendar', exact: true }).click();
