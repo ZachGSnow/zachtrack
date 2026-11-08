@@ -38,7 +38,9 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
   your next fast, and a weekly plan gives each weekday its own method and
   time or a rest day, and the timer shows this week as a dot per day. After
   a fortnight without a goal fast, a card sums up the year and offers a
-  shorter method to come back with. Long fasts get hydration and electrolyte prompts,
+  shorter method to come back with. History opens with a month calendar
+  and weekly totals. Long fasts get hydration and electrolyte prompts and a
+  one-tap glass of water,
   cautions at 48 and 72 hours, and refeeding advice when they end. Journey has a goal streak (days a fast met its goal), this
   week against last, a habit grid of fasting days, and a weight-after-fasting
   insight next to the table and charts.
@@ -47,8 +49,9 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
   entries on one day combine (`sum` for Water, `last` for Weight, `average`).
   Each trackable leads with what matters for its kind, picked automatically
   from its fields and changeable: time since (events), latest value with its
-  7-day average and weekly trend (readings like Weight, and a goal-weight
-  date at that rate), today's total (Calories, Water) or logged
+  7-day average and weekly trend (readings like Weight, with the average
+  drawn through the chart, changes coloured toward your goal weight, and a
+  goal-weight date at that rate), today's total (Calories, Water) or logged
   today with a streak (check-ins). Optional goals: a daily total, N times a
   week, every N days (with due and overdue) or avoid, each with its own
   streak; times per day too, and daily goals can apply on chosen weekdays,
@@ -56,8 +59,12 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
   streak. A trackable with a goal gets a habit-grid strip on its card and a
   check button for today; each trackable's page has the full grid by week,
   month, six months or year. Today shows every habit's last 7 days in one
-  matrix, with a tap to fill in a day, and a habit's page has tiles for days
-  met, the rate, and the current and best streaks. A trackable without fields logs in one tap,
+  matrix, with a tap to fill in a day, grouped into morning, afternoon and
+  evening by when you usually log them, and suggests goals for what you
+  already log most days. A habit's page has a forgiving strength score
+  (one missed day costs a little, not the streak), days met and the
+  current and best streaks, and Today shows a weekly review on Sundays and
+  Mondays. A trackable without fields logs in one tap,
   with undo. The list
   sorts by what's due (or your own order, or A-Z), with pinning and
   archiving; fasts and entries can be filtered by tag. In-app reminders
@@ -75,7 +82,7 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
   US holidays template adds the federal holidays and common observances.
   Dates show under Needs attention a few days ahead, the next two weeks
   under Coming up, and the next year on a Dates page with a list and a
-  month calendar.
+  month calendar; Export to calendar downloads them as an .ics file.
 - **Four tabs:** Today (what to do now: the fast, habits due, what to log
   and dates coming up), Fasting (Timer, Journey, History), Trackables (List,
   Dates) and Insights, with each tab's pages switched at the top of the page
@@ -95,8 +102,8 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
 - **Phone and laptop layouts:** a tab bar on phones; on wider screens a
   sidebar, content that uses the width, and dialogs instead of bottom sheets.
 - **Offline and installable** (service worker, Android/Chrome PWA), with
-  home-screen shortcuts (long-press the icon): Start a fast, Trackables,
-  Journey.
+  home-screen shortcuts (long-press the icon): Log weight, Start a fast,
+  Trackables, Journey.
 - **Two-way sync** across devices: per-record last-write-wins, deletes that
   propagate, conflicts reported instead of guessed, and a sync status pill.
   A Sync page lists your devices and their app versions, the activity on

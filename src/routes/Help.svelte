@@ -54,7 +54,7 @@
       <ol>
         <li>
           <strong>Install it.</strong> In Chrome on your phone, open the app's menu and choose Add to Home screen. It then opens like
-          an app and works offline. A long press on its icon offers shortcuts: Start a fast, Trackables, Journey.
+          an app and works offline. A long press on its icon offers shortcuts: Log weight, Start a fast, Trackables, Journey.
         </li>
         <li>
           <strong>Start a fast.</strong> On Fasting, pick a method (16:8 and so on, or "+ Your own" for a length of your own) and
@@ -92,8 +92,18 @@
           options" opens the timer for starting earlier or picking another method.
         </li>
         <li>
-          <strong>Habits:</strong> every trackable with a goal, most urgent first, each with where it stands and its check button.
-          Done ones sink to the bottom; rest, skipped and paused days are greyed out and don't count.
+          <strong>Habits:</strong> every trackable with a goal, most urgent first, each with where it stands, its streak, how
+          strong the habit is, and its check button. They're grouped into morning, afternoon and evening by when you usually log
+          them. Done ones sink to the bottom; rest, skipped and paused days are greyed out and don't count. A trackable you log
+          most days without a goal gets a suggested one, with "Not now" to hide it for a month.
+        </li>
+        <li>
+          <strong>Strength</strong> is a forgiving score: every day you meet the goal raises it, and a missed day lowers it a
+          little instead of resetting it, like a streak would. Rest, skipped and paused days leave it alone.
+        </li>
+        <li>
+          <strong>Weekly review:</strong> on Sundays (the week so far) and Mondays (the week just ended), habits met, your weight's
+          7-day average against the week before, and fasts. Dismiss hides it until next week.
         </li>
         <li>
           <strong>Log:</strong> the trackables without a goal that you've logged in the last 30 days, with their latest reading
@@ -112,7 +122,8 @@
       <ul>
         <li><strong>Time since:</strong> no fields, so when it happens is the point. Shows how long ago and the usual gap.</li>
         <li>
-          <strong>Latest value:</strong> a reading like Weight. Shows the latest value, then its 7-day average against the week
+          <strong>Latest value:</strong> a reading like Weight. With a goal weight in Settings, changes toward it are green and
+          away from it amber, and the chart draws the 7-day average through your readings. Shows the latest value, then its 7-day average against the week
           before and the trend per week over 30 days, so one high morning doesn't read as a gain. A new entry starts from your
           last readings: change what moved.
         </li>
@@ -162,6 +173,11 @@
           as a month calendar; tap a day to see its dates. Birthdays and anniversaries add every 1,000 days ("10,000 days old").
         </li>
         <li>Each trackable's own page lists its dates, and its card the next three.</li>
+        <li>
+          <strong>Export to calendar</strong> on the Dates page downloads an .ics file. Import it into Google Calendar (Settings >
+          Import) or any calendar app: birthdays, anniversaries and holidays repeat there on their own. The file is made on
+          your device; nothing is uploaded. Importing again later adds copies, so delete the old calendar first.
+        </li>
       </ul>
     </section>
 
@@ -240,7 +256,9 @@
         it. Under the timer: when the fast started, when the goal is and how long is left, and the next zone. One fast per
         start day. This week sits under it as a dot per day: filled for a goal fast, half for one that fell short, hollow
         for a rest day. Between fasts the zones wait behind "About the zones", and after a fortnight without a goal fast a
-        card sums up your year and offers a shorter method to come back with.
+        card sums up your year and offers a shorter method to come back with. During a long fast, "Log 16 oz water" adds a
+        glass to your Water field. History opens with a month calendar: a full day met its goal, the right edge shows each
+        week's goal fasts and hours, and a tap on a day opens its fast.
       </p>
       <ul>
         <li><strong>Forgot to start?</strong> Under Started, pick 30m, 1h or 2h ago, or a time, before Start Fast. Tap the timer to correct the start later.</li>

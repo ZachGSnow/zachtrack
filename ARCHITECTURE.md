@@ -932,6 +932,80 @@ every screen with the design system from 3.40:
 - Empty states use `EmptyState`, the undo toast slides in, and the README
   screenshots are recaptured with a Today shot first.
 
+### 3.47 Measurements and logging, made faster (v1.16.0)
+
+- **The average on the chart** (`TrackableFieldsChart.svelte`): the weight
+  field's daily readings become dots on a faint line, with the 7-day
+  average (`rollingSeries` in `utils/measurement.ts`) drawn bold through
+  them, next to the goal line it already had. Other fields are unchanged.
+- **Colour toward the goal** (`goalDirection`, `changeTone`): with a goal
+  weight, the good direction is down when the goal is below the 7-day
+  average. The header's average and trend lines (`KindSummary.subChanges`),
+  the per-week tile (`KindStat.change`) and the trends table's change
+  figures for weight, BMI and body fat (`MetricDef.better`,
+  `metricDeltaTone`) turn green toward it and amber away. 3.11 deferred a
+  per-field "higher is better" setting because it needed a schema change;
+  the goal weight already says which way is good for the one field that
+  has a goal, so this needs none, and other fields stay neutral.
+- **Log weight** (`shortcuts.ts`, the manifest): a fourth home-screen
+  shortcut, `/?shortcut=log-weight#/`. Today takes it once its data has
+  loaded and opens the entry sheet for the trackable holding the weight
+  field, which prefills from the last reading (3.42).
+- **Goal suggestions** (`suggestGoals` in `utils/today.ts`): a trackable
+  without a goal, logged on at least 5 of the last 14 days, is offered one
+  on Today: once a day (no fields) or every day (with fields) when it's
+  logged on 10 or more of them, else every N days from the median gap
+  between logged days (2 to 14). One tap sets it; "Not now" hides that
+  offer on the device for 30 days.
+
+### 3.48 Habits: strength, time of day, the weekly review (v1.16.0)
+
+- **Strength** (`habitStrength` in `utils/trackableGoals.ts`): Loop Habit
+  Tracker's score. Each day, `score = score * m + done * (1 - m)` with
+  `m = 0.5 ^ (sqrt(frequency) / 13)`, where frequency is how many times a
+  day the goal asks for (1 for daily goals, N/7 for N a week, 1/N for every
+  N days) and `done` is the day's share of a daily goal or whether it was
+  logged. Off days with nothing logged are left out; today counts only
+  once met. A streak resets on one missed day; this drops a few points. It
+  leads a habit's tiles (the daily "Rate" folded into "Met, last 30 days",
+  and "This week" and "Next" dropped since the goal card shows them) and
+  sits next to the streak on Today.
+- **Time of day** (`timeOfDay`, `groupByTimeOfDay`): the median hour of a
+  habit's entries over 30 days puts it under Morning (before noon),
+  Afternoon (before 5 PM) or Evening; fewer than 3 entries, or a middle
+  half spread over more than 6 hours, is Anytime. Worked out, not a
+  setting, so it follows the habit as it moves. Headings show only when
+  there is more than one group.
+- **Weekly review** (`utils/weeklyReview.ts`): on Sunday the week so far,
+  on Monday the week just ended (Monday to Sunday). Daily goals count each
+  scheduled day (today only once met), weekly and every-N-days goals once
+  each; the weight field's 7-day average at the week's end against a week
+  earlier; fasts started that week and how many met their goal. Dismiss is
+  remembered per week on the device.
+
+### 3.49 History calendar, water, and calendar export (v1.16.0)
+
+- **History** (`fastMonth` in `utils/fastingJourney.ts`): a month
+  calendar above the list, drawn with `HabitGrid`'s calendar orientation:
+  each day shaded by its best fast's progress toward its goal, days of the
+  neighbouring months faint, and each row's goal fasts of fasts and hours
+  at its right. A tap on a day opens its fast's sheet.
+- **Water** (`waterTarget` in `utils/fastProgress.ts`): the long-fast card
+  (3.36) gets "Log 16 oz water" when a number field named Water that sums
+  (the starter Nutrition one) belongs to a trackable in use and its unit
+  can be sized (oz 16, ml 500, L 0.5, cups 2). It logs through the
+  quick-log store with undo.
+- **Export to calendar** (`utils/ics.ts`): the Dates page downloads every
+  date as an RFC 5545 file of all-day events. Birthdays, anniversaries and
+  yearly holidays repeat `FREQ=YEARLY` from their first date; weekday
+  rules become `BYMONTH`/`BYDAY` rules starting at their next occurrence;
+  renewals keep their `INTERVAL`; one-off countdowns have no rule; Easter
+  has no RRULE form, so Easter-based dates are written out for ten years.
+  Text is escaped and long lines folded. The file is built in the browser
+  from a Blob; nothing is uploaded, so it suits the app's no-third-party
+  rule. A subscribable feed would need a public URL, which Access rules
+  out. A Feb 29 birthday repeats only in leap years in most calendars.
+
 ### 3.21 Trackables list: pin, archive, order; tag filters
 - **Sort** (per device, `zachtrack:trackables-view`): Due first (goal
   urgency from 3.18: overdue, then due, then the rest, then trackables
