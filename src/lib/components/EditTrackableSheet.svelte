@@ -455,7 +455,7 @@
                 type="button"
                 class="flex-1 rounded-lg border py-1.5 text-xs font-medium"
                 style={scheduleDays.includes(i)
-                  ? 'background: var(--color-brand); color: #06140c; border-color: var(--color-brand);'
+                  ? 'background: var(--color-brand); color: var(--color-brand-fg); border-color: var(--color-brand);'
                   : 'border-color: var(--color-border); color: var(--color-text-muted);'}
                 aria-pressed={scheduleDays.includes(i)}
                 onclick={() => (scheduleDays = scheduleDays.includes(i) ? scheduleDays.filter((d) => d !== i) : [...scheduleDays, i])}
@@ -473,7 +473,7 @@
               type="date"
               bind:value={pausedUntilDraft}
               class="flex-1 rounded-lg border bg-transparent p-2 text-text"
-              style="border-color: var(--color-border); color-scheme: dark;"
+              style="border-color: var(--color-border);"
             />
             {#if pausedUntilDraft}
               <button type="button" class="rounded-lg border px-3 text-sm text-text-muted" style="border-color: var(--color-border);" onclick={() => (pausedUntilDraft = '')}>Clear</button>
@@ -571,7 +571,7 @@
                   <p class="text-xs text-text-muted">Also changes it in: {editingAlsoUsedBy.join(', ')}</p>
                 {/if}
                 {#if editFieldError}
-                  <p class="text-xs" style="color: #f87171;">{editFieldError}</p>
+                  <p class="text-xs" style="color: var(--color-danger);">{editFieldError}</p>
                 {/if}
                 <div class="flex gap-2">
                   <button
@@ -583,7 +583,7 @@
                   <button
                     type="button"
                     class="flex-1 rounded-lg py-1.5 text-xs font-semibold"
-                    style="background: var(--color-brand); color: #06140c;"
+                    style="background: var(--color-brand); color: var(--color-brand-fg);"
                     onclick={() => saveEditField(field)}
                   >Save field</button>
                 </div>
@@ -644,7 +644,7 @@
               type="button"
               class="flex-1 rounded-lg border py-1.5 text-xs font-medium"
               style={newFieldKind === k
-                ? 'background: var(--color-brand); color: #06140c; border-color: var(--color-brand);'
+                ? 'background: var(--color-brand); color: var(--color-brand-fg); border-color: var(--color-brand);'
                 : 'border-color: var(--color-border); color: var(--color-text-muted);'}
               onclick={() => (newFieldKind = k)}
             >{KIND_LABELS[k]}</button>
@@ -694,7 +694,7 @@
           <button
             type="button"
             class="flex-1 rounded-lg py-1.5 text-xs font-semibold"
-            style="background: var(--color-brand); color: #06140c;"
+            style="background: var(--color-brand); color: var(--color-brand-fg);"
             onclick={createAndAttachField}
           >Add field</button>
         </div>
@@ -703,14 +703,14 @@
   </div>
 
   {#if error}
-    <p class="text-sm" style="color: #f87171;">{error}</p>
+    <p class="text-sm" style="color: var(--color-danger);">{error}</p>
   {/if}
 
   <div class="flex gap-2">
     {#if trackable}
       <button
         class="flex-1 rounded-xl border py-2.5 text-sm font-medium"
-        style="border-color: #ef444460; color: #f87171;"
+        style="border-color: var(--color-danger-line); color: var(--color-danger);"
         onclick={handleDelete}
       >Delete</button>
       <button
@@ -721,7 +721,7 @@
     {/if}
     <button
       class="flex-1 rounded-xl py-2.5 text-sm font-semibold"
-      style="background: var(--color-brand); color: #06140c;"
+      style="background: var(--color-brand); color: var(--color-brand-fg);"
       onclick={handleSave}
     >Save</button>
   </div>

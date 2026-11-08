@@ -219,7 +219,7 @@ export function goalCardLine(status: GoalStatus, type: TrackableGoalType, kindCa
 export const GOAL_STATE_COLORS: Record<GoalState, string | undefined> = {
   done: 'var(--color-brand)',
   progress: undefined,
-  due: '#fbbf24',
-  overdue: '#f87171',
+  due: 'var(--color-warn)',
+  overdue: 'var(--color-danger)',
   ok: undefined,
 };

@@ -19,7 +19,7 @@
           aria-current={p.href === current.page.href ? 'page' : undefined}
           class="flex-1 rounded-full px-3 py-1.5 text-center font-medium"
           style={p.href === current.page.href
-            ? 'background: var(--color-brand); color: #06140c;'
+            ? 'background: var(--color-brand); color: var(--color-brand-fg);'
             : 'color: var(--color-text-muted);'}>{p.label}</a
         >
       {/each}

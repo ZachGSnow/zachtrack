@@ -83,6 +83,7 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
   measurements logged together.
 - **Help** in the app: Getting started and short guides to each feature,
   with "?" links where questions come up.
+- **Light and dark themes** that follow the device, or your pick in Settings.
 - **Phone and laptop layouts:** a tab bar on phones; on wider screens a
   sidebar, content that uses the width, and dialogs instead of bottom sheets.
 - **Offline and installable** (service worker, Android/Chrome PWA), with
@@ -227,7 +228,8 @@ of synced folders, and delete it when done.
   (same-origin only, no framing), HSTS and related headers; sync responses
   are never cached.
 
-Stack: Vite, Svelte 5 (runes), TypeScript, Tailwind CSS 4, Dexie,
+Stack: Vite, Svelte 5 (runes), TypeScript, Tailwind CSS 4, Inter and Manrope
+(self-hosted), lucide icons, culori, Dexie,
 vite-plugin-pwa, ECharts, Cloudflare Pages + Functions + D1 + Access.
 
 [ARCHITECTURE.md](ARCHITECTURE.md) covers the design decisions, the sync

@@ -728,6 +728,43 @@ days logged (dates trackables left out, since their entries are dates rather
 than things done), the busiest month, and the three trackables logged on
 the most days.
 
+### 3.40 Design system and themes (v1.15.0)
+
+Before v1.15.0 the app had nine flat hex tokens, dark only, Segoe UI on
+Windows and Roboto on Android, emoji for the tab icons, and status colours
+typed inline (`#f87171` for overdue in thirty places). The one-app rework
+(3.41 onward) needed a base to build on, so this came first.
+
+- **Tokens** (`src/app.css`, `@theme static`): each colour is one
+  `light-dark()` pair, light value first, and `color-scheme` picks the side.
+  Semantic names only: `bg`, `surface`, `surface-2`, `border`, `text`,
+  `text-muted`, `brand`, `brand-dim`, `brand-fg` (what's drawn on the brand
+  green), `warn`, `danger`, `info`, and `-soft` tints made with `color-mix`.
+  `static` so a token used only in an inline style is still emitted.
+- **Theme** (`stores/theme.svelte.ts`): System, Light or Dark under Settings
+  > Appearance, per device like the other view preferences. A fixed choice
+  sets `data-theme` on `<html>`; `main.ts` applies it before the first
+  paint. The meta theme-color follows, so Android's status bar matches.
+- **Charts** draw with literal colours, so `utils/theme.ts` repeats the hex
+  values and `chartColors()` hands each chart the text, line and grid
+  colours for the theme in effect. `tests/theme.test.ts` fails if a value
+  there is missing from `app.css`.
+- **Readable colours** (`utils/color.ts`, culori): a trackable's colour is
+  whatever the user picked and is drawn as text on both themes. `ensure()`
+  moves it in OKLCH lightness until it meets a WCAG target against the
+  surface (4.5:1 for text, 3:1 for rings and icons), keeping its hue.
+  Ported from the infographics studio's palette engine.
+- **Fonts**: Inter (body) and Manrope (headings), self-hosted through
+  fontsource so the CSP's `font-src 'self'` holds and the app looks the same
+  on every device. Only the latin files are precached. Digits are tabular
+  everywhere so the timer and the tables don't jitter.
+- **Icons**: lucide for the app chrome (tabs, Help, Settings); trackables
+  keep their emoji, which are the user's.
+- **Primitives** (`components/ui/`): Card, StatTile, SectionHeading,
+  Button, Pill and EmptyState, so screens stop restating the same border and
+  background rules. `SegmentedControl` gained an `onchange` for the cases
+  where a pick does something rather than just binding.
+
 ### 3.21 Trackables list: pin, archive, order; tag filters
 - **Sort** (per device, `zachtrack:trackables-view`): Due first (goal
   urgency from 3.18: overdue, then due, then the rest, then trackables

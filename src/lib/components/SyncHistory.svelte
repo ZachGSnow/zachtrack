@@ -28,8 +28,8 @@
   }
 
   function dotColor(outcome: 'success' | 'error' | 'offline' | 'local'): string {
-    if (outcome === 'error') return '#ef4444';
-    if (outcome === 'offline') return '#eab308';
+    if (outcome === 'error') return 'var(--color-danger)';
+    if (outcome === 'offline') return 'var(--color-warn)';
     if (outcome === 'local') return 'var(--color-text-muted)';
     return 'var(--color-brand-dim)';
   }

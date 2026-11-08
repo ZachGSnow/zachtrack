@@ -10,6 +10,8 @@
   import SyncHistory from '../lib/components/SyncHistory.svelte';
   import SignOutSection from '../lib/components/SignOutSection.svelte';
   import WeekPlanEditor from '../lib/components/WeekPlanEditor.svelte';
+  import SegmentedControl from '../lib/components/SegmentedControl.svelte';
+  import { THEME_CHOICES, themeStore } from '../lib/stores/theme.svelte';
   import { syncStore } from '../lib/stores/sync.svelte';
   import type { CustomFastPreset } from '../lib/data/presets';
 
@@ -78,6 +80,19 @@
 
 <div class="mx-auto flex w-full flex-1 flex-col gap-6 px-5 py-6 lg:max-w-3xl">
   <h1 class="text-xl font-semibold text-text">Settings</h1>
+
+  <section class="space-y-3" aria-labelledby="settings-appearance">
+    <h2 id="settings-appearance" class="text-sm font-semibold uppercase tracking-wide text-text-muted">Appearance</h2>
+    <div class="flex items-center justify-between gap-3 text-sm">
+      <span class="text-text-muted">Theme</span>
+      <SegmentedControl
+        options={THEME_CHOICES}
+        value={themeStore.choice}
+        onchange={(choice) => themeStore.set(choice)}
+      />
+    </div>
+    <p class="text-xs text-text-muted">System follows this device's light or dark setting. The choice is per device.</p>
+  </section>
 
   <section class="space-y-4" aria-labelledby="settings-body">
   <h2 id="settings-body" class="text-sm font-semibold uppercase tracking-wide text-text-muted">Body</h2>
@@ -209,7 +224,7 @@
         value={settingsStore.data.fastScheduleTime ?? ''}
         onchange={(e) => settingsStore.update({ fastScheduleTime: (e.target as HTMLInputElement).value || undefined })}
         class="flex-1 rounded-lg border bg-transparent p-2 text-text"
-        style="border-color: var(--color-border); color-scheme: dark;"
+        style="border-color: var(--color-border);"
       />
       {#if settingsStore.data.fastScheduleTime}
         <button
@@ -238,13 +253,13 @@
     <div class="flex items-center justify-between gap-3 text-sm">
       <span class="text-text">{syncStore.status === 'unauthenticated' && syncStore.signedOut ? 'Signed out' : SYNC_LABELS[syncStore.status]}</span>
       {#if syncStore.status === 'unauthenticated'}
-        <button class="rounded-lg px-3 py-1.5 text-sm font-semibold" style="background: var(--color-brand); color: #06140c;" onclick={() => syncStore.reauthenticate()}>Log in again</button>
+        <button class="rounded-lg px-3 py-1.5 text-sm font-semibold" style="background: var(--color-brand); color: var(--color-brand-fg);" onclick={() => syncStore.reauthenticate()}>Log in again</button>
       {:else if syncStore.status !== 'local'}
         <button class="rounded-lg border px-3 py-1.5 text-sm text-text-muted" style="border-color: var(--color-border);" onclick={() => syncStore.syncNow().catch(() => {})}>Sync now</button>
       {/if}
     </div>
     {#if syncStore.lastError}
-      <p class="text-xs" style="color: #f87171;">{syncStore.lastError}</p>
+      <p class="text-xs" style="color: var(--color-danger);">{syncStore.lastError}</p>
     {/if}
     {#if syncStore.status !== 'local'}
       <p class="text-xs text-text-muted">

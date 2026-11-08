@@ -3,10 +3,15 @@
   import type { FastRecord } from '../../db';
   import { computeDayOfWeekPattern } from '../../utils/stats';
   import EChart from '../EChart.svelte';
+  import { themeStore } from '../../stores/theme.svelte';
+  import { chartColors } from '../../utils/theme';
 
   let { fasts }: { fasts: FastRecord[] } = $props();
 
   const pattern = $derived(computeDayOfWeekPattern(fasts));
+
+  // Chart colours follow the theme (utils/theme.ts), since ECharts draws with literal colours.
+  const ct = $derived(chartColors(themeStore.effective));
 
   const option = $derived<EChartsOption>({
     backgroundColor: 'transparent',
@@ -15,15 +20,15 @@
     xAxis: {
       type: 'category',
       data: pattern.labels,
-      axisLine: { lineStyle: { color: '#262e2a' } },
-      axisLabel: { color: '#8ba398' },
+      axisLine: { lineStyle: { color: ct.line } },
+      axisLabel: { color: ct.muted },
     },
     yAxis: {
       type: 'value',
       name: 'Avg hours',
-      nameTextStyle: { color: '#8ba398' },
-      axisLabel: { color: '#8ba398' },
-      splitLine: { lineStyle: { color: '#1a201d' } },
+      nameTextStyle: { color: ct.muted },
+      axisLabel: { color: ct.muted },
+      splitLine: { lineStyle: { color: ct.grid } },
     },
     series: [
       {

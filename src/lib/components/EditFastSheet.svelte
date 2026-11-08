@@ -124,7 +124,7 @@
             <button
               class="flex-1 rounded-lg border py-2 text-sm"
               style={moodRating === n
-                ? 'background: var(--color-brand); color: #06140c; border-color: var(--color-brand);'
+                ? 'background: var(--color-brand); color: var(--color-brand-fg); border-color: var(--color-brand);'
                 : 'border-color: var(--color-border); color: var(--color-text-muted);'}
               onclick={() => (moodRating = moodRating === n ? null : n)}
             >{n}</button>
@@ -139,7 +139,7 @@
             <button
               class="flex-1 rounded-lg border py-2 text-sm"
               style={energyRating === n
-                ? 'background: var(--color-brand); color: #06140c; border-color: var(--color-brand);'
+                ? 'background: var(--color-brand); color: var(--color-brand-fg); border-color: var(--color-brand);'
                 : 'border-color: var(--color-border); color: var(--color-text-muted);'}
               onclick={() => (energyRating = energyRating === n ? null : n)}
             >{n}</button>
@@ -154,7 +154,7 @@
             <button
               class="flex-1 rounded-lg border py-2 text-sm"
               style={hungerRating === n
-                ? 'background: var(--color-brand); color: #06140c; border-color: var(--color-brand);'
+                ? 'background: var(--color-brand); color: var(--color-brand-fg); border-color: var(--color-brand);'
                 : 'border-color: var(--color-border); color: var(--color-text-muted);'}
               onclick={() => (hungerRating = hungerRating === n ? null : n)}
             >{n}</button>
@@ -179,18 +179,18 @@
     {/if}
 
     {#if error}
-      <p class="text-sm" style="color: #f87171;">{error}</p>
+      <p class="text-sm" style="color: var(--color-danger);">{error}</p>
     {/if}
 
     <div class="flex gap-2">
       <button
         class="flex-1 rounded-xl border py-2.5 text-sm font-medium"
-        style="border-color: #ef444460; color: #f87171;"
+        style="border-color: var(--color-danger-line); color: var(--color-danger);"
         onclick={handleDelete}
       >Delete</button>
       <button
         class="flex-1 rounded-xl py-2.5 text-sm font-semibold"
-        style="background: var(--color-brand); color: #06140c;"
+        style="background: var(--color-brand); color: var(--color-brand-fg);"
         onclick={handleSave}
       >Save</button>
     </div>

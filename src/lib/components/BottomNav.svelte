@@ -1,6 +1,8 @@
 <script lang="ts">
   import { link } from 'svelte-spa-router';
   import active from 'svelte-spa-router/active';
+  import CircleHelp from '@lucide/svelte/icons/circle-help';
+  import Settings from '@lucide/svelte/icons/settings';
   import { attentionStore } from '../stores/attention.svelte';
   import { fastTimer } from '../stores/fast.svelte';
   import SyncStatus from './SyncStatus.svelte';
@@ -25,17 +27,13 @@
     return null;
   };
 
-  // The three sections (data/sections.ts); a section's tab is lit on any of its pages.
+  // The sections (data/sections.ts); a section's tab is lit on any of its pages.
   const items = SECTIONS;
 </script>
 
 {#if variant === 'side'}
-  <nav
-    class="sticky top-0 hidden h-svh w-56 shrink-0 flex-col gap-1 border-r bg-surface px-3 py-5 lg:flex"
-    style="border-color: var(--color-border);"
-    aria-label="Main"
-  >
-    <p class="px-3 text-lg font-semibold text-text">ZachTrack</p>
+  <nav class="sticky top-0 hidden h-svh w-56 shrink-0 flex-col gap-1 border-r border-border bg-surface px-3 py-5 lg:flex" aria-label="Main">
+    <p class="px-3 font-heading text-lg font-semibold text-text">ZachTrack</p>
     <div class="mb-4 px-3 pt-2">
       <SyncStatus align="start" />
     </div>
@@ -46,7 +44,7 @@
         use:active={{ path: item.match, className: 'active' }}
         class="side flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium"
       >
-        <span class="w-6 text-center text-lg leading-none">{item.icon}</span>
+        <item.icon size={20} aria-hidden="true" />
         <span>{item.label}</span>
         {#if badge(item.href)}
           {@const b = badge(item.href)!}
@@ -59,7 +57,7 @@
           href={p.href}
           use:link
           use:active={{ path: p.href === '/trackables' ? /^\/trackables(\/.*)?$/ : p.href, className: 'current' }}
-          class="side sub flex items-center rounded-lg py-1.5 pr-3 pl-12 text-sm"
+          class="side sub flex items-center rounded-lg py-1.5 pr-3 pl-11 text-sm"
         >{p.label}</a>
       {/each}
     {/each}
@@ -69,7 +67,7 @@
       use:active={{ path: activePath('/help'), className: 'active' }}
       class="side mt-auto flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium"
     >
-      <span class="w-6 text-center text-lg leading-none">?</span>
+      <CircleHelp size={20} aria-hidden="true" />
       <span>Help</span>
     </a>
     <a
@@ -78,25 +76,21 @@
       use:active={{ path: activePath('/settings'), className: 'active' }}
       class="side flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium"
     >
-      <span class="w-6 text-center text-lg leading-none">&#9881;</span>
+      <Settings size={20} aria-hidden="true" />
       <span>Settings</span>
     </a>
   </nav>
 {:else}
-  <nav
-    class="sticky bottom-0 z-10 flex justify-around border-t bg-surface/95 backdrop-blur lg:hidden"
-    style="border-color: var(--color-border);"
-    aria-label="Main"
-  >
+  <nav class="sticky bottom-0 z-10 flex justify-around border-t border-border bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden" aria-label="Main">
     {#each items as item (item.href)}
       <a
         href={item.href}
         use:link
         use:active={{ path: item.match, className: 'active' }}
-        class="flex flex-1 flex-col items-center gap-0.5 py-2.5 text-xs font-medium"
+        class="flex flex-1 flex-col items-center gap-1 py-2.5 text-xs font-medium"
       >
-        <span class="relative text-lg leading-none">
-          {item.icon}
+        <span class="relative leading-none">
+          <item.icon size={22} aria-hidden="true" />
           {#if badge(item.href)}
             {@const b = badge(item.href)!}
             <span class="badge absolute -top-1.5 -right-3" class:dot={!b.text} aria-label={b.label}>{b.text}</span>
@@ -123,8 +117,8 @@
     height: 1.1rem;
     padding: 0 0.3rem;
     border-radius: 999px;
-    background: #f87171;
-    color: #1a0606;
+    background: var(--color-danger);
+    color: var(--color-brand-fg);
     font-size: 0.65rem;
     font-weight: 700;
     line-height: 1.1rem;
@@ -135,7 +129,7 @@
     width: 0.6rem;
     height: 0.6rem;
     padding: 0;
-    background: #fbbf24;
+    background: var(--color-warn);
   }
   a.side:global(.active) {
     background: var(--color-surface-2);

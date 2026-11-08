@@ -16,6 +16,12 @@ export default defineConfig({
     host: true,
     port: 5173,
   },
+  build: {
+    // Never inline a font as a data: URL: the CSP allows fonts from the
+    // app itself only (public/_headers), and the small non-latin subsets
+    // would otherwise go under Vite's 4 KB inlining limit.
+    assetsInlineLimit: (file) => (file.endsWith('.woff2') ? false : undefined),
+  },
   plugins: [
     svelte(),
     tailwindcss(),
@@ -66,7 +72,9 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest}'],
+        // The latin font files too, so the app looks the same offline; the
+        // other subsets (cyrillic, greek...) ship but aren't precached.
+        globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest}', '**/*-latin-wght-normal-*.woff2'],
         // Never answer these navigations with the cached app shell -- they must
         // reach the network so Cloudflare Access can run its login/callback
         // flow (see ARCHITECTURE.md 4.9). `?reauth=` is the marker the sync

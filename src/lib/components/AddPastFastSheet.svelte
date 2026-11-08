@@ -78,6 +78,6 @@
     <span class="mb-1 block text-text-muted">Ended</span>
     <input type="datetime-local" bind:value={endLocal} class="w-full rounded-lg border bg-transparent p-2 text-text" style="border-color: var(--color-border);" />
   </label>
-  {#if error}<p class="text-sm" style="color: #f87171;">{error}</p>{/if}
-  <button class="w-full rounded-xl py-2.5 text-sm font-semibold" style="background: var(--color-brand); color: #06140c;" onclick={save}>Save fast</button>
+  {#if error}<p class="text-sm" style="color: var(--color-danger);">{error}</p>{/if}
+  <button class="w-full rounded-xl py-2.5 text-sm font-semibold" style="background: var(--color-brand); color: var(--color-brand-fg);" onclick={save}>Save fast</button>
 </div>

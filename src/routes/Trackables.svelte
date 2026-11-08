@@ -157,7 +157,7 @@
     <h1 class="text-xl font-semibold text-text">Trackables</h1>
     <button
       class="rounded-full px-3 py-1.5 text-sm font-semibold"
-      style="background: var(--color-brand); color: #06140c;"
+      style="background: var(--color-brand); color: var(--color-brand-fg);"
       onclick={openCreate}
     >+ New</button>
   </div>
@@ -169,8 +169,8 @@
   {:else}
     {#if attentionStore.items.length > 0}
       <!-- In-app reminders: goals that are overdue or due today, most urgent first. -->
-      <section class="rounded-2xl border p-3" style="border-color: #f8717155; background: #f8717110;" aria-label="Needs attention">
-        <p class="mb-2 text-xs font-semibold uppercase tracking-wide" style="color: #f87171;">Needs attention</p>
+      <section class="rounded-2xl border p-3" style="border-color: var(--color-danger-line); background: var(--color-danger-soft);" aria-label="Needs attention">
+        <p class="mb-2 text-xs font-semibold uppercase tracking-wide" style="color: var(--color-danger);">Needs attention</p>
         <ul class="flex flex-col gap-1">
           {#each attentionStore.items as item (item.key)}
             <li>
@@ -239,7 +239,7 @@
   </div>
 {/if}
 {#if quickLogError}
-  <p class="px-5 text-sm" style="color: #f87171;">{quickLogError}</p>
+  <p class="px-5 text-sm" style="color: var(--color-danger);">{quickLogError}</p>
 {/if}
 
 <BottomSheet bind:open={editOpen}>

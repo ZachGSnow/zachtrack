@@ -2,6 +2,8 @@
   import Router, { link } from 'svelte-spa-router';
   import { wrap } from 'svelte-spa-router/wrap';
   import { onMount } from 'svelte';
+  import CircleHelp from '@lucide/svelte/icons/circle-help';
+  import Settings from '@lucide/svelte/icons/settings';
   import BottomNav from './lib/components/BottomNav.svelte';
   import SectionTabs from './lib/components/SectionTabs.svelte';
   import Fasting from './routes/Fasting.svelte';
@@ -61,17 +63,15 @@
       <a
         href="/help"
         use:link
-        class="flex h-7 w-7 items-center justify-center rounded-full border text-sm font-semibold"
-        style="border-color: var(--color-border); color: var(--color-text-muted); background: var(--color-surface-2);"
+        class="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface-2 text-text-muted"
         aria-label="Help"
-      >?</a>
+      ><CircleHelp size={18} aria-hidden="true" /></a>
       <a
         href="/settings"
         use:link
-        class="flex h-7 w-7 items-center justify-center rounded-full border text-sm"
-        style="border-color: var(--color-border); color: var(--color-text-muted); background: var(--color-surface-2);"
+        class="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface-2 text-text-muted"
         aria-label="Settings"
-      >&#9881;</a>
+      ><Settings size={18} aria-hidden="true" /></a>
     </header>
     <main class="flex flex-1 flex-col">
       <SectionTabs />

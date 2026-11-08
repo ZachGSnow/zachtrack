@@ -129,7 +129,7 @@
     <div class="flex items-center justify-between gap-3">
       <span class="text-text">{syncStore.status === 'unauthenticated' && syncStore.signedOut ? 'Signed out' : STATUS_LABELS[syncStore.status]}{syncStore.lastSyncedAt && syncStore.status !== 'local' ? `, last synced ${ago(syncStore.lastSyncedAt)}` : ''}</span>
       {#if syncStore.status === 'unauthenticated'}
-        <button class="rounded-lg px-3 py-1.5 text-sm font-semibold" style="background: var(--color-brand); color: #06140c;" onclick={() => syncStore.reauthenticate()}>Log in again</button>
+        <button class="rounded-lg px-3 py-1.5 text-sm font-semibold" style="background: var(--color-brand); color: var(--color-brand-fg);" onclick={() => syncStore.reauthenticate()}>Log in again</button>
       {:else if syncStore.status !== 'local'}
         <button class="rounded-lg border px-3 py-1.5 text-sm text-text-muted" style="border-color: var(--color-border);" onclick={() => syncStore.syncNow().then(() => loadActivity()).catch(() => {})}>Sync now</button>
       {/if}
@@ -196,14 +196,14 @@
           {/each}
         </ul>
       {/if}
-      {#if deviceError}<p class="text-xs" style="color: #f87171;">{deviceError}</p>{/if}
+      {#if deviceError}<p class="text-xs" style="color: var(--color-danger);">{deviceError}</p>{/if}
     </section>
 
     <section class="space-y-2 text-sm" aria-labelledby="sync-activity">
       <h2 id="sync-activity" class="text-sm font-semibold uppercase tracking-wide text-text-muted">Activity on all devices</h2>
       <p class="text-xs text-text-muted">Each sync that changed something, from any device, for 90 days: what kind of records and their names, never the values.</p>
       {#if activityError}
-        <p class="text-xs" style="color: #f87171;">{activityError}</p>
+        <p class="text-xs" style="color: var(--color-danger);">{activityError}</p>
       {:else if events.length === 0 && !loadingActivity}
         <p class="text-xs text-text-muted">No activity yet.</p>
       {/if}
@@ -260,7 +260,7 @@
       {#if checking}
         <p class="text-xs text-text-muted" role="status">Checking...</p>
       {:else if checkError}
-        <p class="text-xs" style="color: #f87171;">{checkError}</p>
+        <p class="text-xs" style="color: var(--color-danger);">{checkError}</p>
       {:else if syncStore.lastCheck}
         {@const c = syncStore.lastCheck}
         <div class="rounded-lg border p-2 text-xs" style="border-color: var(--color-border); background: var(--color-surface);" role="status">

@@ -684,3 +684,22 @@ test('Insights sums up fasting and each trackable above the compare table', asyn
   await expect(page).toHaveURL(/#\/trackables\//);
   expect(problems).toEqual([]);
 });
+
+test('Settings > Appearance switches the theme, which sticks on this device', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await mockSync(page, noServer);
+  await waitForStarterSet(page);
+  await page.goto('/#/settings');
+  const html = page.locator('html');
+  // System by default: no data-theme, so CSS follows prefers-color-scheme.
+  await expect(html).not.toHaveAttribute('data-theme', /./);
+  await page.getByRole('button', { name: 'Light', exact: true }).click();
+  await expect(html).toHaveAttribute('data-theme', 'light');
+  await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#f4f7f5');
+  await page.reload();
+  await expect(html).toHaveAttribute('data-theme', 'light');
+  await page.getByRole('button', { name: 'Dark', exact: true }).click();
+  await expect(html).toHaveAttribute('data-theme', 'dark');
+  await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#0b0f0e');
+  expect(problems).toEqual([]);
+});

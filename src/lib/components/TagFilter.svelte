@@ -22,7 +22,7 @@
       type="button"
       class="rounded-full border px-2.5 py-1 text-xs font-medium"
       style={selected == null
-        ? 'background: var(--color-brand); color: #06140c; border-color: var(--color-brand);'
+        ? 'background: var(--color-brand); color: var(--color-brand-fg); border-color: var(--color-brand);'
         : 'border-color: var(--color-border); color: var(--color-text-muted);'}
       aria-pressed={selected == null}
       onclick={() => (selected = null)}
@@ -32,7 +32,7 @@
         type="button"
         class="rounded-full border px-2.5 py-1 text-xs font-medium"
         style={selected === t.tag
-          ? 'background: var(--color-brand); color: #06140c; border-color: var(--color-brand);'
+          ? 'background: var(--color-brand); color: var(--color-brand-fg); border-color: var(--color-brand);'
           : 'border-color: var(--color-border); color: var(--color-text-muted);'}
         aria-pressed={selected === t.tag}
         onclick={() => (selected = selected === t.tag ? null : t.tag)}

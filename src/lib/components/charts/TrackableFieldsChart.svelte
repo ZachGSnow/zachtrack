@@ -7,6 +7,8 @@
   import { BODY_FAT_COLOR } from '../../utils/metrics';
   import { settingsStore } from '../../stores/settings.svelte';
   import EChart from '../EChart.svelte';
+  import { themeStore } from '../../stores/theme.svelte';
+  import { chartColors } from '../../utils/theme';
 
   let {
     entries,
@@ -24,7 +26,9 @@
   } = $props();
 
 
-  const PALETTE = ['#22ff88', '#a855f7', '#38bdf8', '#f97316', '#eab308', '#ec4899', '#818cf8', '#10b981', '#60a5fa'];
+  // Chart colours follow the theme (utils/theme.ts), since ECharts draws with literal colours.
+  const ct = $derived(chartColors(themeStore.effective));
+  const PALETTE = $derived([ct.brand, '#a855f7', '#38bdf8', '#f97316', '#eab308', '#ec4899', '#818cf8', '#10b981', '#60a5fa']);
 
   // One color per field from its place among all fields, so a pill and its line
   // match whichever other fields are switched on.
@@ -71,15 +75,15 @@
   const option = $derived<EChartsOption>({
     backgroundColor: 'transparent',
     grid: { left: 44, right: 16, top: 36, bottom: 30 },
-    legend: { textStyle: { color: '#8ba398' }, top: 0 },
+    legend: { textStyle: { color: ct.muted }, top: 0 },
     tooltip: { trigger: 'axis' },
     xAxis: {
       type: 'category',
       data: categories,
-      axisLine: { lineStyle: { color: '#262e2a' } },
-      axisLabel: { color: '#8ba398' },
+      axisLine: { lineStyle: { color: ct.line } },
+      axisLabel: { color: ct.muted },
     },
-    yAxis: { type: 'value', scale: true, axisLabel: { color: '#8ba398' }, splitLine: { lineStyle: { color: '#1a201d' } } },
+    yAxis: { type: 'value', scale: true, axisLabel: { color: ct.muted }, splitLine: { lineStyle: { color: ct.grid } } },
     series: [
       ...fields
         .filter((f) => visible[f.id])
@@ -97,8 +101,8 @@
             ? {
                 markLine: {
                   symbol: 'none' as const,
-                  label: { formatter: 'Goal', color: '#8ba398' },
-                  lineStyle: { color: '#8ba398', type: 'dashed' as const, width: 1.5 },
+                  label: { formatter: 'Goal', color: ct.muted },
+                  lineStyle: { color: ct.muted, type: 'dashed' as const, width: 1.5 },
                   data: [{ yAxis: settingsStore.data.goalWeightLb }],
                 },
               }

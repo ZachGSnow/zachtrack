@@ -99,9 +99,9 @@
     <span
       class="h-1.5 w-1.5 rounded-full"
       style="background: {syncStore.status === 'error' || isUnauthenticated
-        ? '#ef4444'
+        ? 'var(--color-danger)'
         : syncStore.status === 'offline'
-          ? '#eab308'
+          ? 'var(--color-warn)'
           : syncStore.status === 'syncing'
             ? 'var(--color-brand)'
             : syncStore.status === 'local'
@@ -127,7 +127,7 @@
   {#if showErrorPanel}
     <div
       class="flex max-w-[240px] flex-col items-end gap-1.5 rounded-md border px-2 py-1 text-right text-[10px] leading-snug break-words"
-      style="border-color: var(--color-border); color: #ef4444; background: var(--color-surface-2);"
+      style="border-color: var(--color-border); color: var(--color-danger); background: var(--color-surface-2);"
     >
       <p>{syncStore.lastError}</p>
       {#if isUnauthenticated}

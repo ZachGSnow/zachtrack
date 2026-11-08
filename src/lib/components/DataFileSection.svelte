@@ -135,7 +135,7 @@
         <button
           type="button"
           class="flex-1 rounded-lg py-2 font-semibold"
-          style="background: var(--color-brand); color: #06140c;"
+          style="background: var(--color-brand); color: var(--color-brand-fg);"
           disabled={busy || plan.added + plan.updated === 0}
           onclick={confirmImport}>{plan.added + plan.updated === 0 ? 'Nothing to import' : 'Import'}</button
         >

@@ -159,7 +159,7 @@
           class="flex-1 rounded-lg border py-2 text-sm"
           aria-pressed={value === n}
           style={value === n
-            ? 'background: var(--color-brand); color: #06140c; border-color: var(--color-brand);'
+            ? 'background: var(--color-brand); color: var(--color-brand-fg); border-color: var(--color-brand);'
             : 'border-color: var(--color-border); color: var(--color-text-muted);'}
           onclick={() => set(value === n ? null : n)}
         >{n}</button>
@@ -224,7 +224,7 @@
       {#if !showStopPanel}
         <button
           class="w-full rounded-xl border py-3 text-base font-semibold"
-          style="border-color: #ef444460; color: #f87171; background: #ef444414;"
+          style="border-color: var(--color-danger-line); color: var(--color-danger); background: var(--color-danger-soft);"
           onclick={() => (showStopPanel = true)}
         >
           End Fast
@@ -235,7 +235,7 @@
             <div aria-label="Fast summary">
               <p class="text-lg font-semibold text-text">{summary.duration}</p>
               {#if summary.goal}
-                <p class="text-sm font-medium" style="color: {summary.goalMet ? 'var(--color-brand)' : '#fbbf24'};">{summary.goal}</p>
+                <p class="text-sm font-medium" style="color: {summary.goalMet ? 'var(--color-brand)' : 'var(--color-warn)'};">{summary.goal}</p>
               {/if}
               <p class="text-xs text-text-muted">Reached: {summary.zone}</p>
               {#if refeeding}
@@ -265,7 +265,7 @@
             ></textarea>
           {/if}
           {#if finishError}
-            <p class="text-sm" style="color: #f87171;">{finishError}</p>
+            <p class="text-sm" style="color: var(--color-danger);">{finishError}</p>
           {/if}
           <div class="flex gap-2">
             <button
@@ -275,7 +275,7 @@
             >Keep fasting</button>
             <button
               class="flex-1 rounded-xl py-2.5 text-sm font-semibold"
-              style="background: var(--color-brand); color: #06140c;"
+              style="background: var(--color-brand); color: var(--color-brand-fg);"
               onclick={handleFinish}
             >Save & Finish</button>
           </div>
@@ -295,7 +295,7 @@
           </div>
         {/if}
         {#if schedule}
-          <p class="text-sm font-medium" style="color: {schedule.late ? '#fbbf24' : 'var(--color-text-muted)'};">{schedule.text}</p>
+          <p class="text-sm font-medium" style="color: {schedule.late ? 'var(--color-warn)' : 'var(--color-text-muted)'};">{schedule.text}</p>
         {/if}
       </div>
 
@@ -309,7 +309,7 @@
               class="rounded-full border px-3 py-1.5 text-sm"
               aria-pressed={startedChoice === option.id}
               style={startedChoice === option.id
-                ? 'background: var(--color-brand); color: #06140c; border-color: var(--color-brand);'
+                ? 'background: var(--color-brand); color: var(--color-brand-fg); border-color: var(--color-brand);'
                 : 'background: var(--color-surface-2); color: var(--color-text); border-color: var(--color-border);'}
               onclick={() => {
                 startedChoice = option.id;
@@ -330,12 +330,12 @@
       </div>
 
       {#if startError}
-        <p class="text-sm" style="color: #f87171;">{startError}</p>
+        <p class="text-sm" style="color: var(--color-danger);">{startError}</p>
       {/if}
 
       <button
         class="w-full rounded-xl py-3.5 text-base font-semibold"
-        style="background: var(--color-brand); color: #06140c;"
+        style="background: var(--color-brand); color: var(--color-brand-fg);"
         onclick={handleStart}
       >
         Start Fast
@@ -355,8 +355,8 @@
     <h2 class="text-lg font-semibold text-text">Change goal</h2>
     <p class="text-sm text-text-muted">The fast keeps its start time; only the goal changes.</p>
     <MethodPicker bind:selectedId={goalPresetId} />
-    {#if goalError}<p class="text-sm" style="color: #f87171;">{goalError}</p>{/if}
-    <button class="w-full rounded-xl py-2.5 text-sm font-semibold" style="background: var(--color-brand); color: #06140c;" onclick={saveGoal}
+    {#if goalError}<p class="text-sm" style="color: var(--color-danger);">{goalError}</p>{/if}
+    <button class="w-full rounded-xl py-2.5 text-sm font-semibold" style="background: var(--color-brand); color: var(--color-brand-fg);" onclick={saveGoal}
       >Save goal</button
     >
   </div>

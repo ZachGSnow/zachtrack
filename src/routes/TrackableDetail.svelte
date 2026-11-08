@@ -218,7 +218,7 @@
       <p class="-mt-3 text-xs text-text-muted">{DATE_KIND_LABELS[dateKind]}</p>
       <button
         class="w-full rounded-xl py-3 text-base font-semibold"
-        style="background: var(--color-brand); color: #06140c;"
+        style="background: var(--color-brand); color: var(--color-brand-fg);"
         onclick={() => openLogNew()}
       >+ {DATE_KIND_ITEM[dateKind].add}</button>
 
@@ -293,7 +293,7 @@
 
           <button
             class="w-full rounded-xl py-3 text-base font-semibold"
-            style="background: var(--color-brand); color: #06140c;"
+            style="background: var(--color-brand); color: var(--color-brand-fg);"
             onclick={() => openLogNew()}
           >Log Entry</button>
 

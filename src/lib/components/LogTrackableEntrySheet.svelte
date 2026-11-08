@@ -314,7 +314,7 @@
                 type="button"
                 class="flex-1 rounded-lg border py-2 text-sm"
                 style={fieldInputs[field.id] === n
-                  ? 'background: var(--color-brand); color: #06140c; border-color: var(--color-brand);'
+                  ? 'background: var(--color-brand); color: var(--color-brand-fg); border-color: var(--color-brand);'
                   : 'border-color: var(--color-border); color: var(--color-text-muted);'}
                 onclick={() => setRating(field.id, n)}
               >{n}</button>
@@ -332,7 +332,7 @@
           <span
             class="rounded-full px-3 py-1 text-xs font-semibold"
             style={fieldInputs[field.id]
-              ? 'background: var(--color-brand); color: #06140c;'
+              ? 'background: var(--color-brand); color: var(--color-brand-fg);'
               : 'background: var(--color-surface-2); color: var(--color-text-muted);'}
           >{fieldInputs[field.id] ? 'Yes' : 'No'}</span>
         </button>
@@ -357,20 +357,20 @@
     {/if}
 
     {#if error}
-      <p class="text-sm" style="color: #f87171;">{error}</p>
+      <p class="text-sm" style="color: var(--color-danger);">{error}</p>
     {/if}
 
     <div class="flex gap-2">
       {#if entry}
         <button
           class="flex-1 rounded-xl border py-2.5 text-sm font-medium"
-          style="border-color: #ef444460; color: #f87171;"
+          style="border-color: var(--color-danger-line); color: var(--color-danger);"
           onclick={handleDelete}
         >Delete</button>
       {/if}
       <button
         class="flex-1 rounded-xl py-2.5 text-sm font-semibold"
-        style="background: var(--color-brand); color: #06140c;"
+        style="background: var(--color-brand); color: var(--color-brand-fg);"
         onclick={handleSave}
       >Save</button>
     </div>

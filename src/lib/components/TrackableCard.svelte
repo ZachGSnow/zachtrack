@@ -7,6 +7,8 @@
   import { habitGridWeeks } from '../utils/habitGrid';
   import { startOfDay } from '../utils/time';
   import HabitGrid from './HabitGrid.svelte';
+  import { themeStore } from '../stores/theme.svelte';
+  import { readableGraphic } from '../utils/color';
 
   let {
     trackable,
@@ -33,6 +35,9 @@
     trackable.fieldIds.map((id) => fields.find((f) => f.id === id)).filter((f): f is FieldDefinition => f != null),
   );
   const kind = $derived(resolveKind(trackable, attachedFields).kind);
+  // The trackable's colour as drawn on the card: tinted backgrounds use it as
+  // is; text, rings and the "+" get a version that reads on this theme.
+  const ink = $derived(readableGraphic(trackable.color, themeStore.effective));
 
   // Re-render "2h ago" as time passes, not only when entries change.
   let now = $state(Date.now());
@@ -135,8 +140,8 @@
       <button
         class="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-lg font-bold"
         style={doneToday
-          ? `background: ${trackable.color}; color: #06140c;`
-          : `box-shadow: inset 0 0 0 2px ${ring != null ? `${trackable.color}33` : `${trackable.color}99`}; color: ${trackable.color};`}
+          ? `background: ${trackable.color}; color: var(--color-brand-fg);`
+          : `box-shadow: inset 0 0 0 2px ${ring != null ? `${ink}33` : `${ink}99`}; color: ${ink};`}
         onclick={check}
         aria-label={checkLabel}
         aria-pressed={noFields ? doneToday : undefined}
@@ -144,7 +149,7 @@
         {#if ring != null}
           <!-- Progress toward today's total. -->
           <svg class="absolute inset-0 -rotate-90" viewBox="0 0 40 40" aria-hidden="true">
-            <circle cx="20" cy="20" r="19" fill="none" stroke={trackable.color} stroke-width="2" stroke-linecap="round" pathLength="100" stroke-dasharray="{ring * 100} 100" />
+            <circle cx="20" cy="20" r="19" fill="none" stroke={ink} stroke-width="2" stroke-linecap="round" pathLength="100" stroke-dasharray="{ring * 100} 100" />
           </svg>
           <span class="text-sm">{multiple && noFields ? todayCount : '+'}</span>
         {:else if doneToday}
@@ -156,7 +161,7 @@
     {:else}
       <button
         class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-lg font-semibold"
-        style="background: {trackable.color}22; color: {trackable.color};"
+        style="background: {trackable.color}22; color: {ink};"
         onclick={onQuickLog}
         aria-label="Log {trackable.name}"
       >+</button>
@@ -164,7 +169,7 @@
   </div>
   {#if goalCard && !compact}
     <div class="mt-2.5" bind:clientWidth={stripWidth}>
-      <HabitGrid weeks={strip} color={trackable.color} labels={false} maxCell={16} />
+      <HabitGrid weeks={strip} color={ink} labels={false} maxCell={16} />
     </div>
   {/if}
 </div>

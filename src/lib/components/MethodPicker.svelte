@@ -66,7 +66,7 @@
           class="border px-3 py-1.5 text-sm font-medium transition-colors {mine ? 'rounded-l-full border-r-0' : 'rounded-full'}"
           class:selected={selectedId === preset.id}
           style={selectedId === preset.id
-            ? 'background: var(--color-brand); color: #06140c; border-color: var(--color-brand);'
+            ? 'background: var(--color-brand); color: var(--color-brand-fg); border-color: var(--color-brand);'
             : 'background: var(--color-surface-2); color: var(--color-text); border-color: var(--color-border);'}
           onclick={() => (selectedId = preset.id)}
         >
@@ -76,7 +76,7 @@
           <button
             class="rounded-r-full border py-1.5 pr-2.5 pl-1.5 text-sm text-text-muted"
             style={selectedId === preset.id
-              ? 'background: var(--color-brand); color: #06140c; border-color: var(--color-brand);'
+              ? 'background: var(--color-brand); color: var(--color-brand-fg); border-color: var(--color-brand);'
               : 'background: var(--color-surface-2); border-color: var(--color-border);'}
             onclick={() => removePreset(preset.id)}
             aria-label="Remove {preset.label}"
@@ -93,7 +93,7 @@
     {/if}
   </div>
   {#if error && !adding}
-    <p class="mt-1 text-xs" style="color: #f87171;">{error}</p>
+    <p class="mt-1 text-xs" style="color: var(--color-danger);">{error}</p>
   {/if}
   {#if adding}
     <div class="mt-2 flex items-center gap-2">
@@ -110,14 +110,14 @@
         />
         hours
       </label>
-      <button class="rounded-lg px-3 py-1.5 text-sm font-semibold" style="background: var(--color-brand); color: #06140c;" onclick={addPreset}>Save</button>
+      <button class="rounded-lg px-3 py-1.5 text-sm font-semibold" style="background: var(--color-brand); color: var(--color-brand-fg);" onclick={addPreset}>Save</button>
       <button class="text-sm text-text-muted" onclick={() => {
         adding = false;
         error = '';
       }}>Cancel</button>
     </div>
     {#if error}
-      <p class="mt-1 text-xs" style="color: #f87171;">{error}</p>
+      <p class="mt-1 text-xs" style="color: var(--color-danger);">{error}</p>
     {/if}
   {/if}
   {#if selectedId}
