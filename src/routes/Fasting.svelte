@@ -15,7 +15,9 @@
   import { db } from '../lib/db';
   import { addDays, formatHoursShort, fromDatetimeLocal, startOfDay, toDatetimeLocal } from '../lib/utils/time';
   import { planForDay, scheduleStatus } from '../lib/utils/fastingSchedule';
-  import { endSummary, fastTimeline, longFastGuidance, refeedingNote, startedAgo } from '../lib/utils/fastProgress';
+  import { endSummary, fastTimeline, longFastGuidance, refeedingNote, startedAgo, waterTarget } from '../lib/utils/fastProgress';
+  import { quickLog } from '../lib/stores/quickLog.svelte';
+  import QuickLogHost from '../lib/components/QuickLogHost.svelte';
   import { eatingWindowStatus, restartSuggestion, weekStrip } from '../lib/utils/fastingJourney';
   import { PRESETS } from '../lib/data/presets';
   import WeekStrip from '../lib/components/WeekStrip.svelte';
@@ -40,6 +42,11 @@
   const strip = $derived(weekStrip($yearFasts ?? [], settingsStore.data, Math.max(now, fastTimer.now)));
   const restart = $derived(fastTimer.ready && settingsStore.ready ? restartSuggestion($yearFasts ?? [], PRESETS, Math.max(now, fastTimer.now)) : null);
   const restartPreset = $derived(restart ? PRESETS.find((p) => p.id === restart.presetId) : undefined);
+  // During a long fast, a glass of water in one tap into the Water field (utils/fastProgress.ts).
+  const allFields = liveQuery(() => db.fieldDefinitions.toArray());
+  const allTrackables = liveQuery(() => db.trackableDefinitions.toArray());
+  const water = $derived(waterTarget($allFields ?? [], $allTrackables ?? []));
+
   // The zone reference is noise between fasts: behind a link while nothing runs.
   let zonesOpen = $state(false);
 
@@ -238,6 +245,15 @@
           <ul class="flex list-disc flex-col gap-1 pl-5 text-text-muted">
             {#each guidance as line (line)}<li>{line}</li>{/each}
           </ul>
+          {#if water}
+            {@const w = water}
+            <div class="mt-3">
+              <Button
+                size="sm"
+                onclick={() => quickLog.logValues(w.trackable, { [w.field.id]: w.amount }, `Logged ${w.amount} ${w.field.unit} water`)}
+              >Log {w.amount} {w.field.unit} water</Button>
+            </div>
+          {/if}
           <p class="mt-2 text-xs text-text-muted">General information, not medical advice.</p>
         </section>
       {/if}
@@ -393,6 +409,8 @@
     </div>
   {/if}
 </div>
+
+<QuickLogHost />
 
 <BottomSheet bind:open={editActiveOpen}>
   <EditFastSheet bind:open={editActiveOpen} fast={fastTimer.activeFast} />

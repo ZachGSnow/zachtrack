@@ -4,6 +4,7 @@ import {
   eatingWindowStatus,
   fastGridWeeks,
   fastingWeightInsight,
+  fastMonth,
   goalDays,
   goalMet,
   restartSuggestion,
@@ -172,5 +173,26 @@ describe('the restart suggestion', () => {
     const s = restartSuggestion(short, presets, now)!;
     expect(s.daysSince).toBeNull();
     expect(s).toMatchObject({ goalFasts: 0, usualHours: 12, presetId: '12:12' });
+  });
+});
+
+describe('the History month calendar', () => {
+  it('lays a month out in Monday-to-Sunday rows with each week\'s fasts, goal fasts and hours', () => {
+    const now = oct(22, 12);
+    const fasts = [fast(oct(5, 20), 16, 16), fast(oct(6, 20), 10, 16), fast(oct(20, 20), 18, 16), fast(oct(22, 8), null, 16)];
+    const m = fastMonth(fasts, new Date(2026, 9, 1).getTime(), now);
+    // October 2026 starts on a Thursday and ends on a Saturday: five rows, Sep 28 to Nov 1.
+    expect(m.rows).toHaveLength(5);
+    expect(m.rows[0][0].day).toBe(startOfDay(new Date(2026, 8, 28).getTime()));
+    expect(m.rows[0][0].outside).toBe(true); // September
+    const oct5 = m.rows[1][0];
+    expect(oct5.level).toBe(1);
+    expect(m.rows[1][1].level).toBeCloseTo(10 / 16);
+    expect(m.totals[1]).toEqual({ fasts: 2, goal: 1, hours: 26 });
+    // Oct 22's fast started at 8 AM and is 4 hours in: counted to now, not met yet.
+    expect(m.totals[3]).toEqual({ fasts: 2, goal: 1, hours: 22 });
+    expect(m.rows[3].find((d) => d.isToday)?.level).toBe(0.25);
+    // The last row runs Oct 26 to Nov 1, all after today.
+    expect(m.rows[4].find((d) => new Date(d.day).getDate() === 26)?.future).toBe(true);
   });
 });

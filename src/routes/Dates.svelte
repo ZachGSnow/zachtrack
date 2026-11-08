@@ -11,6 +11,7 @@
   import { loadPrefs, oneOf, savePrefs } from '../lib/utils/prefs';
   import SegmentedControl from '../lib/components/SegmentedControl.svelte';
   import HelpLink from '../lib/components/HelpLink.svelte';
+  import { datesToIcs } from '../lib/utils/ics';
 
   // Every dates trackable in one place (ARCHITECTURE.md 3.38): the next year
   // of birthdays, anniversaries, holidays and countdowns, as an agenda or a
@@ -31,6 +32,19 @@
   const now = Date.now();
   const today = startOfDay(now);
   const datesTrackables = $derived(($trackables ?? []).filter((t) => !t.archived && t.displayMode === 'ages'));
+
+  // Every date as an .ics file (utils/ics.ts), made here and downloaded; nothing is uploaded.
+  function exportCalendar() {
+    const ics = datesToIcs($trackables ?? [], $entries ?? [], Date.now());
+    const url = URL.createObjectURL(new Blob([ics], { type: 'text/calendar;charset=utf-8' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'zachtrack-dates.ics';
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
   const items = $derived(upcomingDates(datesTrackables, $entries ?? [], now, UPCOMING_DAYS));
 
   // --- List: Today, This week, then by month ---------------------------------
@@ -104,6 +118,12 @@
     <h1 class="flex items-center gap-2 text-xl font-semibold text-text"><span>Dates</span> <HelpLink topic="dates" label="dates" /></h1>
     <SegmentedControl options={VIEWS} bind:value={view} />
   </div>
+  {#if datesTrackables.length > 0}
+    <div class="-mt-1 flex items-center gap-2 text-xs text-text-muted">
+      <button class="font-semibold text-brand" onclick={exportCalendar}>Export to calendar</button>
+      <span>An .ics file for Google Calendar or any calendar app.</span>
+    </div>
+  {/if}
 
   {#if $trackables === undefined}
     <p class="text-sm text-text-muted">Loading&hellip;</p>

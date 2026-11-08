@@ -48,6 +48,17 @@ class QuickLogStore {
     }
   }
 
+  /** Logs an entry with these values now, with undo: the water button during a long fast. */
+  async logValues(t: TrackableDefinition, values: Record<string, number>, message: string) {
+    this.error = '';
+    try {
+      const entry = await addTrackableEntry({ trackableId: t.id, timestamp: Date.now(), values });
+      this.offerUndo(message, () => deleteTrackableEntry(entry.id));
+    } catch (e) {
+      this.error = e instanceof Error ? e.message : 'Could not log it. Please try again.';
+    }
+  }
+
   /** Unchecks today: removes today's latest entry; Undo puts it back. */
   async uncheck(t: TrackableDefinition, entries: readonly TrackableEntry[]) {
     await this.uncheckOn(t, entries, Date.now());
