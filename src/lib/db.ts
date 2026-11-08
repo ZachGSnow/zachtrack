@@ -94,6 +94,11 @@ export interface TrackableDefinition {
   dateKind?: DateKind;
   /** For a dates trackable: show a date in Needs attention this many days ahead; unset = the kind's default. */
   dateLeadDays?: number;
+  /**
+   * Earlier weekday schedules, each in force on the days before `until` (local
+   * start-of-day), so a schedule change doesn't re-judge the past (3.51).
+   */
+  scheduleHistory?: Array<{ until: number; scheduleDays?: number[] }>;
   /** Kept out of the "on days with" comparisons, its own and the others' (utils/insights.ts). */
   insightsHidden?: boolean;
   createdAt: number;

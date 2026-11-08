@@ -3,7 +3,7 @@ import { addDays, startOfDay } from './time';
 import { bucketStart, computeFieldValuesByDay, type TimestampedValues } from './trackableStats';
 import { goalField, offDayReason } from './trackableGoals';
 
-type GridTrackable = Pick<TrackableDefinition, 'goalType' | 'goalValue' | 'createdAt' | 'scheduleDays' | 'skipDays' | 'pausedUntil'>;
+type GridTrackable = Pick<TrackableDefinition, 'goalType' | 'goalValue' | 'createdAt' | 'scheduleDays' | 'skipDays' | 'pausedUntil'> & Partial<Pick<TrackableDefinition, 'scheduleHistory'>>;
 
 /**
  * The habit grid (HabitGrid.svelte): one cell per day, whole weeks Monday to

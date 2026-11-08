@@ -23,7 +23,7 @@
     type TrackableKind,
   } from '../utils/trackableKinds';
 
-  import { DAILY_GOALS, GOAL_LABELS, GOAL_TYPES, goalField, WEEKDAY_NAMES } from '../utils/trackableGoals';
+  import { DAILY_GOALS, GOAL_LABELS, GOAL_TYPES, goalField, WEEKDAY_NAMES, withScheduleChange } from '../utils/trackableGoals';
   import { fromDateInputValue, toDateInputValue } from '../utils/time';
   import { TEMPLATES, type TrackableTemplate } from '../data/templates';
   import { holidayEntry, US_HOLIDAYS } from '../data/holidays';
@@ -287,6 +287,7 @@
         return;
       }
     }
+    const nextSchedule = goalType && DAILY_GOALS.includes(goalType) && scheduleDays.length < 7 ? [...scheduleDays].sort((a, b) => a - b) : undefined;
     const payload = {
       name: trimmedName,
       icon: icon.trim() || '\u2b50',
@@ -300,7 +301,9 @@
       dateLeadDays,
       pinned: pinned || undefined,
       insightsHidden: isDates ? undefined : insightsHidden || undefined,
-      scheduleDays: goalType && DAILY_GOALS.includes(goalType) && scheduleDays.length < 7 ? [...scheduleDays].sort((a, b) => a - b) : undefined,
+      scheduleDays: nextSchedule,
+      // The old weekdays stay in force for the days before today (3.51).
+      ...(trackable ? { scheduleHistory: withScheduleChange(trackable, nextSchedule, Date.now()) } : {}),
       pausedUntil: goalType && pausedUntilDraft ? fromDateInputValue(pausedUntilDraft) : undefined,
     };
     try {

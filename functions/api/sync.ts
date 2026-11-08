@@ -472,14 +472,14 @@ function buildTrackableUpsert(db: D1Database, trackable: TrackableDefinition, se
   return db
     .prepare(
       `INSERT INTO trackableDefinitions (id, name, icon, color, fieldIds, displayMode, goalType, goalValue, pinned, archived, sortOrder,
-         scheduleDays, skipDays, pausedUntil, dateKind, dateLeadDays, insightsHidden, createdAt, updatedAt, deletedAt, serverSeq, updatedBy)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
+         scheduleDays, skipDays, pausedUntil, dateKind, dateLeadDays, insightsHidden, scheduleHistory, createdAt, updatedAt, deletedAt, serverSeq, updatedBy)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          name=excluded.name, icon=excluded.icon, color=excluded.color, fieldIds=excluded.fieldIds,
          displayMode=excluded.displayMode, goalType=excluded.goalType, goalValue=excluded.goalValue,
          pinned=excluded.pinned, archived=excluded.archived, sortOrder=excluded.sortOrder,
          scheduleDays=excluded.scheduleDays, skipDays=excluded.skipDays, pausedUntil=excluded.pausedUntil,
-         dateKind=excluded.dateKind, dateLeadDays=excluded.dateLeadDays, insightsHidden=excluded.insightsHidden,
+         dateKind=excluded.dateKind, dateLeadDays=excluded.dateLeadDays, insightsHidden=excluded.insightsHidden, scheduleHistory=excluded.scheduleHistory,
          createdAt=excluded.createdAt, updatedAt=excluded.updatedAt,
          deletedAt=NULL, serverSeq=excluded.serverSeq, updatedBy=excluded.updatedBy
        WHERE excluded.updatedAt > trackableDefinitions.updatedAt`,
@@ -502,6 +502,7 @@ function buildTrackableUpsert(db: D1Database, trackable: TrackableDefinition, se
       trackable.dateKind ?? null,
       trackable.dateLeadDays ?? null,
       trackable.insightsHidden == null ? null : trackable.insightsHidden ? 1 : 0,
+      trackable.scheduleHistory?.length ? JSON.stringify(trackable.scheduleHistory) : null,
       trackable.createdAt,
       trackable.updatedAt,
       serverSeq,
@@ -671,6 +672,7 @@ function mapTrackableRow(row: Record<string, unknown>): WireRow<TrackableDefinit
     dateKind: (row.dateKind as TrackableDefinition['dateKind']) ?? undefined,
     dateLeadDays: (row.dateLeadDays as number) ?? undefined,
     insightsHidden: row.insightsHidden == null ? undefined : Boolean(row.insightsHidden),
+    scheduleHistory: row.scheduleHistory ? JSON.parse(row.scheduleHistory as string) : undefined,
     createdAt: row.createdAt as number,
     updatedAt: row.updatedAt as number,
     deletedAt: (row.deletedAt as number) ?? undefined,

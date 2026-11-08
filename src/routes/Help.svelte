@@ -204,7 +204,7 @@
         streak from breaking when life gets in the way:
       </p>
       <ul>
-        <li><strong>Rest days:</strong> a daily goal can apply on chosen weekdays only (Edit > On these days). Other days don't count and don't break it.</li>
+        <li><strong>Rest days:</strong> a daily goal can apply on chosen weekdays only (Edit > On these days). Other days don't count and don't break it. Changing the days applies from today on: past days keep the schedule they had.</li>
         <li><strong>Skip a day:</strong> tap the day in the habit grid and choose Skip this day, for when you're sick or travelling.</li>
         <li><strong>Pause:</strong> Edit > Paused until, for a holiday. Nothing is due until then.</li>
       </ul>

@@ -1045,6 +1045,24 @@ the release notes say so. The same was true of every earlier synced
 column; this release is the first where the field is likely to be set
 from one device and the record edited on another soon after.
 
+### 3.51 Schedule history (v1.17.0)
+
+Changing a daily goal's weekdays used to re-judge every past day by the new
+schedule: dropping Sunday turned old Sunday misses into rest days, and
+adding it turned old rest days into misses, rewriting streaks, strength
+and the weekly review. The research put "schedule edits reset progress"
+among Productive's top complaints.
+
+`trackableDefinitions.scheduleHistory` (migration 0009, JSON) keeps each
+earlier schedule with `until`, the local start-of-day it stopped applying.
+`scheduleOn` in `utils/trackableGoals.ts` returns the schedule in force on a
+day, and `offDayReason`, which every goal, grid, strength and review
+calculation goes through, uses it. The Edit sheet records a change with
+`withScheduleChange`: the old schedule applies up to today, a second change
+the same day replaces the first, a trackable made today keeps no history,
+and at most 100 entries are kept. Skip days and pauses were already per
+day and are unchanged.
+
 ### 3.21 Trackables list: pin, archive, order; tag filters
 - **Sort** (per device, `zachtrack:trackables-view`): Due first (goal
   urgency from 3.18: overdue, then due, then the rest, then trackables

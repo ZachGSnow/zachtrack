@@ -132,6 +132,22 @@ const checks: Record<Exclude<RecordKind, 'tombstones'>, Check> = {
       ),
       optional(r, 'dateLeadDays', (v) => Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 365, 'a whole number of days, 0 to 365'),
       optional(r, 'insightsHidden', (v) => typeof v === 'boolean', 'a boolean'),
+      optional(
+        r,
+        'scheduleHistory',
+        (v) =>
+          Array.isArray(v) &&
+          v.length <= 100 &&
+          v.every(
+            (h) =>
+              isObject(h) &&
+              isNum(h.until) &&
+              (h.scheduleDays === undefined ||
+                (Array.isArray(h.scheduleDays) && h.scheduleDays.length <= 7 && h.scheduleDays.every((d) => Number.isInteger(d) && d >= 0 && d <= 6))) &&
+              Object.keys(h).every((k) => k === 'until' || k === 'scheduleDays'),
+          ),
+        'a list of { until, scheduleDays }',
+      ),
     ),
   trackableEntries: (r) =>
     all(

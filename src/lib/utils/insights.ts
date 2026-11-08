@@ -25,7 +25,7 @@ export function insightKey(trackableId: string, otherId: string, daysAfter: numb
   return `${trackableId}|${otherId}|${daysAfter}`;
 }
 
-type Trackable = Pick<TrackableDefinition, 'id' | 'name' | 'goalType' | 'goalValue' | 'scheduleDays' | 'skipDays' | 'pausedUntil' | 'createdAt' | 'insightsHidden'>;
+type Trackable = Pick<TrackableDefinition, 'id' | 'name' | 'goalType' | 'goalValue' | 'scheduleDays' | 'skipDays' | 'pausedUntil' | 'createdAt' | 'insightsHidden'> & Partial<Pick<TrackableDefinition, 'scheduleHistory'>>;
 
 const nf = new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 });
 
