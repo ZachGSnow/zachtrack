@@ -51,7 +51,8 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
   from its fields and changeable: time since (events), latest value with its
   7-day average and weekly trend (readings like Weight, with the average
   drawn through the chart, changes coloured toward your goal weight, and a
-  goal-weight date at that rate), today's total (Calories, Water) or logged
+  goal-weight date as a range, or a smoothed trend that can lead instead of
+  the scale's reading), today's total (Calories, Water) or logged
   today with a streak (check-ins). Optional goals: a daily total, N times a
   week, every N days (with due and overdue) or avoid, each with its own
   streak; times per day too, and daily goals can apply on chosen weekdays,
@@ -64,15 +65,18 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
   already log most days. A habit's page has a forgiving strength score
   (one missed day costs a little, not the streak), days met and the
   current and best streaks, and Today shows a weekly review on Sundays and
-  Mondays. A trackable without fields logs in one tap,
-  with undo. The list
+  Mondays. A habit that slipped after going well gets a card with three
+  ways back (pause a week, a smaller goal for now, start again) instead of
+  a broken streak. A trackable without fields logs in one tap,
+  with undo, and Today logs a reading or a rating inline, without a sheet. The list
   sorts by what's due (or your own order, or A-Z), with pinning and
   archiving; fasts and entries can be filtered by tag. In-app reminders
   instead of notifications: a Needs attention list of overdue and due goals,
   and badges on the Trackables and Fasting tabs. Each trackable's page adds
   plain-language insights: goal consistency, best weekday, and how a value
   differs on days with your other trackables, or the day after them (a
-  late meal in the next morning's weight). A comparison can be hidden, and
+  late meal in the next morning's weight) or after a fast that met its
+  goal. A comparison can be hidden, and
   a trackable kept out of comparisons altogether.
   A starter set (Body Measurements, Vitals, Nutrition, Sleep, Wellness,
   Activity, Menstrual Cycle, Male Health) is offered on a new install and is
@@ -84,9 +88,10 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
   Dates show under Needs attention a few days ahead, the next two weeks
   under Coming up, and the next year on a Dates page with a list and a
   month calendar; each date can carry notes (gift ideas, sizes), and Export
-  to calendar downloads them as an .ics file.
+  to calendar downloads them as an .ics file, with optional reminders.
 - **Four tabs:** Today (what to do now: the fast, habits due, what to log
-  and dates coming up), Fasting (Timer, Journey, History), Trackables (List,
+  and dates coming up, what happened since you were last here, and whether
+  your data is safe: last sync, the server's last backup, your last export), Fasting (Timer, Journey, History), Trackables (List,
   Dates) and Insights, with each tab's pages switched at the top of the page
   on a phone and listed in the sidebar on a laptop. Insights opens with an
   overview of fasting and every trackable, the clearest patterns and a year
@@ -103,6 +108,8 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
 - **Light and dark themes** that follow the device, or your pick in Settings.
 - **Phone and laptop layouts:** a tab bar on phones; on wider screens a
   sidebar, content that uses the width, and dialogs instead of bottom sheets.
+  Single-key shortcuts on a laptop (T Today, W a weigh-in, ? for the list),
+  and a table on each trackable's page to fill in the past week or two.
 - **Offline and installable** (service worker, Android/Chrome PWA), with
   home-screen shortcuts (long-press the icon): Log weight, Start a fast,
   Trackables, Journey.
@@ -116,6 +123,9 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
 - **Templates** for new trackables (Water, Workout, Weigh-in, ...), and a
   compact list view.
 - **CSV export** for a spreadsheet, one row per value.
+- **Scale import:** weigh-ins from a smart scale app's CSV export (Renpho,
+  Withings, Fitbit, Garmin, Eufy, Google Fit), with units converted and days
+  already logged left out.
 - **Export and import** (Settings > Your data): a JSON file of everything on
   the device, and an import that previews what it will add or update, merges
   by newest version, never deletes, then syncs.

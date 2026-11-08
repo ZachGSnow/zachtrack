@@ -1063,6 +1063,130 @@ the same day replaces the first, a trackable made today keeps no history,
 and at most 100 entries are kept. Skip days and pauses were already per
 day and are unchanged.
 
+### 3.52 Your data, and since you were last here (v1.18.0)
+
+The research's loudest complaint across all three kinds of app was data
+loss: a sync that dropped weeks, a restore that didn't, an export nobody
+knew was stale. Today now ends with a **Your data** card
+(`DataSafetyCard.svelte`) that answers "is everything safe?" from three
+facts: when this device last synced, when the server's nightly backup last
+ran, and when a backup file was last exported here. `assessDataSafety` in
+`utils/dataSafety.ts` turns them into lines and an ok flag: a sync older
+than 3 days, a server backup older than 36 hours, or no export in 30 days
+turns it amber, and a device that never synced says it holds the only copy.
+
+The backup time comes from `GET /api/backup-status`
+(`functions/api/backup-status.ts`). It checks the Access JWT like sync,
+lists the R2 bucket under `zachtrack-db/` and returns the newest object's
+key, upload time and size. Without a `BACKUPS` binding it answers
+`{configured: false}` and the card leaves the line out, so a deployment
+without the backup Worker still works. The endpoint only lists the
+bucket; it never reads or writes a backup. The last export time is a per-device pref
+(`last-export`) set by `downloadBackupFile` in `exportData.ts`, which the
+Settings export now uses too.
+
+**Since you were last here** (`AwayCard.svelte`): `visit.svelte.ts` writes
+`last-active` every minute and when the page hides, and keeps the value
+from before this visit. After 12 hours or more away,
+`utils/sinceLastVisit.ts` lists at most six things that happened
+meanwhile: fasts that reached their goal (with when), daily goals missed
+(by days), dates that went by, and how many records arrived from other
+devices (from the sync log). Dismiss hides it until the next gap.
+
+### 3.53 Never zero: strength first, and a way back from a lapse (v1.18.0)
+
+A broken streak was the most common reason people gave for quitting a
+habit app. Two changes:
+- **Strength before streak.** `goalCardLine` puts "80% strong" ahead of the
+  streak on cards and Today's habit rows. Strength (3.48) only dents on a
+  miss, so the first number a person sees after a bad day isn't a zero.
+- **Lapsed habits.** `lapsedHabits` in `utils/today.ts` finds daily goals
+  (perDay or dailyTotal) met on none of the last 7 scheduled days (at least
+  3 of them) after being met on at least half of the 30 scheduled days
+  before (at least 7 days counted). History counts from the earlier of the
+  trackable's creation and its first entry, so imported history counts.
+  `LapsedHabitCard.svelte` offers Pause a week (`pausedUntil`), a smaller
+  goal for now (one fewer per day, or 75% of a daily total), or Start again,
+  which only hides the card. "Not now" snoozes it for 14 days (per device,
+  `lapsed-dismissed`).
+
+### 3.54 The smoothed trend and a goal range (v1.18.0)
+
+Weight apps that people stay with (Happy Scale, Libra, The Hacker's Diet)
+lead with a trend, not the scale. `utils/measurement.ts` adds an
+exponentially smoothed series (`smoothedSeries`, factor 0.1: each reading
+moves the trend a tenth of the way toward it, and days without a reading
+carry it over) next to the existing 7-day average.
+`trendNow` gives the current value and the one a week ago in either mode.
+
+`trendFit` fits a line to the last 30 days and also returns its standard
+error; `projectGoalRange` turns the slope plus or minus one standard error
+into an earliest and latest date for the goal, and `describeRange` says
+"(Jan 4 to Feb 10)", "(Jan 4 or later)" when the slower rate never gets
+there, or nothing when both dates are the same. A single
+date implied a precision the data doesn't have.
+
+The choice is per device (`measurementView.svelte.ts`, pref
+`measurement-view`): Trend (7-day average or Smoothed) and Lead with the
+trend, which swaps the card's main number and sub line and hides the raw
+readings on the chart. `summarize` in `trackableKinds.ts` takes the view.
+
+### 3.55 Logging inline, and fasting as a factor (v1.18.0)
+
+Each row on Today's Log list has `InlineLog.svelte` under it: a number
+box for a measurement (placeholder from the last reading, Enter logs) or the
+rating as taps for a check-in. Both go through `quickLog.logValues`, so the
+undo toast and errors are the same as the sheet's. Other kinds keep the "+".
+
+`goalFastFactor` in `utils/insights.ts` makes goal fasts one more factor for
+the "On days with" comparisons: a day counts when a fast that met its goal
+ended on it. Its id is `__goal-fast`, so hiding it and Settings' hidden
+list work like any other comparison.
+
+### 3.56 Calendar export: February 29 and reminders (v1.18.0)
+
+A February 29 birthday exported as a plain yearly rule only appears in
+leap years. `datesToIcs` now writes `BYMONTH=2;BYMONTHDAY=-1`, the last day
+of February, which matches how the app counts it. With "with reminders"
+ticked, each event gets a `VALARM`: as many days ahead as the date's own
+lead time (`leadDaysOf`), or 9 AM on the day for a lead of 0. The phone's
+calendar does the alerting; the app still sends nothing.
+
+### 3.57 Weigh-ins from a scale app's CSV (v1.18.0)
+
+A PWA can't read Apple Health or Health Connect, and the research found
+live platform syncs are where readings silently go missing. Every smart
+scale app exports CSV, so `utils/scaleImport.ts` reads that instead:
+`parseCsv` (comma, semicolon or tab; quotes; a byte-order mark), column
+detection by header name (a date or time column, an optional separate time
+column, and a weight column that isn't fat, muscle, bone, water or a
+min/max; "Average weight" wins for Google Fit), `parseDateTime` (ISO, US
+slashes, day-first dots, month names; a date alone is noon), units from the
+header or the cell (kg, lb, stone, "12 st 6 lb"), and decimal commas in
+semicolon files. `newWeighIns` drops a reading when that day already has
+one within 0.1. `ScaleImportSection.svelte` in Settings previews the count,
+date span and conversion, then adds entries to the weight field's
+trackable (3.14) as ordinary entries, which sync.
+
+### 3.58 On a laptop: shortcuts and filling in past days (v1.18.0)
+
+`utils/keyboard.ts` maps single keys to pages (T, F, J, H, L, D, I, S), W
+to a weigh-in and ? to the list, like Gmail's. `shortcutFor` ignores keys
+with Ctrl, Alt or Cmd, keys already handled, and anything typed into a text
+box, textarea, select or editable element (a checkbox or button still
+lets them through). `App.svelte` handles the key; while a sheet is open
+only ? works. W finds the weight field's trackable (`weighIn.ts`, shared
+with the home-screen shortcut), goes to Today and opens the entry sheet
+there. The sidebar says "Press ? for keyboard shortcuts".
+
+**Fill in past days** (`BackfillGrid.svelte`, `utils/backfill.ts`) on a
+trackable's page is a table of the last 7 or 14 days with a cell per field
+(a text box for numbers and ratings, a checkbox for yes/no, or a Done
+checkbox for a trackable without fields) and how many entries each day
+already has. Saving adds one entry at noon for each day with a value;
+cells that aren't a number, or a rating out of range, are flagged and left
+out.
+
 ### 3.21 Trackables list: pin, archive, order; tag filters
 - **Sort** (per device, `zachtrack:trackables-view`): Due first (goal
   urgency from 3.18: overdue, then due, then the rest, then trackables
