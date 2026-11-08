@@ -383,3 +383,28 @@ describe('hardening', () => {
     ]);
   });
 });
+
+describe('insight controls and date notes (v1.17.0)', () => {
+  it('round-trips insightsHidden, mutedInsights and date details, and refuses malformed muted keys', async () => {
+    const hidden = { ...trackable, id: 't-hidden', insightsHidden: true };
+    const dated = { ...entry('e-bday', 5, 0), values: undefined, note: 'Alex', details: 'Gift: coffee beans' };
+    const settings = { id: 'app-settings', defaultPresetId: '16:8', notificationsEnabled: false, mutedInsights: ['t1|t2|0', 't1|t3|1'], updatedAt: 5 };
+    await sync(syncBody(0, { trackableDefinitions: [hidden], trackableEntries: [dated], settings }));
+    const other = await pull(0);
+    expect(other.changes.trackableDefinitions[0].insightsHidden).toBe(true);
+    expect(other.changes.trackableEntries[0].details).toBe('Gift: coffee beans');
+    expect(other.changes.settings.mutedInsights).toEqual(['t1|t2|0', 't1|t3|1']);
+
+    for (const bad of [['t1|t2'], ['t1|t2|2'], 'not a list', [42]]) {
+      const res = await sync(syncBody(0, { settings: { ...settings, mutedInsights: bad, updatedAt: 9 } }));
+      expect(res.body.rejected).toEqual([expect.objectContaining({ recordType: 'settings', reason: expect.stringContaining('mutedInsights') })]);
+    }
+  });
+
+  it('clears a deleted date entry\'s notes on the server', async () => {
+    await sync(syncBody(0, { trackableEntries: [{ ...entry('e-gone', 5, 0), values: undefined, note: 'Sam', details: 'Size S' }] }));
+    await sync(syncBody(0, {}, [{ recordType: 'trackableEntries', uuid: 'e-gone', deletedAt: 20 }]));
+    const row = await db.prepare('SELECT details, note FROM trackableEntries WHERE id = ?').bind('e-gone').first<{ details: string | null; note: string | null }>();
+    expect(row).toEqual({ details: null, note: null });
+  });
+});

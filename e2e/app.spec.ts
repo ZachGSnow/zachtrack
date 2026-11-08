@@ -909,3 +909,74 @@ test('the Log weight shortcut opens the weigh-in sheet from the last reading, an
   await expect(nutrition).toHaveCount(0);
   expect(problems).toEqual([]);
 });
+
+test('a comparison can be hidden and brought back in Settings, and a trackable kept out of comparisons', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await mockSync(page, noServer);
+  await importSampleData(page);
+  // Plant a clear pattern: Male Health logged on the evenings of the heavier half of the sample weigh-ins,
+  // so Body Measurements has "on days with" comparisons to hide. Written straight into the test browser's
+  // database (fictional sample data only), then reloaded so the app reads it.
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve, reject) => {
+        const open = indexedDB.open('snowfast');
+        open.onerror = () => reject(open.error);
+        open.onsuccess = () => {
+          const db = open.result;
+          const tx = db.transaction(['trackableDefinitions', 'fieldDefinitions', 'trackableEntries'], 'readwrite');
+          const t = tx.objectStore('trackableDefinitions').getAll();
+          const f = tx.objectStore('fieldDefinitions').getAll();
+          const e = tx.objectStore('trackableEntries').getAll();
+          tx.oncomplete = () => {
+            const body = t.result.find((x: { name: string }) => x.name === 'Body Measurements');
+            const male = t.result.find((x: { name: string }) => x.name === 'Male Health');
+            const weight = f.result.find((x: { name: string }) => x.name === 'Weight');
+            const weighIns = (e.result as Array<{ trackableId: string; timestamp: number; values?: Record<string, number> }>)
+              .filter((x) => x.trackableId === body.id && x.values?.[weight.id] != null)
+              .sort((a, b) => b.values![weight.id] - a.values![weight.id]);
+            const heavy = weighIns.slice(0, Math.ceil(weighIns.length / 2));
+            const write = db.transaction('trackableEntries', 'readwrite');
+            const store = write.objectStore('trackableEntries');
+            heavy.forEach((w, i) => {
+              const at = new Date(w.timestamp);
+              at.setHours(7, 30, 0, 0);
+              store.put({ id: `planted-${i}`, trackableId: male.id, timestamp: at.getTime(), createdAt: Date.now(), updatedAt: Date.now() });
+            });
+            write.oncomplete = () => {
+              db.close();
+              resolve();
+            };
+            write.onerror = () => reject(write.error);
+          };
+        };
+      }),
+  );
+  await page.goto('/#/trackables');
+  await page.reload();
+  await page.getByRole('link', { name: /Body Measurements/ }).click();
+  const insights = page.getByRole('region', { name: 'Insights' });
+  const hide = insights.getByRole('button', { name: 'Hide this comparison' });
+  await expect(hide.first()).toBeVisible();
+  const before = await hide.count();
+  const hidden = (await insights.getByRole('listitem').filter({ has: page.getByRole('button', { name: 'Hide this comparison' }) }).first().textContent())!.replace('Hide', '').trim();
+  await hide.first().click();
+  await expect(insights.getByText(hidden, { exact: false })).toHaveCount(0);
+
+  await openSettings(page);
+  const list = page.getByRole('list', { name: 'Hidden comparisons' });
+  await expect(list.getByRole('listitem')).toHaveCount(1);
+  await expect(list).toContainText(/^Body Measurements (on days with|the day after) Male Health/);
+  await list.getByRole('button', { name: 'Show' }).click();
+  await expect(list).toHaveCount(0);
+
+  // Keep out of comparisons: none on its own page.
+  await page.goto('/#/trackables');
+  await page.getByRole('link', { name: /Body Measurements/ }).click();
+  await expect(hide).toHaveCount(before);
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.getByRole('checkbox', { name: /Keep out of comparisons/ }).check();
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(hide).toHaveCount(0);
+  expect(problems).toEqual([]);
+});

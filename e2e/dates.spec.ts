@@ -36,12 +36,18 @@ test('a birthday shows the age it turns and a countdown, on its page and its car
   await page.getByRole('button', { name: '+ Add person' }).click();
   await page.getByRole('textbox', { name: 'Name' }).fill('Mom');
   await page.getByLabel('Birthdate').fill(await dateFromToday(page, 5, 60));
+  await page.getByRole('textbox', { name: 'Notes (optional)' }).fill('Likes orchids');
   await page.getByRole('button', { name: 'Save', exact: true }).click();
 
   const row = page.getByRole('list', { name: 'Upcoming' }).getByRole('button', { name: /Mom/ });
   await expect(row).toContainText('in 5 days');
+  // Its notes show under the date, here and on the Dates page.
+  await expect(row).toContainText('Likes orchids');
   await expect(row).toContainText('turns 60');
   await expect(row).toContainText(/59 years 11 months \d+ days? old/);
+
+  await page.goto('/#/dates');
+  await expect(page.getByRole('link', { name: /Mom.*turns 60/ })).toContainText('Likes orchids');
 
   await page.goto('/#/trackables');
   await expect(page.getByText('Mom in 5 days')).toBeVisible();

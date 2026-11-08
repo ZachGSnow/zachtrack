@@ -82,6 +82,8 @@
 
   let dateLocal = $state('');
   let note = $state('');
+  /** A date's notes (gift ideas, sizes); `note` holds its name. */
+  let details = $state('');
   let tags = $state<string[]>([]);
   let fieldInputs = $state<Record<string, string | number | boolean>>({});
   let error = $state('');
@@ -104,6 +106,7 @@
     dateLocal = ages ? toDateInputValue(when) : toDatetimeLocal(when);
     if (ages) loadRepeat(entry?.dateRepeat ?? defaultRepeat(dateKindOf(trackable)));
     note = entry?.note ?? '';
+    details = entry?.details ?? '';
     tags = entry?.tags ?? [];
     error = '';
   });
@@ -208,7 +211,7 @@
       note: note.trim() || undefined,
       tags: tags.length ? [...tags] : undefined,
       values: Object.keys(values).length ? values : undefined,
-      ...(isAges ? { dateRepeat } : {}),
+      ...(isAges ? { dateRepeat, details: details.trim() || undefined } : {}),
     };
 
     try {
@@ -305,6 +308,16 @@
           />
         </label>
       {/if}
+
+      <label class="block text-sm">
+        <span class="mb-1 block text-text-muted">Notes (optional)</span>
+        <textarea
+          bind:value={details}
+          rows="2"
+          placeholder={dateKind === 'birthday' ? 'Gift ideas, sizes, what they like' : 'Anything to remember'}
+          class="w-full resize-none rounded-lg border bg-transparent p-2 text-text placeholder:text-text-muted border-border"
+        ></textarea>
+      </label>
     {:else}
       <label class="block text-sm">
         <span class="mb-1 block text-text-muted">Date & time</span>

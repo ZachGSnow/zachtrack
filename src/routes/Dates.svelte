@@ -107,6 +107,9 @@
       <span class="min-w-0 flex-1">
         <span class="block truncate text-sm font-semibold text-text">{d.name}</span>
         <span class="block truncate text-xs text-text-muted">{when(d.at)}{d.detail ? `, ${d.detail.charAt(0).toLowerCase()}${d.detail.slice(1)}` : ''} &middot; {d.trackableName}</span>
+        {#if d.details}
+          <span class="block truncate text-xs text-text">{d.details}</span>
+        {/if}
       </span>
       <span class="shrink-0 text-xs font-medium" style="color: {d.daysUntil <= 7 ? readableText(d.color, themeStore.effective) : 'var(--color-text-muted)'};">{d.countdown}</span>
     </a>

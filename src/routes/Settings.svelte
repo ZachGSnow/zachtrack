@@ -31,6 +31,19 @@
   // Fields no trackable uses any more: left behind by edits and deleted trackables.
   const unused = $derived(unusedFields($allFields ?? [], $allTrackables ?? []));
   let unusedOpen = $state(false);
+  // Comparisons hidden from trackable pages (settings.mutedInsights), named from their keys.
+  const hiddenInsights = $derived(
+    (settingsStore.data.mutedInsights ?? []).map((key) => {
+      const [id, otherId, after] = key.split('|');
+      const name = (tid: string) => ($allTrackables ?? []).find((t) => t.id === tid)?.name ?? 'a deleted trackable';
+      return { key, label: `${name(id)} ${after === '1' ? 'the day after' : 'on days with'} ${name(otherId)}` };
+    }),
+  );
+  function showInsight(key: string) {
+    const next = (settingsStore.data.mutedInsights ?? []).filter((k) => k !== key);
+    settingsStore.update({ mutedInsights: next.length ? [...next] : undefined });
+  }
+
   async function removeUnused(fieldId: string) {
     const f = unused.find((u) => u.id === fieldId);
     if (!f || !confirm(`Delete the field "${f.name}"? Values logged under it stay in their entries but won't be shown.`)) return;
@@ -208,6 +221,21 @@
       {/if}
     {/if}
   </section>
+
+  {#if hiddenInsights.length > 0}
+    <section class="space-y-2" aria-labelledby="settings-insights">
+      <h2 id="settings-insights" class="text-sm font-semibold uppercase tracking-wide text-text-muted">Hidden comparisons</h2>
+      <p class="text-xs text-text-muted">Insights you hid on a trackable's page. Hiding syncs to your other devices.</p>
+      <ul class="divide-y divide-border rounded-lg border border-border" aria-label="Hidden comparisons">
+        {#each hiddenInsights as h (h.key)}
+          <li class="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+            <span class="min-w-0 truncate text-text">{h.label}</span>
+            <button class="shrink-0 text-xs font-medium text-brand" onclick={() => showInsight(h.key)}>Show</button>
+          </li>
+        {/each}
+      </ul>
+    </section>
+  {/if}
 
   <section class="space-y-4" aria-labelledby="settings-fasting">
   <h2 id="settings-fasting" class="text-sm font-semibold uppercase tracking-wide text-text-muted">Fasting</h2>

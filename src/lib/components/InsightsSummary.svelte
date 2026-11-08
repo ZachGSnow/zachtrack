@@ -2,6 +2,7 @@
   import { link } from 'svelte-spa-router';
   import type { FastRecord, FieldDefinition, TrackableDefinition, TrackableEntry } from '../db';
   import { trackableInsights } from '../utils/insights';
+  import { settingsStore } from '../stores/settings.svelte';
   import { goalStatus } from '../utils/trackableGoals';
   import { computeFastStats } from '../utils/stats';
   import { goalMet } from '../utils/fastingJourney';
@@ -30,13 +31,16 @@
     return map;
   });
 
+  // Comparisons hidden from a trackable's page stay out of Patterns too.
+  const muted = $derived(new Set(settingsStore.data.mutedInsights ?? []));
+
   const rows = $derived.by(() => {
     const others = tracked.map((t) => ({ trackable: t, entries: byTrackable.get(t.id) ?? [] }));
     return tracked
       .map((t) => {
         const own = byTrackable.get(t.id) ?? [];
         const attached = t.fieldIds.map((id) => fields.find((f) => f.id === id)).filter((f): f is FieldDefinition => f != null);
-        const insights = own.length ? trackableInsights(t, own, attached, others, now) : [];
+        const insights = own.length ? trackableInsights(t, own, attached, others, now, muted) : [];
         const goal = t.goalType ? goalStatus(t, own, attached, now) : null;
         return {
           trackable: t,

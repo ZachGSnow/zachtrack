@@ -174,6 +174,10 @@
         </li>
         <li>Each trackable's own page lists its dates, and its card the next three.</li>
         <li>
+          <strong>Notes</strong> on a date (gift ideas, sizes) show under it on its page and the Dates page, and go into the
+          calendar export.
+        </li>
+        <li>
           <strong>Export to calendar</strong> on the Dates page downloads an .ics file. Import it into Google Calendar (Settings >
           Import) or any calendar app: birthdays, anniversaries and holidays repeat there on their own. The file is made on
           your device; nothing is uploaded. Importing again later adds copies, so delete the old calendar first.
@@ -240,7 +244,12 @@
         <li><strong>By weekday:</strong> the days you log it most and least, when the difference is clear.</li>
         <li>
           <strong>On days with:</strong> how its value (its first rating or number field, or whether you logged it) differs on days
-          you also logged another trackable, with the number of days on each side.
+          you also logged another trackable, with the number of days on each side. "On days after" does the same for the day
+          after, like a late meal in the next morning's weight.
+        </li>
+        <li>
+          <strong>Hide</strong> next to a comparison hides it on every device; Settings > Hidden comparisons brings it back. To keep
+          a trackable out of comparisons altogether, its own and the others', tick "Keep out of comparisons" in its Edit sheet.
         </li>
       </ul>
       <p>

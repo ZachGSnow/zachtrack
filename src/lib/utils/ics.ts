@@ -44,7 +44,7 @@ function fold(line: string): string {
 }
 
 type IcsTrackable = Pick<TrackableDefinition, 'id' | 'name' | 'displayMode' | 'dateKind' | 'archived'>;
-type IcsEntry = Pick<TrackableEntry, 'id' | 'trackableId' | 'timestamp' | 'note' | 'dateRepeat'>;
+type IcsEntry = Pick<TrackableEntry, 'id' | 'trackableId' | 'timestamp' | 'note' | 'dateRepeat'> & Partial<Pick<TrackableEntry, 'details'>>;
 
 /** The event's title: "Alex's birthday", "Us anniversary", or the date's name. */
 function summaryFor(kind: string, name: string): string {
@@ -57,7 +57,7 @@ export function datesToIcs(trackables: readonly IcsTrackable[], entries: readonl
   const byId = new Map(trackables.filter((t) => t.displayMode === 'ages' && !t.archived).map((t) => [t.id, t] as const));
   const stamp = icsStamp(now);
   const events: string[][] = [];
-  const event = (uid: string, start: number, summary: string, category: string, rrule?: string) => {
+  const event = (uid: string, start: number, summary: string, category: string, rrule?: string, description?: string) => {
     const lines = [
       'BEGIN:VEVENT',
       `UID:${uid}@zachtrack`,
@@ -69,6 +69,7 @@ export function datesToIcs(trackables: readonly IcsTrackable[], entries: readonl
       'TRANSP:TRANSPARENT',
     ];
     if (rrule) lines.push(`RRULE:${rrule}`);
+    if (description) lines.push(`DESCRIPTION:${escapeText(description)}`);
     lines.push('END:VEVENT');
     events.push(lines);
   };
@@ -80,24 +81,25 @@ export function datesToIcs(trackables: readonly IcsTrackable[], entries: readonl
     const repeat = repeatOf(e, kind);
     const name = e.note?.trim() || 'Untitled';
     const summary = summaryFor(kind, name);
+    const notes = e.details?.trim() || undefined;
     switch (repeat.type) {
       case 'yearly':
-        event(e.id, e.timestamp, summary, t.name, 'FREQ=YEARLY');
+        event(e.id, e.timestamp, summary, t.name, 'FREQ=YEARLY', notes);
         break;
       case 'once':
-        event(e.id, e.timestamp, summary, t.name);
+        event(e.id, e.timestamp, summary, t.name, undefined, notes);
         break;
       case 'every':
-        event(e.id, e.timestamp, summary, t.name, `FREQ=${repeat.unit === 'years' ? 'YEARLY' : 'MONTHLY'};INTERVAL=${repeat.count}`);
+        event(e.id, e.timestamp, summary, t.name, `FREQ=${repeat.unit === 'years' ? 'YEARLY' : 'MONTHLY'};INTERVAL=${repeat.count}`, notes);
         break;
       case 'nthWeekday':
         // From the next time it falls, so the start date is a real occurrence.
-        event(e.id, nextOccurrence(e, kind, now).at, summary, t.name, `FREQ=YEARLY;BYMONTH=${repeat.month + 1};BYDAY=${repeat.nth}${WEEKDAYS[repeat.weekday]}`);
+        event(e.id, nextOccurrence(e, kind, now).at, summary, t.name, `FREQ=YEARLY;BYMONTH=${repeat.month + 1};BYDAY=${repeat.nth}${WEEKDAYS[repeat.weekday]}`, notes);
         break;
       case 'easter': {
         const first = new Date(now).getFullYear();
         for (let y = first; y < first + EASTER_YEARS; y++) {
-          event(`${e.id}-${y}`, addDays(easterSunday(y), repeat.offsetDays ?? 0), summary, t.name);
+          event(`${e.id}-${y}`, addDays(easterSunday(y), repeat.offsetDays ?? 0), summary, t.name, undefined, notes);
         }
         break;
       }

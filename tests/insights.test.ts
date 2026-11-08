@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { FieldDefinition } from '../src/lib/db';
-import { trackableInsights } from '../src/lib/utils/insights';
+import { insightKey, trackableInsights } from '../src/lib/utils/insights';
 import type { TimestampedValues } from '../src/lib/utils/trackableStats';
 
 // America/New_York (vitest config). 2026-10-26 is a Monday.
@@ -87,5 +87,33 @@ describe('insights', () => {
     const text = trackableInsights(goal, entries, [], [], NOW).find((i) => i.label === 'Last 30 days')!.text;
     // Sep 27 to Oct 26 has 21 weekdays.
     expect(text).toMatch(/^Goal met on \d+ of 21 days \(\d+%\)$/);
+  });
+});
+
+describe('insight controls', () => {
+  // Mood every day for 40 days: 5 on gym days (every other day), 3 otherwise; the same with Walk.
+  const gym: TimestampedValues[] = [];
+  const entries: TimestampedValues[] = [];
+  for (let n = 0; n < 40; n++) {
+    const gymDay = n % 2 === 0;
+    if (gymDay) gym.push({ timestamp: daysAgo(n, 18) });
+    entries.push({ timestamp: daysAgo(n, 21), values: { 'f-m': gymDay ? 5 : 3 } });
+  }
+  const others = [{ trackable: { id: 'g', name: 'Gym' }, entries: gym }];
+  const comparisons = (list: ReturnType<typeof trackableInsights>) => list.filter((i) => i.key);
+
+  it('gives each comparison a key, and a muted key hides just that one', () => {
+    const all = comparisons(trackableInsights(base, entries, [mood], others, NOW));
+    expect(all.map((i) => i.key)).toContain(insightKey('t', 'g', 0));
+    const muted = comparisons(trackableInsights(base, entries, [mood], others, NOW, new Set([insightKey('t', 'g', 0)])));
+    expect(muted.map((i) => i.key)).not.toContain(insightKey('t', 'g', 0));
+    expect(muted.length).toBe(all.length - 1);
+  });
+
+  it('keeps a trackable out of comparisons both ways', () => {
+    expect(comparisons(trackableInsights({ ...base, insightsHidden: true }, entries, [mood], others, NOW))).toEqual([]);
+    expect(comparisons(trackableInsights(base, entries, [mood], [{ trackable: { id: 'g', name: 'Gym', insightsHidden: true }, entries: gym }], NOW))).toEqual([]);
+    // The other insights stay.
+    expect(trackableInsights({ ...base, insightsHidden: true }, entries, [mood], others, NOW).find((i) => i.label === 'Last 30 days')).toBeTruthy();
   });
 });

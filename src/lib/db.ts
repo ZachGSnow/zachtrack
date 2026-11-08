@@ -94,6 +94,8 @@ export interface TrackableDefinition {
   dateKind?: DateKind;
   /** For a dates trackable: show a date in Needs attention this many days ahead; unset = the kind's default. */
   dateLeadDays?: number;
+  /** Kept out of the "on days with" comparisons, its own and the others' (utils/insights.ts). */
+  insightsHidden?: boolean;
   createdAt: number;
   updatedAt: number;
 }
@@ -128,6 +130,8 @@ export interface TrackableEntry {
   values?: Record<string, number | boolean>;
   /** For an entry of a dates trackable: how it repeats (DateRepeat). */
   dateRepeat?: DateRepeat;
+  /** For an entry of a dates trackable: free-text notes (gift ideas, sizes); `note` is its name. */
+  details?: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -155,6 +159,8 @@ export interface SettingsRecord {
   customFastPresets?: CustomFastPreset[];
   /** A plan per weekday, Monday first (utils/fastingSchedule.ts); null entries use the daily defaults. */
   fastWeekPlan?: Array<FastDayPlan | null>;
+  /** Comparisons hidden on trackable pages, as "<trackableId>|<otherId>|<0 same day, 1 day after>" (utils/insights.ts). */
+  mutedInsights?: string[];
   updatedAt: number;
 }
 

@@ -16,9 +16,16 @@ export interface Insight {
   /** Short heading, e.g. "Last 30 days". */
   label: string;
   text: string;
+  /** A comparison's key, "<trackableId>|<otherId>|<0 same day, 1 day after>", for hiding it (settings.mutedInsights). */
+  key?: string;
 }
 
-type Trackable = Pick<TrackableDefinition, 'id' | 'name' | 'goalType' | 'goalValue' | 'scheduleDays' | 'skipDays' | 'pausedUntil' | 'createdAt'>;
+/** The key a comparison is hidden by. */
+export function insightKey(trackableId: string, otherId: string, daysAfter: number): string {
+  return `${trackableId}|${otherId}|${daysAfter}`;
+}
+
+type Trackable = Pick<TrackableDefinition, 'id' | 'name' | 'goalType' | 'goalValue' | 'scheduleDays' | 'skipDays' | 'pausedUntil' | 'createdAt' | 'insightsHidden'>;
 
 const nf = new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 });
 
@@ -47,8 +54,10 @@ export function trackableInsights(
   trackable: Trackable,
   entries: readonly TimestampedValues[],
   fields: readonly FieldDefinition[],
-  others: readonly { trackable: Pick<TrackableDefinition, 'id' | 'name'>; entries: readonly TimestampedValues[] }[],
+  others: readonly { trackable: Pick<TrackableDefinition, 'id' | 'name' | 'insightsHidden'>; entries: readonly TimestampedValues[] }[],
   now: number = Date.now(),
+  /** Comparisons hidden one by one (settings.mutedInsights). */
+  muted: ReadonlySet<string> = new Set(),
 ): Insight[] {
   const insights: Insight[] = [];
   const firstDay = Math.min(startOfDay(trackable.createdAt), ...entries.map((e) => startOfDay(e.timestamp)));
@@ -110,16 +119,19 @@ export function trackableInsights(
     ? last90.filter((d) => metric.byDay!.has(d)).map((d) => ({ day: d, v: metric.byDay!.get(d)! }))
     : last90.map((d) => ({ day: d, v: loggedDays.has(d) ? 1 : 0 }));
   const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
-  const comparisons: { label: string; text: string; size: number }[] = [];
+  const comparisons: { label: string; text: string; size: number; key: string }[] = [];
   // Two comparisons per other trackable: the same day, and the day after it
   // was logged (a late meal shows in the next morning's weight).
   const shifts: Array<{ label: string; days: number }> = [
     { label: 'On days with', days: 0 },
     { label: 'On days after', days: 1 },
   ];
-  for (const other of others) {
-    if (other.trackable.id === trackable.id) continue;
+  // A trackable kept out of comparisons has none of its own and appears in no one else's.
+  for (const other of trackable.insightsHidden ? [] : others) {
+    if (other.trackable.id === trackable.id || other.trackable.insightsHidden) continue;
     for (const shift of shifts) {
+    const key = insightKey(trackable.id, other.trackable.id, shift.days);
+    if (muted.has(key)) continue;
     const otherDays = new Set(other.entries.map((e) => addDays(startOfDay(e.timestamp), shift.days)));
     const withIt = samples.filter((s) => otherDays.has(s.day)).map((s) => s.v);
     const without = samples.filter((s) => !otherDays.has(s.day)).map((s) => s.v);
@@ -140,10 +152,11 @@ export function trackableInsights(
       label: shift.label,
       text: `${subject} ${metric.describe(a)}${tail} ${joiner} ${other.trackable.name} (${withIt.length} days), ${metric.describe(b)}${tail} ${shift.days ? 'otherwise' : 'without'} (${without.length})`,
       size,
+      key,
     });
     }
   }
-  for (const c of comparisons.sort((x, y) => y.size - x.size).slice(0, 3)) insights.push({ label: c.label, text: c.text });
+  for (const c of comparisons.sort((x, y) => y.size - x.size).slice(0, 3)) insights.push({ label: c.label, text: c.text, key: c.key });
 
   return insights;
 }

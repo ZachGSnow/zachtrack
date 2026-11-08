@@ -80,6 +80,10 @@ describe('in words', () => {
     const item = describeDate(trackable('birthday'), entry(d(1965, 11, 4), 'Mom'), NOW);
     expect(item).toMatchObject({ name: 'Mom', daysUntil: 12, countdown: 'in 12 days', detail: 'Turns 61' });
     expect(item.since).toMatch(/^60 years 11 months \d+ days? old$/);
+    expect(item.details).toBeUndefined();
+    // A date's notes come along, trimmed; blank notes don't.
+    expect(describeDate(trackable('birthday'), { ...entry(d(1965, 11, 4), 'Mom'), details: '  Size M\n' }, NOW).details).toBe('Size M');
+    expect(describeDate(trackable('birthday'), { ...entry(d(1965, 11, 4), 'Mom'), details: '   ' }, NOW).details).toBeUndefined();
   });
 
   it('an anniversary says which one', () => {
