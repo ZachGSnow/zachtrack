@@ -141,7 +141,7 @@
         <h2 id="journey-grid" class="text-sm font-semibold text-text">Fasting days</h2>
         <SegmentedControl options={RANGES} bind:value={range} />
       </div>
-      <HabitGrid weeks={grid} color="#22c55e" maxCell={range === 'all' ? 14 : 28} />
+      <HabitGrid weeks={grid} color="var(--color-brand)" maxCell={range === 'all' ? 14 : 28} />
       <p class="mt-2 text-xs text-text-muted">A full square met its goal; a part-filled one got that far toward it.</p>
     </section>
 
