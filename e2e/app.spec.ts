@@ -718,9 +718,14 @@ test('Today shows the fast, habits with a goal and recent logs, and checks a hab
   await page.getByRole('textbox', { name: 'Times per day' }).fill('1');
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByText('Goal: Once a day')).toBeVisible();
+  // A habit's page leads its tiles with how established it is.
+  await expect(page.getByText('Strength', { exact: true })).toBeVisible();
 
   await page.goto('/#/');
   await expect(page.getByRole('heading', { name: 'Today', level: 1 })).toBeVisible();
+  // The weekly review shows on Sundays and Mondays only.
+  const weekday = new Date().getDay();
+  await expect(page.getByRole('region', { name: 'Weekly review' })).toHaveCount(weekday === 0 || weekday === 1 ? 1 : 0);
   // The sample data has a 16:8 fast running past its goal.
   const fasting = page.getByRole('region', { name: 'Fasting' });
   await expect(fasting).toContainText('Fasting \u00b7 16:8');
@@ -730,6 +735,7 @@ test('Today shows the fast, habits with a goal and recent logs, and checks a hab
   const habits = page.getByRole('region', { name: 'Habits' });
   await expect(habits).toContainText('Male Health');
   await expect(habits).toContainText('0 of 1 done');
+  await expect(habits).toContainText(/\d+% strong/);
   await habits.getByRole('button', { name: 'Check Male Health for today' }).click();
   await expect(page.getByRole('status')).toContainText('Logged Male Health');
   await expect(habits).toContainText('1 of 1 done');

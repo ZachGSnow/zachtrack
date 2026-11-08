@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { FieldDefinition, TrackableDefinition, TrackableEntry } from '../src/lib/db';
-import { suggestGoals, todayDates, todayHabits, todayLogs } from '../src/lib/utils/today';
+import { suggestGoals, timeOfDay, todayDates, todayHabits, todayLogs } from '../src/lib/utils/today';
 
 // America/New_York (vitest config). A Friday at noon.
 const NOW = new Date(2026, 10, 6, 12).getTime();
@@ -114,5 +114,22 @@ describe('goal suggestions', () => {
   it('leaves out rare ones, ones with a goal, dates and archived ones', () => {
     const ids = suggestGoals([...list, trackable('arch', 'Archived', { archived: true })], [...logs, ...Array.from({ length: 14 }, (_, i) => entry('arch', daysAgo(i)))], NOW).map((x) => x.trackable.id);
     for (const id of ['rare', 'goal', 'bdays', 'arch']) expect(ids).not.toContain(id);
+  });
+});
+
+describe('time of day', () => {
+  const at = (daysAgo: number, h: number) => {
+    const d = new Date(NOW);
+    d.setDate(d.getDate() - daysAgo);
+    d.setHours(h, 0, 0, 0);
+    return { timestamp: d.getTime() };
+  };
+  it('follows the median hour of the last 30 days, or anytime when scattered or rare', () => {
+    expect(timeOfDay([at(1, 7), at(2, 8), at(3, 7), at(4, 9)], NOW)).toBe('morning');
+    expect(timeOfDay([at(1, 13), at(2, 14), at(3, 15)], NOW)).toBe('afternoon');
+    expect(timeOfDay([at(1, 21), at(2, 22), at(3, 20)], NOW)).toBe('evening');
+    expect(timeOfDay([at(1, 7), at(2, 21), at(3, 8), at(4, 22)], NOW)).toBe('anytime');
+    expect(timeOfDay([at(1, 7), at(2, 7)], NOW)).toBe('anytime');
+    expect(timeOfDay([at(40, 7), at(41, 7), at(42, 7)], NOW)).toBe('anytime');
   });
 });

@@ -162,3 +162,43 @@ export function suggestGoals(
   }
   return out.sort((a, b) => a.trackable.name.localeCompare(b.trackable.name));
 }
+
+// ---------------------------------------------------------------------------
+// Time of day (3.48): Today groups habits by when they're usually logged.
+// ---------------------------------------------------------------------------
+
+export type TimeOfDay = 'morning' | 'afternoon' | 'evening' | 'anytime';
+export const TIME_OF_DAY_ORDER: TimeOfDay[] = ['morning', 'afternoon', 'evening', 'anytime'];
+export const TIME_OF_DAY_LABEL: Record<TimeOfDay, string> = { morning: 'Morning', afternoon: 'Afternoon', evening: 'Evening', anytime: 'Anytime' };
+
+/**
+ * When a trackable is usually logged, from its entries in the last 30 days:
+ * the median hour (morning before noon, afternoon before 5 PM, evening
+ * after), or anytime with fewer than 3 entries or when the middle half of
+ * them spreads over more than 6 hours.
+ */
+export function timeOfDay(entries: readonly { timestamp: number }[], now: number): TimeOfDay {
+  const since = now - 30 * DAY_MS;
+  const hours = entries
+    .filter((e) => e.timestamp > since && e.timestamp <= now)
+    .map((e) => {
+      const d = new Date(e.timestamp);
+      return d.getHours() + d.getMinutes() / 60;
+    })
+    .sort((a, b) => a - b);
+  if (hours.length < 3) return 'anytime';
+  const q = (p: number) => hours[Math.min(hours.length - 1, Math.floor(p * hours.length))];
+  if (q(0.75) - q(0.25) > 6) return 'anytime';
+  const median = q(0.5);
+  return median < 12 ? 'morning' : median < 17 ? 'afternoon' : 'evening';
+}
+
+/** Habits grouped by time of day, in day order, each group keeping the habits' own order. */
+export function groupByTimeOfDay(habits: readonly TodayHabit[], now: number): Array<{ time: TimeOfDay; habits: TodayHabit[] }> {
+  const groups = new Map<TimeOfDay, TodayHabit[]>();
+  for (const h of habits) {
+    const t = timeOfDay(h.entries, now);
+    groups.set(t, [...(groups.get(t) ?? []), h]);
+  }
+  return TIME_OF_DAY_ORDER.filter((t) => groups.has(t)).map((time) => ({ time, habits: groups.get(time)! }));
+}

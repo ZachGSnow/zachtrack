@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { FieldDefinition } from '../src/lib/db';
 import type { TimestampedValues } from '../src/lib/utils/trackableStats';
-import { describeGoal, goalCardLine, goalStats, goalStatus } from '../src/lib/utils/trackableGoals';
+import { describeGoal, goalCardLine, goalStats, goalStatus, habitStrength } from '../src/lib/utils/trackableGoals';
 
 // America/New_York (vitest config). 2026-10-19 is a Monday; DST ends 2026-11-01.
 const at = (month: number, d: number, h = 9) => new Date(2026, month, d, h).getTime();
@@ -153,10 +153,10 @@ describe('goal stat tiles', () => {
       if (!skip.has(new Date(t).setHours(0, 0, 0, 0))) times.push(t);
     }
     const stats = goalStats({ goalType: 'perDay', goalValue: 1, createdAt: at(8, 1) }, logs(...times), [], oct(21, 10))!;
-    expect(stats.map((s) => s.label)).toEqual(['Met, last 30 days', 'Rate (30d)', 'Current streak', 'Best streak']);
+    expect(stats.map((s) => s.label)).toEqual(['Strength', 'Met, last 30 days', 'Current streak', 'Best streak']);
+    expect(stats[0].value).toMatch(/^\d+%$/);
     // Sep 22 to Oct 20 are the 29 finished days in the window; 3 were missed.
-    expect(stats[0].value).toBe('26 of 29');
-    expect(stats[1].value).toBe('90%');
+    expect(stats[1].value).toBe('26 of 29 (90%)');
     expect(stats[2].value).toBe('15 days'); // Oct 6 to 20
     expect(stats[3].value).toBe('22 days'); // Sep 11 to Oct 2
   });
@@ -171,13 +171,14 @@ describe('goal stat tiles', () => {
       at(8, 21), at(8, 23),
     ];
     const stats = goalStats({ goalType: 'perWeek', goalValue: 3, createdAt: at(8, 21) }, logs(...times), [], oct(21, 10))!;
-    expect(stats.map((s) => s.value)).toEqual(['1 of 3', '3 of 4', '3 weeks', '3 weeks']);
+    expect(stats.map((s) => s.value).slice(1)).toEqual(['3 of 4', '3 weeks', '3 weeks']);
+    expect(stats[0].label).toBe('Strength');
   });
 
   it('every N days: on-time intervals and runs', () => {
     const times = [oct(1), oct(7), oct(13), oct(22)]; // 6, 6, then 9 days: the last one late
     const stats = goalStats({ goalType: 'everyDays', goalValue: 7, createdAt: oct(1) }, logs(...times), [], oct(23, 10))!;
-    expect(stats.map((s) => s.label)).toEqual(['Next', 'On time (90d)', 'Current streak', 'Best streak']);
+    expect(stats.map((s) => s.label)).toEqual(['Strength', 'On time (90d)', 'Current streak', 'Best streak']);
     expect(stats[1].value).toBe('2 of 3');
     expect(stats[2].value).toBe('0 on time');
     expect(stats[3].value).toBe('2 on time');
@@ -190,3 +191,38 @@ describe('goal stat tiles', () => {
     expect(goalStats({ createdAt: 0 }, [], [], oct(21))).toBeNull();
   });
 });
+
+describe('habit strength', () => {
+  const daily = { goalType: 'perDay' as const, goalValue: 1, createdAt: at(7, 1) };
+  // Every day from Aug 1 to Oct 20, then today (Oct 21) not yet.
+  const everyDay = (skip: (t: number) => boolean = () => false) => {
+    const times: number[] = [];
+    for (let t = at(7, 1); t < oct(21); t = new Date(t).setDate(new Date(t).getDate() + 1)) if (!skip(t)) times.push(t);
+    return logs(...times);
+  };
+  const missed = (...days: number[]) => (t: number) => days.some((d) => new Date(t).getMonth() === 9 && new Date(t).getDate() === d);
+
+  it('climbs with every day met, and today counts only once done', () => {
+    const s = habitStrength(daily, everyDay(), [], oct(21, 10))!;
+    expect(s).toBeGreaterThan(0.9);
+    expect(s).toBeLessThan(1);
+    expect(habitStrength(daily, [], [], oct(21, 10))).toBe(0);
+  });
+
+  it('forgives a missed day: a little lower, not reset', () => {
+    const full = habitStrength(daily, everyDay(), [], oct(21, 10))!;
+    const oneMiss = habitStrength(daily, everyDay(missed(19)), [], oct(21, 10))!;
+    expect(oneMiss).toBeLessThan(full);
+    expect(oneMiss).toBeGreaterThan(full - 0.1);
+    expect(habitStrength(daily, everyDay(missed(10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20)), [], oct(21, 10))!).toBeLessThan(oneMiss - 0.2);
+  });
+
+  it('leaves rest days alone, and has nothing for avoid', () => {
+    // Weekdays only (0 = Monday), logged on weekdays only: the weekends don't drag it down.
+    const weekdays = { ...daily, scheduleDays: [0, 1, 2, 3, 4] };
+    const weekdayLogs = everyDay((t) => [0, 6].includes(new Date(t).getDay()));
+    expect(habitStrength(weekdays, weekdayLogs, [], oct(21, 10))!).toBeGreaterThan(0.85);
+    expect(habitStrength({ goalType: 'avoid', createdAt: 0 }, [], [], oct(21))).toBeNull();
+  });
+});
+
