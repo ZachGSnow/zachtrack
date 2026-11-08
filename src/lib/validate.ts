@@ -131,6 +131,23 @@ const checks: Record<Exclude<RecordKind, 'tombstones'>, Check> = {
         "'birthday', 'anniversary', 'holiday' or 'countdown'",
       ),
       optional(r, 'dateLeadDays', (v) => Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 365, 'a whole number of days, 0 to 365'),
+      optional(r, 'insightsHidden', (v) => typeof v === 'boolean', 'a boolean'),
+      optional(
+        r,
+        'scheduleHistory',
+        (v) =>
+          Array.isArray(v) &&
+          v.length <= 100 &&
+          v.every(
+            (h) =>
+              isObject(h) &&
+              isNum(h.until) &&
+              (h.scheduleDays === undefined ||
+                (Array.isArray(h.scheduleDays) && h.scheduleDays.length <= 7 && h.scheduleDays.every((d) => Number.isInteger(d) && d >= 0 && d <= 6))) &&
+              Object.keys(h).every((k) => k === 'until' || k === 'scheduleDays'),
+          ),
+        'a list of { until, scheduleDays }',
+      ),
     ),
   trackableEntries: (r) =>
     all(
@@ -142,6 +159,7 @@ const checks: Record<Exclude<RecordKind, 'tombstones'>, Check> = {
       optional(r, 'note', isText, 'a string'),
       optional(r, 'tags', isStringList(MAX_TAGS), 'a list of strings'),
       optional(r, 'dateRepeat', isDateRepeat, 'a date repeat rule'),
+      optional(r, 'details', isText, 'a string'),
       optional(
         r,
         'values',
@@ -190,6 +208,12 @@ const checks: Record<Exclude<RecordKind, 'tombstones'>, Check> = {
                 (d.rest === undefined || typeof d.rest === 'boolean')),
           ),
         'a list of 7 day plans',
+      ),
+      optional(
+        r,
+        'mutedInsights',
+        (v) => Array.isArray(v) && v.length <= 500 && v.every((k) => typeof k === 'string' && /^[^|]{1,100}\|[^|]{1,100}\|[01]$/.test(k)),
+        "a list of '<trackable>|<other>|<0 or 1>' keys",
       ),
     ),
 };

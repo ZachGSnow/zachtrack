@@ -108,7 +108,7 @@ const TOMBSTONE_TABLES: Record<SyncRecordType, { table: string; keyColumn: strin
   },
   fieldDefinitions: { table: 'fieldDefinitions', keyColumn: 'id' },
   trackableDefinitions: { table: 'trackableDefinitions', keyColumn: 'id' },
-  trackableEntries: { table: 'trackableEntries', keyColumn: 'id', scrub: 'note = NULL, tags = NULL, fieldValues = NULL' },
+  trackableEntries: { table: 'trackableEntries', keyColumn: 'id', scrub: 'note = NULL, tags = NULL, fieldValues = NULL, details = NULL' },
 };
 
 export const onRequestPost: PagesFunction<Env> = (context) => handleSync(context.request, context.env);
@@ -472,14 +472,14 @@ function buildTrackableUpsert(db: D1Database, trackable: TrackableDefinition, se
   return db
     .prepare(
       `INSERT INTO trackableDefinitions (id, name, icon, color, fieldIds, displayMode, goalType, goalValue, pinned, archived, sortOrder,
-         scheduleDays, skipDays, pausedUntil, dateKind, dateLeadDays, createdAt, updatedAt, deletedAt, serverSeq, updatedBy)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
+         scheduleDays, skipDays, pausedUntil, dateKind, dateLeadDays, insightsHidden, scheduleHistory, createdAt, updatedAt, deletedAt, serverSeq, updatedBy)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          name=excluded.name, icon=excluded.icon, color=excluded.color, fieldIds=excluded.fieldIds,
          displayMode=excluded.displayMode, goalType=excluded.goalType, goalValue=excluded.goalValue,
          pinned=excluded.pinned, archived=excluded.archived, sortOrder=excluded.sortOrder,
          scheduleDays=excluded.scheduleDays, skipDays=excluded.skipDays, pausedUntil=excluded.pausedUntil,
-         dateKind=excluded.dateKind, dateLeadDays=excluded.dateLeadDays,
+         dateKind=excluded.dateKind, dateLeadDays=excluded.dateLeadDays, insightsHidden=excluded.insightsHidden, scheduleHistory=excluded.scheduleHistory,
          createdAt=excluded.createdAt, updatedAt=excluded.updatedAt,
          deletedAt=NULL, serverSeq=excluded.serverSeq, updatedBy=excluded.updatedBy
        WHERE excluded.updatedAt > trackableDefinitions.updatedAt`,
@@ -501,6 +501,8 @@ function buildTrackableUpsert(db: D1Database, trackable: TrackableDefinition, se
       trackable.pausedUntil ?? null,
       trackable.dateKind ?? null,
       trackable.dateLeadDays ?? null,
+      trackable.insightsHidden == null ? null : trackable.insightsHidden ? 1 : 0,
+      trackable.scheduleHistory?.length ? JSON.stringify(trackable.scheduleHistory) : null,
       trackable.createdAt,
       trackable.updatedAt,
       serverSeq,
@@ -511,11 +513,11 @@ function buildTrackableUpsert(db: D1Database, trackable: TrackableDefinition, se
 function buildEntryUpsert(db: D1Database, entry: TrackableEntry, serverSeq: number, updatedBy: string | null): D1PreparedStatement {
   return db
     .prepare(
-      `INSERT INTO trackableEntries (id, trackableId, timestamp, note, tags, fieldValues, dateRepeat, createdAt, updatedAt, deletedAt, serverSeq, updatedBy)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
+      `INSERT INTO trackableEntries (id, trackableId, timestamp, note, tags, fieldValues, dateRepeat, details, createdAt, updatedAt, deletedAt, serverSeq, updatedBy)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          trackableId=excluded.trackableId, timestamp=excluded.timestamp, note=excluded.note, tags=excluded.tags,
-         fieldValues=excluded.fieldValues, dateRepeat=excluded.dateRepeat, createdAt=excluded.createdAt, updatedAt=excluded.updatedAt,
+         fieldValues=excluded.fieldValues, dateRepeat=excluded.dateRepeat, details=excluded.details, createdAt=excluded.createdAt, updatedAt=excluded.updatedAt,
          deletedAt=NULL, serverSeq=excluded.serverSeq, updatedBy=excluded.updatedBy
        WHERE excluded.updatedAt > trackableEntries.updatedAt`,
     )
@@ -527,6 +529,7 @@ function buildEntryUpsert(db: D1Database, entry: TrackableEntry, serverSeq: numb
       entry.tags ? JSON.stringify(entry.tags) : null,
       entry.values ? JSON.stringify(entry.values) : null,
       entry.dateRepeat ? JSON.stringify(entry.dateRepeat) : null,
+      entry.details ?? null,
       entry.createdAt,
       entry.updatedAt,
       serverSeq,
@@ -538,14 +541,14 @@ function buildSettingsUpsert(db: D1Database, settings: SettingsRecord, serverSeq
   return db
     .prepare(
       `INSERT INTO settings (id, defaultPresetId, notificationsEnabled, heightInches, goalWeightLb, weightFieldId,
-         waistFieldId, neckFieldId, hipFieldId, bodyFatSex, fastScheduleTime, customFastPresets, fastWeekPlan, updatedAt, serverSeq, updatedBy)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         waistFieldId, neckFieldId, hipFieldId, bodyFatSex, fastScheduleTime, customFastPresets, fastWeekPlan, mutedInsights, updatedAt, serverSeq, updatedBy)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          defaultPresetId=excluded.defaultPresetId, notificationsEnabled=excluded.notificationsEnabled,
          heightInches=excluded.heightInches, goalWeightLb=excluded.goalWeightLb, weightFieldId=excluded.weightFieldId,
          waistFieldId=excluded.waistFieldId, neckFieldId=excluded.neckFieldId, hipFieldId=excluded.hipFieldId,
          bodyFatSex=excluded.bodyFatSex, fastScheduleTime=excluded.fastScheduleTime,
-         customFastPresets=excluded.customFastPresets, fastWeekPlan=excluded.fastWeekPlan,
+         customFastPresets=excluded.customFastPresets, fastWeekPlan=excluded.fastWeekPlan, mutedInsights=excluded.mutedInsights,
          updatedAt=excluded.updatedAt, serverSeq=excluded.serverSeq, updatedBy=excluded.updatedBy
        WHERE excluded.updatedAt > settings.updatedAt`,
     )
@@ -563,6 +566,7 @@ function buildSettingsUpsert(db: D1Database, settings: SettingsRecord, serverSeq
       settings.fastScheduleTime ?? null,
       settings.customFastPresets ? JSON.stringify(settings.customFastPresets) : null,
       settings.fastWeekPlan ? JSON.stringify(settings.fastWeekPlan) : null,
+      settings.mutedInsights?.length ? JSON.stringify(settings.mutedInsights) : null,
       settings.updatedAt,
       serverSeq,
       updatedBy,
@@ -667,6 +671,8 @@ function mapTrackableRow(row: Record<string, unknown>): WireRow<TrackableDefinit
     pausedUntil: (row.pausedUntil as number) ?? undefined,
     dateKind: (row.dateKind as TrackableDefinition['dateKind']) ?? undefined,
     dateLeadDays: (row.dateLeadDays as number) ?? undefined,
+    insightsHidden: row.insightsHidden == null ? undefined : Boolean(row.insightsHidden),
+    scheduleHistory: row.scheduleHistory ? JSON.parse(row.scheduleHistory as string) : undefined,
     createdAt: row.createdAt as number,
     updatedAt: row.updatedAt as number,
     deletedAt: (row.deletedAt as number) ?? undefined,
@@ -683,6 +689,7 @@ function mapEntryRow(row: Record<string, unknown>): WireRow<TrackableEntry> {
     tags: row.tags ? JSON.parse(row.tags as string) : undefined,
     values: row.fieldValues ? JSON.parse(row.fieldValues as string) : undefined,
     dateRepeat: row.dateRepeat ? JSON.parse(row.dateRepeat as string) : undefined,
+    details: (row.details as string) ?? undefined,
     createdAt: row.createdAt as number,
     updatedAt: row.updatedAt as number,
     deletedAt: (row.deletedAt as number) ?? undefined,
@@ -705,6 +712,7 @@ function mapSettingsRow(row: Record<string, unknown>): WireRow<SettingsRecord> {
     fastScheduleTime: (row.fastScheduleTime as string) ?? undefined,
     customFastPresets: row.customFastPresets ? JSON.parse(row.customFastPresets as string) : undefined,
     fastWeekPlan: row.fastWeekPlan ? JSON.parse(row.fastWeekPlan as string) : undefined,
+    mutedInsights: row.mutedInsights ? JSON.parse(row.mutedInsights as string) : undefined,
     updatedAt: row.updatedAt as number,
     deletedAt: (row.deletedAt as number) ?? undefined,
     updatedBy: (row.updatedBy as string) ?? undefined,

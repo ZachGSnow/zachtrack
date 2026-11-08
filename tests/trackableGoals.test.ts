@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { FieldDefinition } from '../src/lib/db';
 import type { TimestampedValues } from '../src/lib/utils/trackableStats';
-import { describeGoal, goalCardLine, goalStats, goalStatus, habitStrength } from '../src/lib/utils/trackableGoals';
+import { describeGoal, goalCardLine, goalStats, goalStatus, habitStrength, offDayReason, scheduleOn, withScheduleChange } from '../src/lib/utils/trackableGoals';
 
 // America/New_York (vitest config). 2026-10-19 is a Monday; DST ends 2026-11-01.
 const at = (month: number, d: number, h = 9) => new Date(2026, month, d, h).getTime();
@@ -226,3 +226,27 @@ describe('habit strength', () => {
   });
 });
 
+describe('schedule history', () => {
+  // Oct 19 2026 is a Monday. Weekdays only until Oct 21; every day from then.
+  const midnight = (t: number) => new Date(t).setHours(0, 0, 0, 0);
+  const t = { goalType: 'perDay' as const, scheduleDays: undefined, scheduleHistory: [{ until: midnight(oct(21)), scheduleDays: [0, 1, 2, 3, 4] }] };
+
+  it('judges each day by the schedule in force then', () => {
+    expect(scheduleOn(t, oct(18))).toEqual([0, 1, 2, 3, 4]); // a Sunday before the change
+    expect(offDayReason(t, oct(18))).toBe('rest');
+    expect(scheduleOn(t, oct(25))).toBeUndefined(); // a Sunday after it
+    expect(offDayReason(t, oct(25))).toBeNull();
+  });
+
+  it('keeps the old schedule for the days before a change, once per day', () => {
+    const created = oct(1);
+    const before = { scheduleDays: [0, 1, 2, 3, 4], createdAt: created };
+    const h1 = withScheduleChange(before, undefined, oct(21, 15))!;
+    expect(h1).toEqual([{ until: midnight(oct(21)), scheduleDays: [0, 1, 2, 3, 4] }]);
+    // A second change the same day replaces the first entry rather than adding one.
+    expect(withScheduleChange({ scheduleDays: undefined, createdAt: created, scheduleHistory: h1 }, [5, 6], oct(21, 18))).toEqual([{ until: midnight(oct(21)) }]);
+    // No change, or a trackable made today: nothing new.
+    expect(withScheduleChange(before, [4, 3, 2, 1, 0], oct(21))).toBeUndefined();
+    expect(withScheduleChange({ scheduleDays: [0], createdAt: oct(21, 8) }, [1], oct(21, 15))).toBeUndefined();
+  });
+});

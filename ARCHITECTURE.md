@@ -1006,6 +1006,63 @@ every screen with the design system from 3.40:
   rule. A subscribable feed would need a public URL, which Access rules
   out. A Feb 29 birthday repeats only in leap years in most calendars.
 
+### 3.50 Insight controls and notes on dates (v1.17.0)
+
+One additive migration, `0009_insight_controls_and_date_notes.sql`, for
+the two things the v1.16.0 plan held back because they need synced
+columns:
+
+- **Hide a comparison** (`settings.mutedInsights`, JSON list): every
+  "on days with" or "on days after" insight carries a key,
+  `<trackableId>|<otherId>|<0 same day, 1 day after>` (`insightKey` in
+  `utils/insights.ts`). "Hide" on a trackable's page adds it; Settings >
+  Hidden comparisons names each from its key and brings it back. Patterns
+  on Insights honours the same list. It lives in the synced settings
+  record, so hiding something on the phone hides it on the laptop.
+  Validation allows up to 500 keys of the exact shape.
+- **Keep out of comparisons** (`trackableDefinitions.insightsHidden`): a
+  switch in the Edit sheet. Such a trackable gets no comparisons of its
+  own and appears in no one else's; its other insights (last 30 days, by
+  weekday) stay. Some pairs are noise, and some are more than you want on
+  a screen.
+- **Notes on dates** (`trackableEntries.details`): free text on a date
+  entry, since `note` already holds its name. Shown under the date on its
+  trackable's page and the Dates page, and written into the calendar
+  export as each event's DESCRIPTION. Cleared on the server with the rest
+  of a deleted entry's content (`TOMBSTONE_TABLES`); the one-off
+  `d1/scrub-deleted.sql` is unchanged, since rows deleted before v1.17.0
+  can't have notes.
+
+None of the three is indexed, so Dexie needs no new version: it stores
+whole records. The sync upserts and row mappers carry the columns, and
+`validate.ts` checks them.
+
+**Older app versions.** An upsert writes every column, so a device still
+on v1.16.0 that edits a trackable, an entry or the settings sends them
+without these fields and clears them on the server, and the clearing
+syncs back. Update every device before relying on these three features;
+the release notes say so. The same was true of every earlier synced
+column; this release is the first where the field is likely to be set
+from one device and the record edited on another soon after.
+
+### 3.51 Schedule history (v1.17.0)
+
+Changing a daily goal's weekdays used to re-judge every past day by the new
+schedule: dropping Sunday turned old Sunday misses into rest days, and
+adding it turned old rest days into misses, rewriting streaks, strength
+and the weekly review. The research put "schedule edits reset progress"
+among Productive's top complaints.
+
+`trackableDefinitions.scheduleHistory` (migration 0009, JSON) keeps each
+earlier schedule with `until`, the local start-of-day it stopped applying.
+`scheduleOn` in `utils/trackableGoals.ts` returns the schedule in force on a
+day, and `offDayReason`, which every goal, grid, strength and review
+calculation goes through, uses it. The Edit sheet records a change with
+`withScheduleChange`: the old schedule applies up to today, a second change
+the same day replaces the first, a trackable made today keeps no history,
+and at most 100 entries are kept. Skip days and pauses were already per
+day and are unchanged.
+
 ### 3.21 Trackables list: pin, archive, order; tag filters
 - **Sort** (per device, `zachtrack:trackables-view`): Due first (goal
   urgency from 3.18: overdue, then due, then the rest, then trackables

@@ -72,7 +72,8 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
   and badges on the Trackables and Fasting tabs. Each trackable's page adds
   plain-language insights: goal consistency, best weekday, and how a value
   differs on days with your other trackables, or the day after them (a
-  late meal in the next morning's weight).
+  late meal in the next morning's weight). A comparison can be hidden, and
+  a trackable kept out of comparisons altogether.
   A starter set (Body Measurements, Vitals, Nutrition, Sleep, Wellness,
   Activity, Menstrual Cycle, Male Health) is offered on a new install and is
   fully editable, including each field's name, unit and rating scale.
@@ -82,7 +83,8 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
   US holidays template adds the federal holidays and common observances.
   Dates show under Needs attention a few days ahead, the next two weeks
   under Coming up, and the next year on a Dates page with a list and a
-  month calendar; Export to calendar downloads them as an .ics file.
+  month calendar; each date can carry notes (gift ideas, sizes), and Export
+  to calendar downloads them as an .ics file.
 - **Four tabs:** Today (what to do now: the fast, habits due, what to log
   and dates coming up), Fasting (Timer, Journey, History), Trackables (List,
   Dates) and Insights, with each tab's pages switched at the top of the page

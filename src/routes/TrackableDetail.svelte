@@ -167,13 +167,19 @@
     return describeProjection(projectGoal(averages.current, goalWeight, trendPerWeek(byDay, now), now), goalWeight, field.unit);
   });
 
+  /** Hides one comparison on every device (settings.mutedInsights, synced). Plain copies for IndexedDB (ARCHITECTURE.md 4.4). */
+  function hideInsight(key: string) {
+    const current = [...(settingsStore.data.mutedInsights ?? [])];
+    if (!current.includes(key)) settingsStore.update({ mutedInsights: [...current, key] });
+  }
+
   const insights = $derived.by(() => {
     const t = $trackable;
     if (!t || isAges) return [];
     const others = ($allTrackables ?? [])
       .filter((o) => o.id !== t.id && !o.archived && o.displayMode !== 'ages')
       .map((o) => ({ trackable: o, entries: ($allEntries ?? []).filter((e) => e.trackableId === o.id) }));
-    return trackableInsights(t, $entries ?? [], attachedFields, others, now);
+    return trackableInsights(t, $entries ?? [], attachedFields, others, now, new Set(settingsStore.data.mutedInsights ?? []));
   });
 
   /**
@@ -269,6 +275,9 @@
             <p class="mt-1 text-xs text-text-muted">
               {whenText(d.item.at)}{d.item.detail ? `, ${d.item.detail.charAt(0).toLowerCase()}${d.item.detail.slice(1)}` : ''}{d.item.since ? ` \u00b7 ${d.item.since}` : ''}
             </p>
+            {#if d.item.details}
+              <p class="mt-1 whitespace-pre-line text-xs text-text">{d.item.details}</p>
+            {/if}
           </button>
         </li>
       {/snippet}
@@ -370,7 +379,13 @@
               <p class="mb-2 flex items-center gap-1.5 text-sm font-medium text-text-muted"><span>Insights</span> <HelpLink topic="insights" label="insights" /></p>
               <ul class="flex flex-col gap-1.5">
                 {#each insights as insight, i (i)}
-                  <li class="text-sm text-text"><span class="text-xs text-text-muted">{insight.label}:</span> {insight.text}</li>
+                  <li class="flex items-start gap-2 text-sm text-text">
+                    <span class="min-w-0 flex-1"><span class="text-xs text-text-muted">{insight.label}:</span> {insight.text}</span>
+                    {#if insight.key}
+                      <!-- A comparison can be hidden; Settings > Insights lists hidden ones to bring back. -->
+                      <button class="shrink-0 text-xs text-text-muted hover:text-text" onclick={() => hideInsight(insight.key!)} aria-label="Hide this comparison">Hide</button>
+                    {/if}
+                  </li>
                 {/each}
               </ul>
               <p class="mt-2 text-[11px] text-text-muted">From your own entries; patterns, not causes.</p>

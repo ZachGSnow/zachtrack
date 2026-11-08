@@ -31,7 +31,7 @@ export const DEFAULT_LEAD_DAYS: Record<DateKind, number> = { birthday: 7, annive
 export const UPCOMING_DAYS = 366;
 
 type DatesTrackable = Pick<TrackableDefinition, 'id' | 'name' | 'icon' | 'color' | 'dateKind' | 'dateLeadDays'>;
-type DateEntry = Pick<TrackableEntry, 'id' | 'timestamp' | 'note' | 'dateRepeat'>;
+type DateEntry = Pick<TrackableEntry, 'id' | 'timestamp' | 'note' | 'dateRepeat'> & Partial<Pick<TrackableEntry, 'details'>>;
 
 export function dateKindOf(t: Pick<TrackableDefinition, 'dateKind'>): DateKind {
   return t.dateKind ?? 'birthday';
@@ -203,6 +203,8 @@ export interface DateItem {
   since?: string;
   /** A round number of days (every 1,000), not the date itself. */
   milestone?: boolean;
+  /** The entry's notes (gift ideas, sizes), when it has any. */
+  details?: string;
 }
 
 /** One entry of a dates trackable, as the lists show it. */
@@ -237,6 +239,7 @@ export function describeDate(trackable: DatesTrackable, entry: DateEntry, now: n
     countdown: formatDaysUntil(daysUntil),
     detail: past ? '' : detail,
     ...(since ? { since } : {}),
+    ...(entry.details?.trim() ? { details: entry.details.trim() } : {}),
   };
 }
 

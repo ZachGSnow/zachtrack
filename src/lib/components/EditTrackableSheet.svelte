@@ -23,7 +23,7 @@
     type TrackableKind,
   } from '../utils/trackableKinds';
 
-  import { DAILY_GOALS, GOAL_LABELS, GOAL_TYPES, goalField, WEEKDAY_NAMES } from '../utils/trackableGoals';
+  import { DAILY_GOALS, GOAL_LABELS, GOAL_TYPES, goalField, WEEKDAY_NAMES, withScheduleChange } from '../utils/trackableGoals';
   import { fromDateInputValue, toDateInputValue } from '../utils/time';
   import { TEMPLATES, type TrackableTemplate } from '../data/templates';
   import { holidayEntry, US_HOLIDAYS } from '../data/holidays';
@@ -75,6 +75,7 @@
   let goalType = $state<TrackableGoalType | ''>('');
   let goalValueDraft = $state('');
   let pinned = $state(false);
+  let insightsHidden = $state(false);
   /** Weekdays a daily goal applies, 0 = Monday; all seven = every day. */
   let scheduleDays = $state<number[]>([0, 1, 2, 3, 4, 5, 6]);
   let pausedUntilDraft = $state('');
@@ -102,6 +103,7 @@
     goalType = trackable?.goalType ?? '';
     goalValueDraft = trackable?.goalValue?.toString() ?? '';
     pinned = trackable?.pinned ?? false;
+    insightsHidden = trackable?.insightsHidden ?? false;
     scheduleDays = trackable?.scheduleDays?.length ? [...trackable.scheduleDays] : [0, 1, 2, 3, 4, 5, 6];
     pausedUntilDraft = trackable?.pausedUntil ? toDateInputValue(trackable.pausedUntil) : '';
     dateKind = trackable?.dateKind ?? 'birthday';
@@ -285,6 +287,7 @@
         return;
       }
     }
+    const nextSchedule = goalType && DAILY_GOALS.includes(goalType) && scheduleDays.length < 7 ? [...scheduleDays].sort((a, b) => a - b) : undefined;
     const payload = {
       name: trimmedName,
       icon: icon.trim() || '\u2b50',
@@ -297,7 +300,10 @@
       dateKind: isDates ? dateKind : undefined,
       dateLeadDays,
       pinned: pinned || undefined,
-      scheduleDays: goalType && DAILY_GOALS.includes(goalType) && scheduleDays.length < 7 ? [...scheduleDays].sort((a, b) => a - b) : undefined,
+      insightsHidden: isDates ? undefined : insightsHidden || undefined,
+      scheduleDays: nextSchedule,
+      // The old weekdays stay in force for the days before today (3.51).
+      ...(trackable ? { scheduleHistory: withScheduleChange(trackable, nextSchedule, Date.now()) } : {}),
       pausedUntil: goalType && pausedUntilDraft ? fromDateInputValue(pausedUntilDraft) : undefined,
     };
     try {
@@ -509,6 +515,16 @@
     <input type="checkbox" bind:checked={pinned} class="h-4 w-4" style="accent-color: var(--color-brand);" />
     Pin to the top of the list
   </label>
+
+  {#if summaryMode !== 'ages'}
+    <label class="flex items-start gap-2 text-sm text-text">
+      <input type="checkbox" bind:checked={insightsHidden} class="mt-0.5 h-4 w-4" style="accent-color: var(--color-brand);" />
+      <span>
+        Keep out of comparisons
+        <span class="block text-xs text-text-muted">No "on days with" insights for it, and it doesn't appear in other trackables' ones.</span>
+      </span>
+    </label>
+  {/if}
 
   <div>
     <p class="mb-1.5 text-sm text-text-muted">Fields</p>

@@ -14,7 +14,7 @@ const trackables = [
   { id: 'w', name: 'Weight' },
 ];
 const entries = [
-  { id: 'e1', trackableId: 'b', timestamp: day(1990, 11, 15), note: 'Alex' },
+  { id: 'e1', trackableId: 'b', timestamp: day(1990, 11, 15), note: 'Alex', details: 'Likes coffee; size M' },
   { id: 'e2', trackableId: 'a', timestamp: day(2010, 3, 17), note: 'Us' },
   { id: 'e3', trackableId: 'h', timestamp: day(2000, 1, 1), note: 'Thanksgiving', dateRepeat: { type: 'nthWeekday' as const, month: 10, weekday: 3, nth: 4 } },
   { id: 'e4', trackableId: 'h', timestamp: day(2000, 1, 1), note: 'Good Friday', dateRepeat: { type: 'easter' as const, offsetDays: -2 } },
@@ -44,6 +44,8 @@ describe('calendar export', () => {
     expect(alex).toContain('DTSTART;VALUE=DATE:19901115');
     expect(alex).toContain('DTEND;VALUE=DATE:19901116');
     expect(alex).toContain('RRULE:FREQ=YEARLY');
+    // A date's notes become the event's description.
+    expect(alex).toContain('DESCRIPTION:Likes coffee' + String.fromCharCode(92) + '; size M');
     expect(find('e2')).toContain('SUMMARY:Us anniversary');
   });
 

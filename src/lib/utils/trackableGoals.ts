@@ -31,7 +31,7 @@ export const DAILY_GOALS: readonly TrackableGoalType[] = ['dailyTotal', 'perDay'
 
 export const WEEKDAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-type Scheduled = Pick<TrackableDefinition, 'goalType' | 'scheduleDays' | 'skipDays' | 'pausedUntil'>;
+type Scheduled = Pick<TrackableDefinition, 'goalType' | 'scheduleDays' | 'skipDays' | 'pausedUntil'> & Partial<Pick<TrackableDefinition, 'scheduleHistory'>>;
 
 /** "YYYY-MM-DD" for a local day, the form `skipDays` stores. */
 export function isoDay(day: number): string {
@@ -48,12 +48,42 @@ export function isPaused(trackable: Pick<TrackableDefinition, 'pausedUntil'>, da
   return trackable.pausedUntil != null && startOfDay(day) <= startOfDay(trackable.pausedUntil);
 }
 
+/**
+ * The weekdays a daily goal applied on `day` (3.51): the schedule in force
+ * then, from `scheduleHistory`, or the current one. Undefined = every day.
+ */
+export function scheduleOn(trackable: Pick<TrackableDefinition, 'scheduleDays'> & Partial<Pick<TrackableDefinition, 'scheduleHistory'>>, day: number): number[] | undefined {
+  const d = startOfDay(day);
+  const earlier = (trackable.scheduleHistory ?? []).filter((h) => d < h.until).sort((a, b) => a.until - b.until)[0];
+  return earlier ? earlier.scheduleDays : trackable.scheduleDays;
+}
+
+/**
+ * The history to save when a schedule changes today: the old schedule, kept
+ * for the days before today, so editing the weekdays doesn't re-judge the past.
+ * Unchanged schedules, and trackables created today, keep their history as is.
+ */
+export function withScheduleChange(
+  trackable: Pick<TrackableDefinition, 'scheduleDays' | 'createdAt'> & Partial<Pick<TrackableDefinition, 'scheduleHistory'>>,
+  next: number[] | undefined,
+  now: number,
+): TrackableDefinition['scheduleHistory'] {
+  const same = (a?: number[], b?: number[]) => JSON.stringify(a?.length ? [...a].sort() : null) === JSON.stringify(b?.length ? [...b].sort() : null);
+  const today = startOfDay(now);
+  const history = trackable.scheduleHistory ?? [];
+  if (same(trackable.scheduleDays, next) || startOfDay(trackable.createdAt) >= today) return history.length ? history : undefined;
+  // A second change on the same day replaces the first; the oldest entries go past 100.
+  const kept = history.filter((h) => h.until < today);
+  return [...kept, { until: today, ...(trackable.scheduleDays?.length ? { scheduleDays: [...trackable.scheduleDays] } : {}) }].slice(-100);
+}
+
 /** Why a day doesn't count for this trackable's goal, or null when it does. */
 export function offDayReason(trackable: Scheduled, day: number): 'paused' | 'skipped' | 'rest' | null {
   if (isPaused(trackable, day)) return 'paused';
   if (trackable.skipDays?.includes(isoDay(day))) return 'skipped';
   const daily = trackable.goalType != null && DAILY_GOALS.includes(trackable.goalType);
-  if (daily && trackable.scheduleDays?.length && !trackable.scheduleDays.includes(weekdayIndex(day))) return 'rest';
+  const schedule = daily ? scheduleOn(trackable, day) : undefined;
+  if (schedule?.length && !schedule.includes(weekdayIndex(day))) return 'rest';
   return null;
 }
 
