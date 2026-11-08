@@ -1089,3 +1089,23 @@ test('a measurement can read a smoothed trend and lead with it instead of the sc
   await expect(page.getByRole('region', { name: 'Log' })).toContainText(/Body Measurements\s+trend \d/);
   expect(problems).toEqual([]);
 });
+
+test('Today logs a reading or a rating without opening the sheet', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await mockSync(page, noServer);
+  await importSampleData(page);
+  await page.goto('/#/');
+  const log = page.getByRole('region', { name: 'Log' });
+  const weight = log.getByRole('textbox', { name: 'Weight (lb)' });
+  await expect(weight).toHaveAttribute('placeholder', /^Weight: last \d/);
+  await weight.fill('181.4');
+  await weight.press('Enter');
+  await expect(page.getByRole('status').filter({ hasText: 'Logged Weight 181.4 lb' })).toBeVisible();
+  await expect(weight).toHaveValue('');
+
+  // The sample Wellness Check-in leads with Overall Mood, 1 to 5.
+  const mood = log.getByRole('group', { name: 'Overall Mood, 1 to 5' });
+  await mood.getByRole('button', { name: 'Overall Mood 4' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Logged Overall Mood 4' })).toBeVisible();
+  expect(problems).toEqual([]);
+});

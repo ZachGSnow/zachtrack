@@ -20,6 +20,20 @@ export interface Insight {
   key?: string;
 }
 
+/**
+ * Fasting as a factor (3.55): goal fasts as one more "trackable" to compare
+ * against, so a page can say how weight or mood moves the day after a goal
+ * fast. Its id is in comparison keys like any other.
+ */
+export const GOAL_FAST_ID = '__goal-fast';
+
+export function goalFastFactor(
+  fasts: readonly { startTime: number; endTime?: number; targetHours?: number }[],
+  isGoal: (f: { startTime: number; endTime?: number; targetHours?: number }) => boolean,
+): { trackable: { id: string; name: string }; entries: TimestampedValues[] } {
+  return { trackable: { id: GOAL_FAST_ID, name: 'a goal fast' }, entries: fasts.filter((f) => f.endTime != null && isGoal(f)).map((f) => ({ timestamp: f.startTime })) };
+}
+
 /** The key a comparison is hidden by. */
 export function insightKey(trackableId: string, otherId: string, daysAfter: number): string {
   return `${trackableId}|${otherId}|${daysAfter}`;

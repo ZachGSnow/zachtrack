@@ -10,6 +10,7 @@
   import DataSafetyCard from '../lib/components/DataSafetyCard.svelte';
   import AwayCard from '../lib/components/AwayCard.svelte';
   import LapsedHabitCard from '../lib/components/LapsedHabitCard.svelte';
+  import InlineLog from '../lib/components/InlineLog.svelte';
   import { takeShortcut } from '../lib/utils/shortcuts';
   import { resolveBodyFieldIds } from '../lib/utils/health';
   import { loadPrefs, savePrefs } from '../lib/utils/prefs';
@@ -252,20 +253,24 @@
           <ul class="divide-y divide-border">
             {#each logs as l (l.trackable.id)}
               {@const ink = readableGraphic(l.trackable.color, themeStore.effective)}
-              <li class="flex items-center gap-3 py-1.5">
-                <a href="/trackables/{l.trackable.id}" use:link class="flex min-w-0 flex-1 items-center gap-3">
-                  <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-lg" style="background: {l.trackable.color}22;">{l.trackable.icon}</span>
-                  <span class="min-w-0">
-                    <span class="block truncate text-sm font-medium text-text">{l.trackable.name}</span>
-                    <span class="block truncate text-xs text-text-muted">{l.summary}</span>
-                  </span>
-                </a>
-                <button
-                  class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-base font-semibold"
-                  style="background: {l.trackable.color}22; color: {ink};"
-                  onclick={() => quickLog.log(l.trackable)}
-                  aria-label="Log {l.trackable.name}"
-                >+</button>
+              <li class="flex flex-col gap-1 py-1.5">
+                <div class="flex items-center gap-3">
+                  <a href="/trackables/{l.trackable.id}" use:link class="flex min-w-0 flex-1 items-center gap-3">
+                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-lg" style="background: {l.trackable.color}22;">{l.trackable.icon}</span>
+                    <span class="min-w-0">
+                      <span class="block truncate text-sm font-medium text-text">{l.trackable.name}</span>
+                      <span class="block truncate text-xs text-text-muted">{l.summary}</span>
+                    </span>
+                  </a>
+                  <button
+                    class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-base font-semibold"
+                    style="background: {l.trackable.color}22; color: {ink};"
+                    onclick={() => quickLog.log(l.trackable)}
+                    aria-label="Log {l.trackable.name}"
+                  >+</button>
+                </div>
+                <!-- A reading or a rating straight from here, without the sheet (3.55). -->
+                <InlineLog trackable={l.trackable} fields={l.fields} entries={l.entries} kind={l.kind} />
               </li>
             {/each}
           </ul>

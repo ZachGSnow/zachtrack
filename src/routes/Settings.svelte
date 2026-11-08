@@ -13,6 +13,7 @@
   import SegmentedControl from '../lib/components/SegmentedControl.svelte';
   import { THEME_CHOICES, themeStore } from '../lib/stores/theme.svelte';
   import { syncStore } from '../lib/stores/sync.svelte';
+  import { GOAL_FAST_ID } from '../lib/utils/insights';
   import type { CustomFastPreset } from '../lib/data/presets';
 
   const allFields = liveQuery(() => db.fieldDefinitions.orderBy('name').toArray());
@@ -35,7 +36,7 @@
   const hiddenInsights = $derived(
     (settingsStore.data.mutedInsights ?? []).map((key) => {
       const [id, otherId, after] = key.split('|');
-      const name = (tid: string) => ($allTrackables ?? []).find((t) => t.id === tid)?.name ?? 'a deleted trackable';
+      const name = (tid: string) => (tid === GOAL_FAST_ID ? 'a goal fast' : (($allTrackables ?? []).find((t) => t.id === tid)?.name ?? 'a deleted trackable'));
       return { key, label: `${name(id)} ${after === '1' ? 'the day after' : 'on days with'} ${name(otherId)}` };
     }),
   );

@@ -8,7 +8,8 @@
   import { measurementView } from '../lib/stores/measurementView.svelte';
   import { kindStats, resolveKind, summarize } from '../lib/utils/trackableKinds';
   import { describeGoal, GOAL_STATE_COLORS, goalStats, goalStatus } from '../lib/utils/trackableGoals';
-  import { trackableInsights } from '../lib/utils/insights';
+  import { goalFastFactor, trackableInsights } from '../lib/utils/insights';
+  import { goalMet } from '../lib/utils/fastingJourney';
   import { DATE_KIND_ITEM, DATE_KIND_LABELS, dateKindOf, describeDate } from '../lib/utils/dates';
   import { rangeStartFor, type ChartRange } from '../lib/utils/stats';
   import {
@@ -54,6 +55,7 @@
   // For insights comparing this trackable with the others.
   const allTrackables = liveQuery(() => db.trackableDefinitions.toArray());
   const allEntries = liveQuery(() => db.trackableEntries.toArray());
+  const allFasts = liveQuery(() => db.fasts.toArray());
 
   type TrendsView = 'table' | 'chart';
 
@@ -183,6 +185,9 @@
     const others = ($allTrackables ?? [])
       .filter((o) => o.id !== t.id && !o.archived && o.displayMode !== 'ages')
       .map((o) => ({ trackable: o, entries: ($allEntries ?? []).filter((e) => e.trackableId === o.id) }));
+    // Goal fasts count as a factor too (3.55), when there are any.
+    const fasting = goalFastFactor($allFasts ?? [], (f) => goalMet(f, now));
+    if (fasting.entries.length) others.push(fasting as (typeof others)[number]);
     return trackableInsights(t, $entries ?? [], attachedFields, others, now, new Set(settingsStore.data.mutedInsights ?? []));
   });
 
