@@ -1,8 +1,13 @@
 <script lang="ts">
   import { liveQuery } from 'dexie';
   import { link } from 'svelte-spa-router';
-  import { db } from '../lib/db';
-  import { DATES_WITHIN_DAYS, LOG_RECENT_DAYS, todayDates, todayHabits, todayLogs } from '../lib/utils/today';
+  import { db, updateTrackable } from '../lib/db';
+  import { DATES_WITHIN_DAYS, LOG_RECENT_DAYS, suggestGoals, todayDates, todayHabits, todayLogs, type GoalSuggestion } from '../lib/utils/today';
+  import { takeShortcut } from '../lib/utils/shortcuts';
+  import { resolveBodyFieldIds } from '../lib/utils/health';
+  import { loadPrefs, savePrefs } from '../lib/utils/prefs';
+  import { settingsStore } from '../lib/stores/settings.svelte';
+  import Button from '../lib/components/ui/Button.svelte';
   import { dateItemKey } from '../lib/utils/dates';
   import { readableGraphic } from '../lib/utils/color';
   import { themeStore } from '../lib/stores/theme.svelte';
@@ -36,6 +41,30 @@
   const counted = $derived(habits.filter((h) => !h.offDay));
   const done = $derived(counted.filter((h) => h.goal?.state === 'done').length);
 
+  // Goal suggestions (utils/today.ts): "Not now" hides one on this device for 30 days.
+  const SNOOZE_KEY = 'goal-suggestions';
+  let snoozed = $state<Record<string, number>>(loadPrefs<Record<string, number>>(SNOOZE_KEY, {}));
+  const suggestions = $derived(suggestGoals($trackables ?? [], $allEntries ?? [], now).filter((s) => !(snoozed[s.trackable.id] > now)));
+  function snooze(id: string) {
+    snoozed = { ...snoozed, [id]: Date.now() + 30 * 24 * 3600_000 };
+    savePrefs(SNOOZE_KEY, snoozed);
+  }
+  async function adopt(s: GoalSuggestion) {
+    await updateTrackable(s.trackable.id, { goalType: s.goalType, goalValue: s.goalValue });
+  }
+
+  // The "Log weight" home-screen shortcut: the entry sheet for the trackable holding the weight
+  // field (the one BMI follows), prefilled from the last reading, once everything has loaded.
+  let shortcutChecked = false;
+  $effect(() => {
+    if (shortcutChecked || $trackables === undefined || $allFields === undefined || !settingsStore.ready) return;
+    shortcutChecked = true;
+    if (!takeShortcut('log-weight')) return;
+    const weightId = resolveBodyFieldIds($allFields, settingsStore.data).weight;
+    const holder = weightId ? $trackables.filter((t) => t.fieldIds.includes(weightId)).sort((a, b) => Number(!!a.archived) - Number(!!b.archived))[0] : undefined;
+    if (holder) void quickLog.log(holder);
+  });
+
   const dateLine = $derived(new Date(now).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }));
   const when = (at: number) => new Date(at).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 </script>
@@ -57,8 +86,19 @@
           {/if}
         {/snippet}
       </SectionHeading>
+      {#each suggestions as s (s.trackable.id)}
+        <Card tone="brand" padding="p-3" label="Suggested goal for {s.trackable.name}">
+          <p class="text-sm text-text"><span aria-hidden="true">{s.trackable.icon}</span> Make <strong>{s.trackable.name}</strong> a habit? {s.reason}.</p>
+          <div class="mt-2 flex flex-wrap items-center gap-3">
+            <Button variant="primary" size="sm" onclick={() => adopt(s)}>Goal: {s.label.toLowerCase()}</Button>
+            <button class="text-xs text-text-muted" onclick={() => snooze(s.trackable.id)}>Not now</button>
+          </div>
+        </Card>
+      {/each}
       {#if $trackables === undefined}
         <p class="text-sm text-text-muted">Loading&hellip;</p>
+      {:else if habits.length === 0 && suggestions.length > 0}
+        <!-- The suggestions above stand in for the empty state. -->
       {:else if habits.length === 0}
         <EmptyState title="No goals yet" text="Give a trackable a goal in its Edit sheet and it shows up here each day with a check button.">
           {#snippet action()}

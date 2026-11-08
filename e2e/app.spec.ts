@@ -251,7 +251,7 @@ test('a goal shows progress and due dates, and a trackable without fields logs i
 test('the home-screen shortcuts are in the manifest, and Start fast starts the default method once', async ({ page, request }) => {
   const problems = watchForProblems(page);
   const manifest = await (await request.get('/manifest.webmanifest')).json();
-  expect(manifest.shortcuts.map((s: { url: string }) => s.url)).toEqual(['/?shortcut=start-fast#/fasting', '/#/trackables', '/#/journey']);
+  expect(manifest.shortcuts.map((s: { url: string }) => s.url)).toEqual(['/?shortcut=log-weight#/', '/?shortcut=start-fast#/fasting', '/#/trackables', '/#/journey']);
 
   await mockSync(page, noServer);
   await waitForStarterSet(page);
@@ -866,5 +866,34 @@ test('the weight chart draws its 7-day average, and changes are coloured toward 
   await expect(page.getByText(/^7-day average \d/)).toHaveClass(/text-(brand|warn)/);
   await page.getByRole('button', { name: 'Chart', exact: true }).click();
   await expect(page.locator('[_echarts_instance_] svg').first()).toContainText('Weight 7-day avg');
+  expect(problems).toEqual([]);
+});
+
+test('the Log weight shortcut opens the weigh-in sheet from the last reading, and Today suggests goals', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await mockSync(page, noServer);
+  await importSampleData(page);
+
+  await page.goto('/?shortcut=log-weight#/');
+  const sheet = page.getByRole('dialog');
+  await expect(sheet.getByRole('heading', { name: /Body Measurements/ })).toBeVisible();
+  await expect(sheet.getByRole('textbox', { name: 'Weight (lb)' })).not.toHaveValue('');
+  await expect.poll(() => new URL(page.url()).search).toBe('');
+  await page.keyboard.press('Escape');
+
+  // The sample data logs Sleep every day without a goal: Today offers one, and one tap sets it.
+  const sleep = page.getByRole('region', { name: 'Suggested goal for Sleep' });
+  await expect(sleep).toContainText(/Logged on 1[0-4] of the last 14 days/);
+  await sleep.getByRole('button', { name: 'Goal: every day' }).click();
+  await expect(sleep).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Habits' }).getByRole('link', { name: /Sleep/ }).first()).toBeVisible();
+
+  // Not now hides an offer on this device.
+  const nutrition = page.getByRole('region', { name: 'Suggested goal for Nutrition' });
+  await nutrition.getByRole('button', { name: 'Not now' }).click();
+  await expect(nutrition).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Today', level: 1 })).toBeVisible();
+  await expect(nutrition).toHaveCount(0);
   expect(problems).toEqual([]);
 });

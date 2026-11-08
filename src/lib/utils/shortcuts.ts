@@ -2,7 +2,7 @@
 // the installed app's icon) open the app at `/?shortcut=<name>#/...`. The
 // query is read once and then removed, so a reload doesn't repeat the action.
 
-export type ShortcutName = 'start-fast';
+export type ShortcutName = 'start-fast' | 'log-weight';
 
 /** True if the app was opened by this shortcut; removes the marker from the address either way. */
 export function takeShortcut(name: ShortcutName): boolean {
