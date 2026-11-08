@@ -11,6 +11,8 @@
   import { addDays, formatDuration, startOfDay } from '../utils/time';
   import Card from './ui/Card.svelte';
   import Button from './ui/Button.svelte';
+  import { readableText } from '../utils/color';
+  import { themeStore } from '../stores/theme.svelte';
 
   // Today's fasting block: the running fast at a glance, or, between fasts,
   // the eating window and the schedule with one tap to start today's method.
@@ -58,7 +60,7 @@
     <p class="mt-2 text-sm text-text">{fastTimer.zone.title}</p>
     {#if timeline?.goal}<p class="text-xs text-text-muted">{timeline.goal}</p>{/if}
     {#if fastTimer.milestone}
-      <p class="mt-2 text-xs font-medium" style="color: {fastTimer.zone.color};">{fastTimer.milestone.title}</p>
+      <p class="mt-2 text-xs font-medium" style="color: {readableText(fastTimer.zone.color, themeStore.effective)};">{fastTimer.milestone.title}</p>
     {/if}
   {:else}
     <div class="flex items-baseline justify-between gap-2">

@@ -41,7 +41,6 @@
     bind:value={draft}
     onkeydown={handleKeydown}
     placeholder="Add a tag (e.g. traveled) and press Enter"
-    class="w-full rounded-lg border bg-transparent p-2 text-sm text-text placeholder:text-text-muted"
-    style="border-color: var(--color-border);"
+    class="w-full rounded-lg border bg-transparent p-2 text-sm text-text placeholder:text-text-muted border-border"
   />
 </div>

@@ -93,7 +93,7 @@
   <div class="space-y-4">
     <h2 class="text-lg font-semibold text-text">
       {fast.presetLabel ?? 'Custom fast'}
-      {#if isActive}<span class="ml-1 text-sm font-normal" style="color: var(--color-brand);">(in progress)</span>{/if}
+      {#if isActive}<span class="ml-1 text-sm font-normal text-brand">(in progress)</span>{/if}
     </h2>
 
     <label class="block text-sm">
@@ -101,8 +101,7 @@
       <input
         type="datetime-local"
         bind:value={startLocal}
-        class="w-full rounded-lg border bg-transparent p-2 text-text"
-        style="border-color: var(--color-border);"
+        class="w-full rounded-lg border bg-transparent p-2 text-text border-border"
       />
     </label>
 
@@ -112,8 +111,7 @@
         <input
           type="datetime-local"
           bind:value={endLocal}
-          class="w-full rounded-lg border bg-transparent p-2 text-text"
-          style="border-color: var(--color-border);"
+          class="w-full rounded-lg border bg-transparent p-2 text-text border-border"
         />
       </label>
 
@@ -172,25 +170,22 @@
         <textarea
           bind:value={note}
           rows="2"
-          class="w-full resize-none rounded-lg border bg-transparent p-2 text-text"
-          style="border-color: var(--color-border);"
+          class="w-full resize-none rounded-lg border bg-transparent p-2 text-text border-border"
         ></textarea>
       </label>
     {/if}
 
     {#if error}
-      <p class="text-sm" style="color: var(--color-danger);">{error}</p>
+      <p class="text-sm text-danger">{error}</p>
     {/if}
 
     <div class="flex gap-2">
       <button
-        class="flex-1 rounded-xl border py-2.5 text-sm font-medium"
-        style="border-color: var(--color-danger-line); color: var(--color-danger);"
+        class="flex-1 rounded-xl border py-2.5 text-sm font-medium border-danger-line text-danger"
         onclick={handleDelete}
       >Delete</button>
       <button
-        class="flex-1 rounded-xl py-2.5 text-sm font-semibold"
-        style="background: var(--color-brand); color: var(--color-brand-fg);"
+        class="flex-1 rounded-xl py-2.5 text-sm font-semibold bg-brand text-brand-fg"
         onclick={handleSave}
       >Save</button>
     </div>

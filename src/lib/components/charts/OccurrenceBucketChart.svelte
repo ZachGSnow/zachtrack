@@ -46,10 +46,10 @@
   ];
 </script>
 
-<div class="rounded-2xl border p-4" style="border-color: var(--color-border); background: var(--color-surface);">
+<div class="rounded-2xl border p-4 border-border bg-surface">
   <div class="mb-2 flex items-center justify-between">
     <p class="text-sm font-medium text-text-muted">Occurrences over time</p>
-    <div class="flex overflow-hidden rounded-full border" style="border-color: var(--color-border);">
+    <div class="flex overflow-hidden rounded-full border border-border">
       {#each BUCKETS as b (b.id)}
         <button
           class="px-2 py-1 text-xs font-medium"

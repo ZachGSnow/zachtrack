@@ -42,7 +42,7 @@
   });
 </script>
 
-<div class="rounded-2xl border p-4" style="border-color: var(--color-border); background: var(--color-surface);">
+<div class="rounded-2xl border p-4 border-border bg-surface">
   <p class="mb-2 text-sm font-medium text-text-muted">Pattern by day of week</p>
   <EChart {option} height="220px" />
 </div>

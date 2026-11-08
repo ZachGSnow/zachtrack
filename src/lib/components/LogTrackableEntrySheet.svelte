@@ -244,15 +244,14 @@
           type="text"
           bind:value={note}
           placeholder={item.namePlaceholder}
-          class="w-full rounded-lg border bg-transparent p-2 text-text placeholder:text-text-muted"
-          style="border-color: var(--color-border);"
+          class="w-full rounded-lg border bg-transparent p-2 text-text placeholder:text-text-muted border-border"
         />
       </label>
 
       {#if dateKind === 'holiday' || dateKind === 'countdown'}
         <label class="block text-sm">
           <span class="mb-1 block text-text-muted">Repeats</span>
-          <select bind:value={repeatChoice} class="w-full rounded-lg border bg-transparent p-2 text-text" style="border-color: var(--color-border);">
+          <select bind:value={repeatChoice} class="w-full rounded-lg border bg-transparent p-2 text-text border-border">
             {#if dateKind === 'holiday'}
               <option value="yearly">Same date every year</option>
               <option value="nthWeekday">A weekday of a month (e.g. 4th Thursday)</option>
@@ -269,25 +268,25 @@
         {#if repeatChoice === 'everyMonths' || repeatChoice === 'everyYears'}
           <label class="block text-sm">
             <span class="mb-1 block text-text-muted">Every how many {repeatChoice === 'everyYears' ? 'years' : 'months'}</span>
-            <input type="text" inputmode="numeric" bind:value={repeatCount} class="w-full rounded-lg border bg-transparent p-2 text-text" style="border-color: var(--color-border);" />
+            <input type="text" inputmode="numeric" bind:value={repeatCount} class="w-full rounded-lg border bg-transparent p-2 text-text border-border" />
           </label>
         {:else if repeatChoice === 'nthWeekday'}
           <div class="grid grid-cols-3 gap-2 text-sm">
-            <select bind:value={ruleNth} aria-label="Which" class="rounded-lg border bg-transparent p-2 text-text" style="border-color: var(--color-border);">
+            <select bind:value={ruleNth} aria-label="Which" class="rounded-lg border bg-transparent p-2 text-text border-border">
               {#each [1, 2, 3, 4, 5] as n (n)}<option value={n}>{ordinal(n)}</option>{/each}
               <option value={-1}>Last</option>
             </select>
-            <select bind:value={ruleWeekday} aria-label="Weekday" class="rounded-lg border bg-transparent p-2 text-text" style="border-color: var(--color-border);">
+            <select bind:value={ruleWeekday} aria-label="Weekday" class="rounded-lg border bg-transparent p-2 text-text border-border">
               {#each WEEKDAY_NAMES as w, i (w)}<option value={i}>{w}</option>{/each}
             </select>
-            <select bind:value={ruleMonth} aria-label="Month" class="rounded-lg border bg-transparent p-2 text-text" style="border-color: var(--color-border);">
+            <select bind:value={ruleMonth} aria-label="Month" class="rounded-lg border bg-transparent p-2 text-text border-border">
               {#each MONTH_NAMES as m, i (m)}<option value={i}>{m}</option>{/each}
             </select>
           </div>
         {:else if repeatChoice === 'easter'}
           <label class="block text-sm">
             <span class="mb-1 block text-text-muted">Days from Easter (0 = Easter Sunday, -2 = Good Friday)</span>
-            <input type="text" inputmode="numeric" bind:value={easterOffset} class="w-full rounded-lg border bg-transparent p-2 text-text" style="border-color: var(--color-border);" />
+            <input type="text" inputmode="numeric" bind:value={easterOffset} class="w-full rounded-lg border bg-transparent p-2 text-text border-border" />
           </label>
         {/if}
         {#if !usesDate}
@@ -302,8 +301,7 @@
           <input
             type="date"
             bind:value={dateLocal}
-            class="w-full rounded-lg border bg-transparent p-2 text-text"
-            style="border-color: var(--color-border);"
+            class="w-full rounded-lg border bg-transparent p-2 text-text border-border"
           />
         </label>
       {/if}
@@ -313,8 +311,7 @@
         <input
           type="datetime-local"
           bind:value={dateLocal}
-          class="w-full rounded-lg border bg-transparent p-2 text-text"
-          style="border-color: var(--color-border);"
+          class="w-full rounded-lg border bg-transparent p-2 text-text border-border"
         />
       </label>
     {/if}
@@ -328,8 +325,7 @@
             inputmode="decimal"
             value={fieldInputs[field.id] ?? ''}
             oninput={(e) => (fieldInputs = { ...fieldInputs, [field.id]: (e.target as HTMLInputElement).value })}
-            class="w-full rounded-lg border bg-transparent p-2 text-text"
-            style="border-color: var(--color-border);"
+            class="w-full rounded-lg border bg-transparent p-2 text-text border-border"
           />
         </label>
       {:else if field.kind === 'rating'}
@@ -351,8 +347,7 @@
       {:else}
         <button
           type="button"
-          class="flex w-full items-center justify-between rounded-lg border p-2 text-sm"
-          style="border-color: var(--color-border);"
+          class="flex w-full items-center justify-between rounded-lg border p-2 text-sm border-border"
           onclick={() => toggleBoolean(field.id)}
         >
           <span class="text-text-muted">{field.name}</span>
@@ -380,27 +375,24 @@
         <textarea
           bind:value={note}
           rows="2"
-          class="w-full resize-none rounded-lg border bg-transparent p-2 text-text"
-          style="border-color: var(--color-border);"
+          class="w-full resize-none rounded-lg border bg-transparent p-2 text-text border-border"
         ></textarea>
       </label>
     {/if}
 
     {#if error}
-      <p class="text-sm" style="color: var(--color-danger);">{error}</p>
+      <p class="text-sm text-danger">{error}</p>
     {/if}
 
     <div class="flex gap-2">
       {#if entry}
         <button
-          class="flex-1 rounded-xl border py-2.5 text-sm font-medium"
-          style="border-color: var(--color-danger-line); color: var(--color-danger);"
+          class="flex-1 rounded-xl border py-2.5 text-sm font-medium border-danger-line text-danger"
           onclick={handleDelete}
         >Delete</button>
       {/if}
       <button
-        class="flex-1 rounded-xl py-2.5 text-sm font-semibold"
-        style="background: var(--color-brand); color: var(--color-brand-fg);"
+        class="flex-1 rounded-xl py-2.5 text-sm font-semibold bg-brand text-brand-fg"
         onclick={handleSave}
       >Save</button>
     </div>

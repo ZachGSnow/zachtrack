@@ -366,8 +366,7 @@
         type="text"
         bind:value={name}
         placeholder="e.g. Watered Plants"
-        class="w-full rounded-lg border bg-transparent p-2 text-text placeholder:text-text-muted"
-        style="border-color: var(--color-border);"
+        class="w-full rounded-lg border bg-transparent p-2 text-text placeholder:text-text-muted border-border"
       />
     </label>
     <label class="block text-sm">
@@ -376,8 +375,7 @@
         type="text"
         bind:value={icon}
         placeholder="&#x1F33F;"
-        class="w-16 rounded-lg border bg-transparent p-2 text-center text-text placeholder:text-text-muted"
-        style="border-color: var(--color-border);"
+        class="w-16 rounded-lg border bg-transparent p-2 text-center text-text placeholder:text-text-muted border-border"
       />
     </label>
   </div>
@@ -401,8 +399,7 @@
     <span class="mb-1 flex items-center gap-1.5 text-text-muted">Summary <HelpLink topic="trackables" label="what each kind shows" /></span>
     <select
       bind:value={summaryMode}
-      class="w-full rounded-lg border bg-transparent p-2 text-text"
-      style="border-color: var(--color-border);"
+      class="w-full rounded-lg border bg-transparent p-2 text-text border-border"
     >
       <option value="auto">Auto: {SUMMARY_LABELS[auto.kind]}</option>
       {#each KINDS as k (k)}
@@ -422,8 +419,7 @@
         <span class="mb-1 flex items-center gap-1.5 text-text-muted">Goal <HelpLink topic="goals" label="goals" /></span>
         <select
           bind:value={goalType}
-          class="w-full rounded-lg border bg-transparent p-2 text-text"
-          style="border-color: var(--color-border);"
+          class="w-full rounded-lg border bg-transparent p-2 text-text border-border"
         >
           <option value="">No goal</option>
           {#each GOAL_TYPES as g (g)}
@@ -438,8 +434,7 @@
             type="text"
             inputmode="decimal"
             bind:value={goalValueDraft}
-            class="w-32 rounded-lg border bg-transparent p-2 text-text"
-            style="border-color: var(--color-border);"
+            class="w-32 rounded-lg border bg-transparent p-2 text-text border-border"
           />
         </label>
       {/if}
@@ -472,11 +467,10 @@
             <input
               type="date"
               bind:value={pausedUntilDraft}
-              class="flex-1 rounded-lg border bg-transparent p-2 text-text"
-              style="border-color: var(--color-border);"
+              class="flex-1 rounded-lg border bg-transparent p-2 text-text border-border"
             />
             {#if pausedUntilDraft}
-              <button type="button" class="rounded-lg border px-3 text-sm text-text-muted" style="border-color: var(--color-border);" onclick={() => (pausedUntilDraft = '')}>Clear</button>
+              <button type="button" class="rounded-lg border px-3 text-sm text-text-muted border-border" onclick={() => (pausedUntilDraft = '')}>Clear</button>
             {/if}
           </div>
           <span class="mt-1 block text-xs text-text-muted">For a holiday or a sick week: nothing is due, and the streak waits.</span>
@@ -487,7 +481,7 @@
     <div class="space-y-2">
       <label class="block text-sm">
         <span class="mb-1 flex items-center gap-1.5 text-text-muted">Dates are <HelpLink topic="dates" label="dates" /></span>
-        <select bind:value={dateKind} class="w-full rounded-lg border bg-transparent p-2 text-text" style="border-color: var(--color-border);">
+        <select bind:value={dateKind} class="w-full rounded-lg border bg-transparent p-2 text-text border-border">
           {#each DATE_KINDS as k (k)}
             <option value={k}>{DATE_KIND_LABELS[k]}</option>
           {/each}
@@ -500,8 +494,7 @@
           inputmode="numeric"
           bind:value={leadDaysDraft}
           placeholder={String(DEFAULT_LEAD_DAYS[dateKind])}
-          class="w-full rounded-lg border bg-transparent p-2 text-text placeholder:text-text-muted"
-          style="border-color: var(--color-border);"
+          class="w-full rounded-lg border bg-transparent p-2 text-text placeholder:text-text-muted border-border"
           aria-label="Days ahead"
         />
         <span class="mt-1 block text-xs text-text-muted">Blank uses {DEFAULT_LEAD_DAYS[dateKind]} days. Upcoming dates also show under Coming up.</span>
@@ -522,25 +515,24 @@
     {#if attachedFields.length > 0}
       <ul class="mb-2 flex flex-col gap-1.5">
         {#each attachedFields as field (field.id)}
-          <li class="rounded-lg border p-2 text-sm" style="border-color: var(--color-border);">
+          <li class="rounded-lg border p-2 text-sm border-border">
             <div class="flex items-center justify-between gap-2">
               <span class="text-text">{field.name} <span class="text-text-muted">({KIND_LABELS[field.kind]}{field.unit ? `, ${field.unit}` : ''}{field.kind === 'rating' ? `, 1 to ${field.ratingMax ?? 5}` : ''})</span></span>
               <div class="flex shrink-0 items-center gap-3">
                 {#if editingFieldId !== field.id}
-                  <button type="button" class="text-xs font-medium" style="color: var(--color-brand);" onclick={() => startEditField(field)} aria-label="Edit {field.name}">Edit</button>
+                  <button type="button" class="text-xs font-medium text-brand" onclick={() => startEditField(field)} aria-label="Edit {field.name}">Edit</button>
                 {/if}
                 <button type="button" class="text-text-muted" onclick={() => removeField(field.id)} aria-label="Remove {field.name}">&times;</button>
               </div>
             </div>
             {#if editingFieldId === field.id}
-              <div class="mt-2 space-y-2 rounded-lg border p-2" style="border-color: var(--color-border);">
+              <div class="mt-2 space-y-2 rounded-lg border p-2 border-border">
                 <label class="block text-xs">
                   <span class="mb-1 block text-text-muted">Field name</span>
                   <input
                     type="text"
                     bind:value={editFieldName}
-                    class="w-full rounded-lg border bg-transparent p-1.5 text-sm text-text"
-                    style="border-color: var(--color-border);"
+                    class="w-full rounded-lg border bg-transparent p-1.5 text-sm text-text border-border"
                   />
                 </label>
                 {#if field.kind === 'number'}
@@ -550,8 +542,7 @@
                       type="text"
                       bind:value={editFieldUnit}
                       placeholder="e.g. in"
-                      class="w-full rounded-lg border bg-transparent p-1.5 text-sm text-text placeholder:text-text-muted"
-                      style="border-color: var(--color-border);"
+                      class="w-full rounded-lg border bg-transparent p-1.5 text-sm text-text placeholder:text-text-muted border-border"
                     />
                     <span class="mt-1 block text-text-muted">Only the label changes. Values you already logged are not converted.</span>
                   </label>
@@ -562,8 +553,7 @@
                       type="text"
                       inputmode="numeric"
                       bind:value={editFieldRatingMax}
-                      class="w-20 rounded-lg border bg-transparent p-1.5 text-sm text-text"
-                      style="border-color: var(--color-border);"
+                      class="w-20 rounded-lg border bg-transparent p-1.5 text-sm text-text border-border"
                     />
                   </label>
                 {/if}
@@ -571,19 +561,17 @@
                   <p class="text-xs text-text-muted">Also changes it in: {editingAlsoUsedBy.join(', ')}</p>
                 {/if}
                 {#if editFieldError}
-                  <p class="text-xs" style="color: var(--color-danger);">{editFieldError}</p>
+                  <p class="text-xs text-danger">{editFieldError}</p>
                 {/if}
                 <div class="flex gap-2">
                   <button
                     type="button"
-                    class="flex-1 rounded-lg border py-1.5 text-xs font-medium text-text-muted"
-                    style="border-color: var(--color-border);"
+                    class="flex-1 rounded-lg border py-1.5 text-xs font-medium text-text-muted border-border"
                     onclick={() => (editingFieldId = null)}
                   >Cancel</button>
                   <button
                     type="button"
-                    class="flex-1 rounded-lg py-1.5 text-xs font-semibold"
-                    style="background: var(--color-brand); color: var(--color-brand-fg);"
+                    class="flex-1 rounded-lg py-1.5 text-xs font-semibold bg-brand text-brand-fg"
                     onclick={() => saveEditField(field)}
                   >Save field</button>
                 </div>
@@ -593,8 +581,7 @@
               <label class="mt-1.5 block text-xs">
                 <span class="mb-1 block text-text-muted">Combine same-day entries by</span>
                 <select
-                  class="w-full rounded-lg border bg-transparent p-1.5 text-xs text-text"
-                  style="border-color: var(--color-border);"
+                  class="w-full rounded-lg border bg-transparent p-1.5 text-xs text-text border-border"
                   value={field.aggregation ?? 'last'}
                   onchange={(e) => handleAggregationChange(field.id, e)}
                 >
@@ -611,8 +598,7 @@
 
     {#if availableFields.length > 0}
       <select
-        class="mb-2 w-full rounded-lg border bg-transparent p-2 text-sm text-text-muted"
-        style="border-color: var(--color-border);"
+        class="mb-2 w-full rounded-lg border bg-transparent p-2 text-sm text-text-muted border-border"
         onchange={addExistingField}
       >
         <option value="">+ Add existing field...</option>
@@ -625,18 +611,16 @@
     {#if !showNewField}
       <button
         type="button"
-        class="text-sm font-medium"
-        style="color: var(--color-brand);"
+        class="text-sm font-medium text-brand"
         onclick={() => (showNewField = true)}
       >+ Create new field</button>
     {:else}
-      <div class="space-y-2 rounded-lg border p-3" style="border-color: var(--color-border);">
+      <div class="space-y-2 rounded-lg border p-3 border-border">
         <input
           type="text"
           bind:value={newFieldName}
           placeholder="Field name (e.g. Satisfaction)"
-          class="w-full rounded-lg border bg-transparent p-2 text-sm text-text placeholder:text-text-muted"
-          style="border-color: var(--color-border);"
+          class="w-full rounded-lg border bg-transparent p-2 text-sm text-text placeholder:text-text-muted border-border"
         />
         <div class="flex gap-2">
           {#each ['number', 'rating', 'boolean'] as const as k (k)}
@@ -655,8 +639,7 @@
             type="text"
             bind:value={newFieldUnit}
             placeholder="Unit (optional, e.g. lb)"
-            class="w-full rounded-lg border bg-transparent p-2 text-sm text-text placeholder:text-text-muted"
-            style="border-color: var(--color-border);"
+            class="w-full rounded-lg border bg-transparent p-2 text-sm text-text placeholder:text-text-muted border-border"
           />
         {:else if newFieldKind === 'rating'}
           <label class="block text-xs">
@@ -665,8 +648,7 @@
               type="text"
               inputmode="numeric"
               bind:value={newFieldRatingMax}
-              class="w-20 rounded-lg border bg-transparent p-1.5 text-sm text-text"
-              style="border-color: var(--color-border);"
+              class="w-20 rounded-lg border bg-transparent p-1.5 text-sm text-text border-border"
             />
           </label>
         {/if}
@@ -674,8 +656,7 @@
           <label class="block text-xs">
             <span class="mb-1 block text-text-muted">Combine same-day entries by</span>
             <select
-              class="w-full rounded-lg border bg-transparent p-1.5 text-xs text-text"
-              style="border-color: var(--color-border);"
+              class="w-full rounded-lg border bg-transparent p-1.5 text-xs text-text border-border"
               bind:value={newFieldAggregation}
             >
               {#each ['sum', 'average', 'last'] as const as a (a)}
@@ -687,14 +668,12 @@
         <div class="flex gap-2">
           <button
             type="button"
-            class="flex-1 rounded-lg border py-1.5 text-xs font-medium text-text-muted"
-            style="border-color: var(--color-border);"
+            class="flex-1 rounded-lg border py-1.5 text-xs font-medium text-text-muted border-border"
             onclick={() => (showNewField = false)}
           >Cancel</button>
           <button
             type="button"
-            class="flex-1 rounded-lg py-1.5 text-xs font-semibold"
-            style="background: var(--color-brand); color: var(--color-brand-fg);"
+            class="flex-1 rounded-lg py-1.5 text-xs font-semibold bg-brand text-brand-fg"
             onclick={createAndAttachField}
           >Add field</button>
         </div>
@@ -703,25 +682,22 @@
   </div>
 
   {#if error}
-    <p class="text-sm" style="color: var(--color-danger);">{error}</p>
+    <p class="text-sm text-danger">{error}</p>
   {/if}
 
   <div class="flex gap-2">
     {#if trackable}
       <button
-        class="flex-1 rounded-xl border py-2.5 text-sm font-medium"
-        style="border-color: var(--color-danger-line); color: var(--color-danger);"
+        class="flex-1 rounded-xl border py-2.5 text-sm font-medium border-danger-line text-danger"
         onclick={handleDelete}
       >Delete</button>
       <button
-        class="flex-1 rounded-xl border py-2.5 text-sm font-medium text-text-muted"
-        style="border-color: var(--color-border);"
+        class="flex-1 rounded-xl border py-2.5 text-sm font-medium text-text-muted border-border"
         onclick={handleArchive}
       >{trackable.archived ? 'Unarchive' : 'Archive'}</button>
     {/if}
     <button
-      class="flex-1 rounded-xl py-2.5 text-sm font-semibold"
-      style="background: var(--color-brand); color: var(--color-brand-fg);"
+      class="flex-1 rounded-xl py-2.5 text-sm font-semibold bg-brand text-brand-fg"
       onclick={handleSave}
     >Save</button>
   </div>

@@ -88,7 +88,7 @@
   const exportedOn = (iso: string) => (iso ? new Date(iso).toLocaleString() : 'an unknown date');
 </script>
 
-<section class="space-y-2 rounded-lg border p-3 text-sm" style="border-color: var(--color-border);">
+<section class="space-y-2 rounded-lg border p-3 text-sm border-border">
   <h3 class="font-semibold text-text">Your data</h3>
   <p class="text-xs text-text-muted">
     Export saves everything on this device as a JSON file. It is plain text health data: keep it somewhere private.
@@ -97,24 +97,22 @@
   <div class="flex gap-2">
     <button
       type="button"
-      class="flex-1 rounded-lg border py-2"
-      style="border-color: var(--color-border);"
+      class="flex-1 rounded-lg border py-2 border-border"
       onclick={exportData}>Export data</button
     >
     <button
       type="button"
-      class="flex-1 rounded-lg border py-2"
-      style="border-color: var(--color-border);"
+      class="flex-1 rounded-lg border py-2 border-border"
       onclick={() => fileInput?.click()}>Import file</button
     >
     <input bind:this={fileInput} type="file" accept="application/json,.json" class="hidden" onchange={chooseFile} />
   </div>
-  <button type="button" class="w-full rounded-lg border py-2" style="border-color: var(--color-border);" onclick={exportCsv}
+  <button type="button" class="w-full rounded-lg border py-2 border-border" onclick={exportCsv}
     >Export CSV for a spreadsheet</button
   >
 
   {#if plan}
-    <div class="space-y-2 rounded-lg p-2" style="background: var(--color-surface-2);" role="status">
+    <div class="space-y-2 rounded-lg p-2 bg-surface-2" role="status">
       <p class="text-text">Export from {exportedOn(plan.exportedAt)}</p>
       <ul class="text-xs text-text-muted">
         <li>{pluralize(plan.added, 'new record')} to add</li>
@@ -134,15 +132,13 @@
       <div class="flex gap-2">
         <button
           type="button"
-          class="flex-1 rounded-lg py-2 font-semibold"
-          style="background: var(--color-brand); color: var(--color-brand-fg);"
+          class="flex-1 rounded-lg py-2 font-semibold bg-brand text-brand-fg"
           disabled={busy || plan.added + plan.updated === 0}
           onclick={confirmImport}>{plan.added + plan.updated === 0 ? 'Nothing to import' : 'Import'}</button
         >
         <button
           type="button"
-          class="flex-1 rounded-lg border py-2"
-          style="border-color: var(--color-border);"
+          class="flex-1 rounded-lg border py-2 border-border"
           onclick={() => (plan = null)}>Cancel</button
         >
       </div>

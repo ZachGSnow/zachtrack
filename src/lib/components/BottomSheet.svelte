@@ -36,7 +36,7 @@
       tabindex="-1"
     >
       <!-- The drag handle only means something on a phone's bottom sheet. -->
-      <div class="mx-auto mb-3 h-1 w-10 rounded-full lg:hidden" style="background: var(--color-border);"></div>
+      <div class="mx-auto mb-3 h-1 w-10 rounded-full lg:hidden bg-border"></div>
       {@render children?.()}
     </div>
   </div>

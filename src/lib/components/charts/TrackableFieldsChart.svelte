@@ -9,6 +9,7 @@
   import EChart from '../EChart.svelte';
   import { themeStore } from '../../stores/theme.svelte';
   import { chartColors } from '../../utils/theme';
+  import { readableText } from '../../utils/color';
 
   let {
     entries,
@@ -32,7 +33,10 @@
 
   // One color per field from its place among all fields, so a pill and its line
   // match whichever other fields are switched on.
-  const colorFor = (f: FieldDefinition) => PALETTE[Math.max(0, fields.indexOf(f)) % PALETTE.length];
+  // Readable on this theme, so a pill and its line stay the same colour on light and dark.
+  const colorFor = (f: FieldDefinition) => readableText(PALETTE[Math.max(0, fields.indexOf(f)) % PALETTE.length], themeStore.effective);
+  const goalColor = $derived(readableText('#f472b6', themeStore.effective));
+  const bodyFatColor = $derived(readableText(BODY_FAT_COLOR, themeStore.effective));
 
   const weightField = $derived(weightFieldId ? fields.find((f) => f.id === weightFieldId) : undefined);
   const showBmiOption = $derived(!!weightField && !!settingsStore.data.heightInches);
@@ -118,8 +122,8 @@
               connectNulls: true,
               showSymbol: true,
               symbolSize: 5,
-              itemStyle: { color: '#f472b6' },
-              lineStyle: { color: '#f472b6', width: 2, type: 'dashed' as const },
+              itemStyle: { color: goalColor },
+              lineStyle: { color: goalColor, width: 2, type: 'dashed' as const },
             },
           ]
         : []),
@@ -133,8 +137,8 @@
               connectNulls: true,
               showSymbol: true,
               symbolSize: 5,
-              itemStyle: { color: BODY_FAT_COLOR },
-              lineStyle: { color: BODY_FAT_COLOR, width: 2, type: 'dashed' as const },
+              itemStyle: { color: bodyFatColor },
+              lineStyle: { color: bodyFatColor, width: 2, type: 'dashed' as const },
             },
           ]
         : []),
@@ -142,7 +146,7 @@
   });
 </script>
 
-<div class="rounded-2xl border p-4" style="border-color: var(--color-border); background: var(--color-surface);">
+<div class="rounded-2xl border p-4 border-border bg-surface">
   <p class="mb-2 text-sm font-medium text-text-muted">Fields over time</p>
   <div class="mb-2 flex flex-wrap gap-1.5">
     {#each fields as field (field.id)}
@@ -158,7 +162,7 @@
       <button
         class="rounded-full border px-2.5 py-1 text-xs font-medium"
         style={visible['__bmi']
-          ? 'background: #f472b622; color: #f472b6; border-color: #f472b680;'
+          ? `background: 22; color: ; border-color: 80;`
           : 'color: var(--color-text-muted); border-color: var(--color-border);'}
         onclick={() => toggle('__bmi')}
       >BMI</button>
@@ -167,7 +171,7 @@
       <button
         class="rounded-full border px-2.5 py-1 text-xs font-medium"
         style={visible['__bodyFat']
-          ? `background: ${BODY_FAT_COLOR}22; color: ${BODY_FAT_COLOR}; border-color: ${BODY_FAT_COLOR}80;`
+          ? `background: 22; color: ; border-color: 80;`
           : 'color: var(--color-text-muted); border-color: var(--color-border);'}
         onclick={() => toggle('__bodyFat')}
       >Body fat (Navy)</button>

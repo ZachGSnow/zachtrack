@@ -39,17 +39,17 @@
   }
 </script>
 
-<p class="px-1 pb-1 text-left text-[10px] font-semibold opacity-70" style="color: var(--color-text-muted);">
+<p class="px-1 pb-1 text-left text-[10px] font-semibold opacity-70 text-text-muted">
   {title}
 </p>
 {#if entries.length === 0}
-  <p class="px-1 py-1 text-left text-[10px]" style="color: var(--color-text-muted);">No sync history yet.</p>
+  <p class="px-1 py-1 text-left text-[10px] text-text-muted">No sync history yet.</p>
 {:else}
   <ul class="flex flex-col gap-1">
     {#each entries as entry (entry.completedAt)}
       {@const hasDetails =
         !!entry.details?.length || !!entry.sentDetails?.length || !!entry.rejectedDetails?.length || !!entry.overwritten?.length}
-      <li class="overflow-hidden rounded" style="background: var(--color-surface);">
+      <li class="overflow-hidden rounded bg-surface">
         <button
           type="button"
           disabled={!hasDetails}
@@ -60,17 +60,17 @@
           <span class="flex items-center gap-1.5">
             <span class="h-1.5 w-1.5 shrink-0 rounded-full" style="background: {dotColor(entry.outcome)};"
             ></span>
-            <span class="font-medium" style="color: var(--color-text);">{formatWhen(entry)}</span>
+            <span class="font-medium text-text">{formatWhen(entry)}</span>
             {#if entry.durationMs != null && !entry.repeat}
-              <span class="opacity-60" style="color: var(--color-text-muted);">{formatDuration(entry.durationMs)}{entry.full ? ', full check' : ''}</span>
+              <span class="opacity-60 text-text-muted">{formatDuration(entry.durationMs)}{entry.full ? ', full check' : ''}</span>
             {/if}
             {#if hasDetails}
-              <span class="ml-auto shrink-0 opacity-60" style="color: var(--color-text-muted);"
+              <span class="ml-auto shrink-0 opacity-60 text-text-muted"
                 >{expandedEntryAt === entry.completedAt ? '\u25be' : '\u25b8'}</span
               >
             {/if}
           </span>
-          <span class="mt-0.5 block break-words opacity-80" style="color: var(--color-text-muted);">
+          <span class="mt-0.5 block break-words opacity-80 text-text-muted">
             {entry.outcome === 'error' ? (entry.error ?? entry.summary) : entry.summary}
           </span>
         </button>
@@ -86,8 +86,7 @@
         {/if}
         {#if hasDetails && expandedEntryAt === entry.completedAt}
           <ul
-            class="flex flex-col gap-0.5 border-t px-1.5 py-1 text-left text-[10px]"
-            style="border-color: var(--color-border);"
+            class="flex flex-col gap-0.5 border-t px-1.5 py-1 text-left text-[10px] border-border"
           >
             {#each entry.overwritten ?? [] as line, i (i)}
               <li class="break-words text-amber-400">{line}</li>
@@ -101,23 +100,23 @@
               </li>
             {/if}
             {#if entry.sentDetails?.length}
-              <li class="font-semibold opacity-70" style="color: var(--color-text-muted);">Sent</li>
+              <li class="font-semibold opacity-70 text-text-muted">Sent</li>
               {#each entry.sentDetails as line, i (i)}
-                <li class="break-words opacity-80" style="color: var(--color-text-muted);">{line}</li>
+                <li class="break-words opacity-80 text-text-muted">{line}</li>
               {/each}
               {#if entry.moreSentCount}
-                <li class="italic opacity-60" style="color: var(--color-text-muted);">+{entry.moreSentCount} more</li>
+                <li class="italic opacity-60 text-text-muted">+{entry.moreSentCount} more</li>
               {/if}
             {/if}
             {#if entry.details?.length}
               {#if entry.sentDetails?.length}
-                <li class="font-semibold opacity-70" style="color: var(--color-text-muted);">Received</li>
+                <li class="font-semibold opacity-70 text-text-muted">Received</li>
               {/if}
               {#each entry.details as line, i (i)}
-                <li class="break-words opacity-80" style="color: var(--color-text-muted);">{line}</li>
+                <li class="break-words opacity-80 text-text-muted">{line}</li>
               {/each}
               {#if entry.moreDetailsCount}
-                <li class="italic opacity-60" style="color: var(--color-text-muted);">
+                <li class="italic opacity-60 text-text-muted">
                   +{entry.moreDetailsCount} more
                 </li>
               {/if}

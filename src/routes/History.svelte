@@ -1,4 +1,5 @@
 <script lang="ts">
+  import EmptyState from '../lib/components/ui/EmptyState.svelte';
   import { liveQuery } from 'dexie';
   import { db, type FastRecord } from '../lib/db';
   import { formatDateTime, formatHoursShort } from '../lib/utils/time';
@@ -26,8 +27,7 @@
   <div class="flex items-center justify-between gap-2">
     <h1 class="text-xl font-semibold text-text">History</h1>
     <button
-      class="rounded-lg border px-3 py-1.5 text-sm text-text-muted"
-      style="border-color: var(--color-border);"
+      class="rounded-lg border px-3 py-1.5 text-sm text-text-muted border-border"
       onclick={() => (addOpen = true)}>+ Log a past fast</button
     >
   </div>
@@ -35,15 +35,14 @@
   {#if $fasts === undefined}
     <p class="text-sm text-text-muted">Loading&hellip;</p>
   {:else if $fasts.length === 0}
-    <p class="mt-8 text-center text-sm text-text-muted">No fasts logged yet. Start one from Timer, or log a past one.</p>
+    <EmptyState icon="❄️" title="No fasts yet" text="Start one from the Timer, or log a past one with the button above." class="mt-4" />
   {:else}
     <TagFilter items={$fasts} bind:selected={tagFilter} />
     <ul class="flex flex-col gap-2">
       {#each shown as fast (fast.id)}
         <li>
           <button
-            class="w-full rounded-xl border p-3 text-left"
-            style="border-color: var(--color-border); background: var(--color-surface);"
+            class="w-full rounded-xl border p-3 text-left border-border bg-surface"
             onclick={() => openFast(fast)}
           >
             <div class="flex items-center justify-between">
@@ -62,7 +61,7 @@
             {#if fast.tags?.length}
               <p class="mt-1 flex flex-wrap gap-1">
                 {#each fast.tags as tag (tag)}
-                  <span class="rounded-full px-2 py-0.5 text-[11px] text-text-muted" style="background: var(--color-surface-2);">#{tag}</span>
+                  <span class="rounded-full px-2 py-0.5 text-[11px] text-text-muted bg-surface-2">#{tag}</span>
                 {/each}
               </p>
             {/if}

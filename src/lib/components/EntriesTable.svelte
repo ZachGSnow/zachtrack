@@ -45,7 +45,7 @@
   }
 </script>
 
-<div class="rounded-2xl border" style="border-color: var(--color-border); background: var(--color-surface);">
+<div class="rounded-2xl border border-border bg-surface">
   <div class="flex items-center justify-between gap-2 px-3 pt-3 pb-2">
     <p class="text-sm font-medium text-text-muted">Entries <span class="text-xs">({entries.length})</span></p>
     {#if entries.length > 0}

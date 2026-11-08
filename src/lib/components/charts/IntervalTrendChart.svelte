@@ -44,7 +44,7 @@
   });
 </script>
 
-<div class="rounded-2xl border p-4" style="border-color: var(--color-border); background: var(--color-surface);">
+<div class="rounded-2xl border p-4 border-border bg-surface">
   <p class="mb-2 text-sm font-medium text-text-muted">Time between occurrences</p>
   {#if trend.categories.length === 0}
     <p class="py-4 text-center text-sm text-text-muted">Need at least 2 entries to show a trend.</p>

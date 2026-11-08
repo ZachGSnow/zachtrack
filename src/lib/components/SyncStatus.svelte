@@ -144,16 +144,14 @@
   {/if}
   {#if showHistory}
     <div
-      class="absolute top-full z-10 mt-1 w-64 rounded-md border p-1.5 text-right"
-      style="border-color: var(--color-border); background: var(--color-surface-2);"
+      class="absolute top-full z-10 mt-1 w-64 rounded-md border p-1.5 text-right border-border bg-surface-2"
     >
       <SyncHistory limit={5} />
       <a
         href="/sync"
         use:link
         onclick={() => (showHistory = false)}
-        class="mt-1 block px-1 text-left text-[10px] font-semibold"
-        style="color: var(--color-brand);">All syncs, devices and activity</a
+        class="mt-1 block px-1 text-left text-[10px] font-semibold text-brand">All syncs, devices and activity</a
       >
     </div>
   {/if}

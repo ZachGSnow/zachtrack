@@ -11,7 +11,7 @@
 
 {#if current.section?.pages && current.page}
   <nav class="px-5 pt-3 lg:hidden" aria-label="{current.section.label} pages">
-    <div class="flex rounded-full border p-0.5 text-sm" style="border-color: var(--color-border); background: var(--color-surface);">
+    <div class="flex rounded-full border p-0.5 text-sm border-border bg-surface">
       {#each current.section.pages as p (p.href)}
         <a
           href={p.href}

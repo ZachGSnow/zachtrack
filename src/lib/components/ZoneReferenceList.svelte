@@ -1,5 +1,7 @@
 <script lang="ts">
   import { ZONES } from '../data/zones';
+  import { readableText } from '../utils/color';
+  import { themeStore } from '../stores/theme.svelte';
 
   let { currentZoneId = null }: { currentZoneId?: string | null } = $props();
 
@@ -34,7 +36,7 @@
               <p class="text-sm font-medium text-text">
                 {zone.title}
                 {#if zone.id === currentZoneId}
-                  <span class="ml-1 text-xs font-normal" style="color: {zone.color};">(current)</span>
+                  <span class="ml-1 text-xs font-normal" style="color: {readableText(zone.color, themeStore.effective)};">(current)</span>
                 {/if}
               </p>
               <p class="text-xs text-text-muted">{zone.hourStart}-{zone.hourEnd}h &middot; {zone.summary}</p>

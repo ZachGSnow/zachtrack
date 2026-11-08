@@ -247,11 +247,11 @@
   {#if view === 'table'}
     <DataTable metrics={activeDefs} {granularity} {rangeStart} />
   {:else if !anyVisible}
-    <p class="rounded-2xl border p-6 text-center text-sm text-text-muted" style="border-color: var(--color-border); background: var(--color-surface);">
+    <p class="rounded-2xl border p-6 text-center text-sm text-text-muted border-border bg-surface">
       Select at least one metric above to see the chart.
     </p>
   {:else}
-    <div class="rounded-2xl border p-2" style="border-color: var(--color-border); background: var(--color-surface);">
+    <div class="rounded-2xl border p-2 border-border bg-surface">
       <EChart {option} height="320px" />
     </div>
   {/if}
