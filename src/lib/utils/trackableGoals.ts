@@ -223,3 +223,142 @@ export const GOAL_STATE_COLORS: Record<GoalState, string | undefined> = {
   overdue: 'var(--color-danger)',
   ok: undefined,
 };
+
+// ---------------------------------------------------------------------------
+// The stat tiles on a goal trackable's page (TrackableDetail.svelte): how the
+// goal is going rather than the kind's figures (3.43). Pure; tested in
+// tests/trackableGoals.test.ts.
+// ---------------------------------------------------------------------------
+
+export interface GoalStat {
+  label: string;
+  value: string;
+}
+
+const plural = (n: number, word: string) => `${n} ${n === 1 ? word : `${word}s`}`;
+
+/** The value each day counts toward a daily goal: the total of its field, or how many entries. */
+function dailyValueOn(type: 'dailyTotal' | 'perDay', entries: readonly TimestampedValues[], fields: readonly FieldDefinition[]): ((day: number) => number) | null {
+  if (type === 'dailyTotal') {
+    const field = goalField(fields);
+    if (!field) return null;
+    const byDay = computeFieldValuesByDay(entries as TimestampedValues[], field);
+    return (day) => byDay.get(day) ?? 0;
+  }
+  const counts = new Map<number, number>();
+  for (const e of entries) counts.set(startOfDay(e.timestamp), (counts.get(startOfDay(e.timestamp)) ?? 0) + 1);
+  return (day) => counts.get(day) ?? 0;
+}
+
+export function goalStats(
+  trackable: Pick<TrackableDefinition, 'goalType' | 'goalValue' | 'createdAt'> & Partial<Scheduled>,
+  entries: readonly TimestampedValues[],
+  fields: readonly FieldDefinition[],
+  now: number = Date.now(),
+): GoalStat[] | null {
+  const type = trackable.goalType;
+  const goal = trackable.goalValue;
+  if (!type || (type !== 'avoid' && (goal == null || goal <= 0))) return null;
+  const today = startOfDay(now);
+  const times = entries.map((e) => e.timestamp).sort((a, b) => a - b);
+  const dash = '—';
+  const since30 = addDays(today, -29);
+
+  if (type === 'dailyTotal' || type === 'perDay') {
+    const valueOn = dailyValueOn(type, entries, fields);
+    if (!valueOn) return null;
+    const met = (day: number) => valueOn(day) >= goal!;
+    const earliest = Math.min(startOfDay(trackable.createdAt ?? now), times.length ? startOfDay(times[0]) : today);
+    // The last 30 scheduled days; today counts only once it's met, since it's still open.
+    let scheduled = 0;
+    let metCount = 0;
+    for (let d = Math.max(since30, earliest); d <= today; d = addDays(d, 1)) {
+      if (offDayReason(trackable, d) || (d === today && !met(d))) continue;
+      scheduled += 1;
+      if (met(d)) metCount += 1;
+    }
+    // Runs of met days; off days neither count nor break a run.
+    let best = 0;
+    let run = 0;
+    for (let d = earliest; d <= today; d = addDays(d, 1)) {
+      if (met(d)) run += 1;
+      else if (!offDayReason(trackable, d) && d !== today) run = 0;
+      best = Math.max(best, run);
+    }
+    const current = goalStatus(trackable, entries, fields, now)?.streak?.match(/^(\d+) /)?.[1] ?? '0';
+    return [
+      { label: 'Met, last 30 days', value: scheduled ? `${metCount} of ${scheduled}` : dash },
+      { label: 'Rate (30d)', value: scheduled ? `${Math.round((metCount / scheduled) * 100)}%` : dash },
+      { label: 'Current streak', value: plural(Number(current), 'day') },
+      { label: 'Best streak', value: plural(best, 'day') },
+    ];
+  }
+
+  if (type === 'perWeek') {
+    const weekStart = bucketStart(now, 'week');
+    const daysIn = (start: number) => new Set(times.filter((t) => t >= start && t < addDays(start, 7)).map(startOfDay)).size;
+    const count = daysIn(weekStart);
+    const firstWeek = times.length ? bucketStart(times[0], 'week') : weekStart;
+    // The last 12 finished weeks plus this one once it's met.
+    let weeks = 0;
+    let metWeeks = 0;
+    for (let w = addDays(weekStart, -7 * 12); w <= weekStart; w = addDays(w, 7)) {
+      if (w < firstWeek) continue;
+      const done = daysIn(w) >= goal!;
+      if (w === weekStart && !done) continue;
+      weeks += 1;
+      if (done) metWeeks += 1;
+    }
+    let best = 0;
+    let run = 0;
+    for (let w = firstWeek; w <= weekStart; w = addDays(w, 7)) {
+      if (daysIn(w) >= goal!) run += 1;
+      else if (w !== weekStart) run = 0;
+      best = Math.max(best, run);
+    }
+    let current = count >= goal! ? 1 : 0;
+    for (let w = addDays(weekStart, -7); w >= firstWeek && daysIn(w) >= goal!; w = addDays(w, -7)) current += 1;
+    return [
+      { label: 'This week', value: `${count} of ${goal}` },
+      { label: 'Weeks met (12)', value: weeks ? `${metWeeks} of ${weeks}` : dash },
+      { label: 'Current streak', value: plural(current, 'week') },
+      { label: 'Best streak', value: plural(best, 'week') },
+    ];
+  }
+
+  if (type === 'everyDays') {
+    const status = goalStatus(trackable, entries, fields, now);
+    // Each interval between two logs, on time when it's within the goal; the last 90 days by the later log.
+    const since90 = addDays(today, -89);
+    let recent = 0;
+    let recentOnTime = 0;
+    let best = 0;
+    let run = 0;
+    for (let i = 1; i < times.length; i++) {
+      const onTime = daysBetween(startOfDay(times[i - 1]), startOfDay(times[i])) <= goal!;
+      if (times[i] >= since90) {
+        recent += 1;
+        if (onTime) recentOnTime += 1;
+      }
+      run = onTime ? run + 1 : 0;
+      best = Math.max(best, run);
+    }
+    return [
+      { label: 'Next', value: status?.text ?? dash },
+      { label: 'On time (90d)', value: recent ? `${recentOnTime} of ${recent}` : dash },
+      { label: 'Current streak', value: `${run} on time` },
+      { label: 'Best streak', value: `${best} on time` },
+    ];
+  }
+
+  // avoid: how long since, the longest gap, and the slips lately.
+  const last = times.at(-1);
+  const gaps = times.slice(1).map((t, i) => t - times[i]);
+  const bestGap = last == null ? null : Math.max(now - last, ...gaps);
+  return [
+    { label: 'Since last', value: last == null ? 'Never' : formatTimeSinceAdaptive(now - last) },
+    { label: 'Best', value: bestGap == null ? dash : formatTimeSinceAdaptive(bestGap) },
+    { label: 'Last 30 days', value: plural(times.filter((t) => t >= since30).length, 'slip') },
+    { label: 'Last 90 days', value: plural(times.filter((t) => t >= addDays(today, -89)).length, 'slip') },
+  ];
+}

@@ -188,6 +188,10 @@
 
     <section id="help-grid">
       <h2>The habit grid</h2>
+      <p class="mb-2">
+        Today shows every habit's last 7 days in one place. Tap a day to log it, or to take a logged day back off; a trackable with
+        fields opens the entry sheet for that day.
+      </p>
       <p>
         One square per day, weeks as columns, Monday at the top. The color shows how far that day went toward the goal: a
         partly filled square is part of a daily total or a times-per-day goal. For an avoid goal it's inverted, so clean days

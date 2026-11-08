@@ -21,5 +21,5 @@
 {/if}
 
 <BottomSheet bind:open={quickLog.sheetOpen}>
-  <LogTrackableEntrySheet bind:open={quickLog.sheetOpen} trackable={quickLog.sheetTrackable} />
+  <LogTrackableEntrySheet bind:open={quickLog.sheetOpen} trackable={quickLog.sheetTrackable} defaultTimestamp={quickLog.sheetTimestamp} />
 </BottomSheet>

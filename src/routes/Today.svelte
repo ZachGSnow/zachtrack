@@ -9,6 +9,7 @@
   import { quickLog } from '../lib/stores/quickLog.svelte';
   import FastNow from '../lib/components/FastNow.svelte';
   import HabitRow from '../lib/components/HabitRow.svelte';
+  import HabitMatrix from '../lib/components/HabitMatrix.svelte';
   import QuickLogHost from '../lib/components/QuickLogHost.svelte';
   import Card from '../lib/components/ui/Card.svelte';
   import SectionHeading from '../lib/components/ui/SectionHeading.svelte';
@@ -72,6 +73,7 @@
             {/each}
           </ul>
         </Card>
+        <HabitMatrix {habits} {now} />
       {/if}
     </section>
   </div>

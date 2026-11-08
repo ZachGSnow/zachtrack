@@ -224,7 +224,8 @@ test('a goal shows progress and due dates, and a trackable without fields logs i
   await page.getByRole('textbox', { name: /Every how many days/ }).fill('7');
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByText('Goal: Every 7 days')).toBeVisible();
-  await expect(page.getByText(/^Due (in \dd|tomorrow)$/)).toBeVisible();
+  // The goal card and the Next tile both say it.
+  await expect(page.getByText(/^Due (in \dd|tomorrow)$/).first()).toBeVisible();
 
   // A daily water total with a progress bar.
   await page.goto('/#/trackables');
@@ -733,6 +734,18 @@ test('Today shows the fast, habits with a goal and recent logs, and checks a hab
   await expect(page.getByRole('status')).toContainText('Logged Male Health');
   await expect(habits).toContainText('1 of 1 done');
   await expect(habits.getByRole('button', { name: 'Uncheck Male Health for today' })).toHaveAttribute('aria-pressed', 'true');
+
+  // Last 7 days: one cell per day; a tap on an earlier day fills it in, a second tap takes it back.
+  const week = page.getByRole('region', { name: 'Last 7 days' });
+  const row = week.getByRole('listitem').filter({ hasText: 'Male Health' });
+  await expect(row.getByRole('group', { name: 'Days' }).getByRole('button')).toHaveCount(7);
+  await expect(row.getByRole('button', { name: /1 entry, today$/ })).toBeVisible();
+  await row.getByRole('button', { name: /nothing logged$/ }).first().click();
+  await expect(page.getByRole('status')).toContainText(/^Logged Male Health for /);
+  await expect(row.getByRole('button', { name: /1 entry/ })).toHaveCount(2);
+  await row.getByRole('button', { name: /1 entry$/ }).first().click();
+  await expect(page.getByRole('status')).toContainText(/^Unchecked Male Health for /);
+  await expect(row.getByRole('button', { name: /1 entry/ })).toHaveCount(1);
 
   // The sample data weighs in most mornings: Body Measurements is under Log with its latest reading and 7-day average,
   // and a new entry starts from the last readings.

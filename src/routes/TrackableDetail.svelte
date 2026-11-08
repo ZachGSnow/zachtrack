@@ -6,7 +6,7 @@
   import { computeFieldTodayTotal, computeFieldValuesByDay } from '../lib/utils/trackableStats';
   import { describeProjection, projectGoal, trendPerWeek, weeklyAverages } from '../lib/utils/measurement';
   import { kindStats, resolveKind, summarize } from '../lib/utils/trackableKinds';
-  import { describeGoal, GOAL_STATE_COLORS, goalStatus } from '../lib/utils/trackableGoals';
+  import { describeGoal, GOAL_STATE_COLORS, goalStats, goalStatus } from '../lib/utils/trackableGoals';
   import { trackableInsights } from '../lib/utils/insights';
   import { DATE_KIND_ITEM, DATE_KIND_LABELS, dateKindOf, describeDate } from '../lib/utils/dates';
   import { rangeStartFor, type ChartRange } from '../lib/utils/stats';
@@ -131,7 +131,8 @@
   });
 
   const summary = $derived(summarize(kind, $entries ?? [], attachedFields, now));
-  const stats = $derived(kindStats(kind, $entries ?? [], attachedFields, now));
+  // A trackable with a goal shows how the goal is going; the rest show the kind's figures.
+  const stats = $derived(($trackable && !isAges && goalStats($trackable, $entries ?? [], attachedFields, now)) || kindStats(kind, $entries ?? [], attachedFields, now));
   const goal = $derived($trackable && !isAges ? goalStatus($trackable, $entries ?? [], attachedFields, now) : null);
   const goalText = $derived($trackable ? describeGoal($trackable, attachedFields) : null);
 

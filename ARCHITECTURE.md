@@ -833,6 +833,32 @@ entry notes.
   in the next morning's weight. The new Late meal template is a one-tap
   trackable for exactly that.
 
+### 3.43 Habits at a glance: the week matrix and goal tiles (v1.15.0)
+
+The habit mechanics were all there (grid, streaks, schedules, skips, one-tap
+checks) but each habit's grid lived on its own page, and a habit's stat
+tiles were the kind's figures (streaks and days logged), not how its goal
+was going.
+
+- **Last 7 days** (`HabitMatrix.svelte`, under Habits on Today): one row
+  per goal trackable, one cell per day, the way Streaks and Habitify show a
+  week, drawn with the same `HabitGrid` cells and shading as the strips
+  (3.23). A tap on a cell logs that day, or takes a logged day back off,
+  through the quick-log store: a missed check-in is filled in without
+  opening the trackable. An earlier day's entry is stamped at midday so it
+  lands on that date whatever the time zone does; a trackable with fields
+  opens the sheet for that day instead. The matrix is on Today only: the
+  list's cards already carry a strip each.
+- **Goal tiles** (`goalStats` in `utils/trackableGoals.ts`): a trackable
+  with a goal shows how the goal is going instead of the kind's figures:
+  for a daily goal, days met in the last 30 scheduled days and the rate,
+  the current run and the best run (off days neither count nor break a
+  run, as for the streak); for a weekly goal, this week, weeks met of the
+  last 12, and runs of weeks; for every N days, the next due date, on-time
+  intervals in 90 days and runs of them; for avoid, time since, the best
+  gap and slips in 30 and 90 days. Today is counted only once it's met,
+  since it is still open.
+
 ### 3.21 Trackables list: pin, archive, order; tag filters
 - **Sort** (per device, `zachtrack:trackables-view`): Due first (goal
   urgency from 3.18: overdue, then due, then the rest, then trackables

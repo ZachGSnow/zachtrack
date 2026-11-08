@@ -52,7 +52,9 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
   with days skipped or the goal paused for a holiday without breaking the
   streak. A trackable with a goal gets a habit-grid strip on its card and a
   check button for today; each trackable's page has the full grid by week,
-  month, six months or year. A trackable without fields logs in one tap,
+  month, six months or year. Today shows every habit's last 7 days in one
+  matrix, with a tap to fill in a day, and a habit's page has tiles for days
+  met, the rate, and the current and best streaks. A trackable without fields logs in one tap,
   with undo. The list
   sorts by what's due (or your own order, or A-Z), with pinning and
   archiving; fasts and entries can be filtered by tag. In-app reminders
