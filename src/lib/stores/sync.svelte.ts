@@ -468,6 +468,24 @@ class SyncStore {
   }
 
   /** Recounts `waiting`; cheap enough to run after every local write at this app's scale. */
+  /**
+   * The newest nightly server backup (functions/api/backup-status.ts), for the
+   * "Your data" card. Undefined until asked or when the server can't be reached.
+   */
+  backup = $state<{ configured: boolean; at: number | null } | undefined>(undefined);
+
+  async loadBackupStatus(): Promise<void> {
+    if (this.status === 'local') return;
+    try {
+      const res = await callApi('/api/backup-status');
+      const body = (await res.json()) as { configured: boolean; latest?: { uploaded: number } };
+      this.backup = { configured: body.configured, at: body.latest?.uploaded ?? null };
+    } catch {
+      // Offline, signed out or an older server: the card leaves the line out.
+      this.backup = undefined;
+    }
+  }
+
   async refreshWaiting(): Promise<void> {
     try {
       this.waiting = await countWaitingChanges();

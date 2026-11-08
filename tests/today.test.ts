@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { FieldDefinition, TrackableDefinition, TrackableEntry } from '../src/lib/db';
-import { suggestGoals, timeOfDay, todayDates, todayHabits, todayLogs } from '../src/lib/utils/today';
+import { lapsedHabits, suggestGoals, timeOfDay, todayDates, todayHabits, todayLogs } from '../src/lib/utils/today';
 
 // America/New_York (vitest config). A Friday at noon.
 const NOW = new Date(2026, 10, 6, 12).getTime();
@@ -131,5 +131,67 @@ describe('time of day', () => {
     expect(timeOfDay([at(1, 7), at(2, 21), at(3, 8), at(4, 22)], NOW)).toBe('anytime');
     expect(timeOfDay([at(1, 7), at(2, 7)], NOW)).toBe('anytime');
     expect(timeOfDay([at(40, 7), at(41, 7), at(42, 7)], NOW)).toBe('anytime');
+  });
+});
+
+describe('lapsed habits', () => {
+  const daysAgo = (n: number, h = 8) => {
+    const d = new Date(NOW);
+    d.setDate(d.getDate() - n);
+    d.setHours(h, 0, 0, 0);
+    return d.getTime();
+  };
+  const created = daysAgo(60);
+  const habit = (id: string, extra: Partial<TrackableDefinition>, logDays: number[]) => {
+    const t = trackable(id, id, { goalType: 'perDay', goalValue: 1, createdAt: created, ...extra });
+    return todayHabits([t], fields, logDays.map((n) => entry(id, daysAgo(n))), NOW)[0];
+  };
+  const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
+
+  it('flags a habit that went well and then stopped for a week, offering a lower goal', () => {
+    const floss = habit('floss', { goalValue: 2 }, [...range(8, 30), ...range(8, 30)]); // twice a day, then nothing for a week
+    const [lapsed] = lapsedHabits([floss], NOW);
+    expect(lapsed.habit.trackable.id).toBe('floss');
+    expect(lapsed.before.met).toBe(23);
+    expect(lapsed.lowerTo).toBe(1);
+  });
+
+  it('leaves alone a habit still going, one that never got going, and a once-a-day goal it can\'t lower', () => {
+    expect(lapsedHabits([habit('going', {}, range(1, 30))], NOW)).toEqual([]);
+    expect(lapsedHabits([habit('never', {}, [20, 25])], NOW)).toEqual([]);
+    const once = lapsedHabits([habit('once', {}, range(8, 30))], NOW);
+    expect(once).toHaveLength(1);
+    expect(once[0].lowerTo).toBeUndefined();
+  });
+});
+
+describe('lapsed habits', () => {
+  const daysAgo = (n: number, h = 8) => {
+    const d = new Date(NOW);
+    d.setDate(d.getDate() - n);
+    d.setHours(h, 0, 0, 0);
+    return d.getTime();
+  };
+  const created = daysAgo(60);
+  const habit = (id: string, extra: Partial<TrackableDefinition>, logDays: number[]) => {
+    const t = trackable(id, id, { goalType: 'perDay', goalValue: 1, createdAt: created, ...extra });
+    return todayHabits([t], fields, logDays.map((n, i) => ({ ...entry(id, daysAgo(n)), id: `${id}-${i}` })), NOW)[0];
+  };
+  const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
+
+  it('flags a habit that went well and then stopped for a week, offering a lower goal', () => {
+    const floss = habit('floss', { goalValue: 2 }, [...range(8, 30), ...range(8, 30)]); // twice a day, then nothing for a week
+    const [lapsed] = lapsedHabits([floss], NOW);
+    expect(lapsed.habit.trackable.id).toBe('floss');
+    expect(lapsed.before.met).toBe(23);
+    expect(lapsed.lowerTo).toBe(1);
+  });
+
+  it("leaves alone a habit still going, one that never got going, and offers no lower goal below once a day", () => {
+    expect(lapsedHabits([habit('going', {}, range(1, 30))], NOW)).toEqual([]);
+    expect(lapsedHabits([habit('never', {}, [20, 25])], NOW)).toEqual([]);
+    const once = lapsedHabits([habit('once', {}, range(8, 30))], NOW);
+    expect(once).toHaveLength(1);
+    expect(once[0].lowerTo).toBeUndefined();
   });
 });

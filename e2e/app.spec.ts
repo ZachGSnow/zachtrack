@@ -649,7 +649,7 @@ test('Help opens from the header and from the question marks next to settings th
   await page.getByRole('link', { name: 'Help', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Help', level: 1 })).toBeVisible();
   const topics = page.getByRole('navigation', { name: 'Help topics' }).getByRole('link');
-  await expect(topics).toHaveCount(13);
+  await expect(topics).toHaveCount(14);
   for (const title of await topics.allTextContents()) {
     await expect(page.getByRole('heading', { name: title, level: 2 })).toHaveCount(1);
   }
@@ -978,5 +978,216 @@ test('a comparison can be hidden and brought back in Settings, and a trackable k
   await page.getByRole('checkbox', { name: /Keep out of comparisons/ }).check();
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(hide).toHaveCount(0);
+  expect(problems).toEqual([]);
+});
+
+test('Today says whether your data is safe, and an export from the card settles it', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await mockSync(page, noServer);
+  await waitForStarterSet(page);
+  await page.goto('/#/');
+  const card = page.getByRole('region', { name: 'Your data' });
+  // Local only and never exported: this device holds the only copy.
+  await expect(card).toContainText('Your data needs a look');
+  await expect(card).toContainText('Local only: this device holds the only copy');
+  await expect(card).toContainText('Never exported from this device');
+  const [download] = await Promise.all([page.waitForEvent('download'), card.getByRole('button', { name: 'Export a backup file' }).click()]);
+  expect(download.suggestedFilename()).toMatch(/\.json$/);
+  await expect(card).toContainText('Your data is safe');
+  await card.getByRole('button', { name: /Your data is safe/ }).click();
+  await expect(card).toContainText('Exported here just now');
+  expect(problems).toEqual([]);
+});
+
+test('after a long gap, Today says what happened since you were last here', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await mockSync(page, noServer);
+  await importSampleData(page);
+  // Pretend the app was last open three days ago.
+  await page.evaluate(() => localStorage.setItem('zachtrack:last-active', JSON.stringify({ at: Date.now() - 3 * 24 * 3600_000 })));
+  await page.goto('/#/');
+  await page.reload();
+  const away = page.getByRole('region', { name: 'Since you were last here' });
+  await expect(away).toContainText('(3 days ago)');
+  // The sample data's fasts reached their goals while "away".
+  await expect(away).toContainText(/fast reached its goal/);
+  await away.getByRole('button', { name: 'Dismiss' }).click();
+  await expect(away).toHaveCount(0);
+  // The next visit, moments later, has nothing to say.
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Today', level: 1 })).toBeVisible();
+  await expect(away).toHaveCount(0);
+  expect(problems).toEqual([]);
+});
+
+test('a habit that slipped after going well gets a gentle card on Today, and Pause a week clears it', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await mockSync(page, noServer);
+  await waitForStarterSet(page);
+  // Male Health logged every day from 30 to 8 days ago, then nothing: planted in the test browser's database.
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve, reject) => {
+        const open = indexedDB.open('snowfast');
+        open.onerror = () => reject(open.error);
+        open.onsuccess = () => {
+          const db = open.result;
+          const read = db.transaction('trackableDefinitions', 'readonly').objectStore('trackableDefinitions').getAll();
+          read.onsuccess = () => {
+            const male = read.result.find((t: { name: string }) => t.name === 'Male Health');
+            const tx = db.transaction('trackableEntries', 'readwrite');
+            for (let n = 8; n <= 30; n++) {
+              const d = new Date();
+              d.setDate(d.getDate() - n);
+              d.setHours(21, 0, 0, 0);
+              tx.objectStore('trackableEntries').put({ id: `planted-${n}`, trackableId: male.id, timestamp: d.getTime(), createdAt: Date.now(), updatedAt: Date.now() });
+            }
+            tx.oncomplete = () => {
+              db.close();
+              resolve();
+            };
+            tx.onerror = () => reject(tx.error);
+          };
+        };
+      }),
+  );
+  await page.reload();
+  await page.getByRole('link', { name: /Male Health/ }).click();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.getByRole('combobox', { name: /^Goal/ }).selectOption('perDay');
+  await page.getByRole('textbox', { name: 'Times per day' }).fill('1');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.getByText('Goal: Once a day')).toBeVisible();
+
+  await page.goto('/#/');
+  const card = page.getByRole('region', { name: 'Male Health has slipped' });
+  await expect(card).toContainText('after 23 of 23 days before');
+  await card.getByRole('button', { name: 'Pause a week' }).click();
+  await expect(card).toHaveCount(0);
+  expect(problems).toEqual([]);
+});
+
+test('a measurement can read a smoothed trend and lead with it instead of the scale reading', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await mockSync(page, noServer);
+  await importSampleData(page);
+  await page.goto('/#/trackables');
+  await page.getByRole('link', { name: /Body Measurements/ }).click();
+  const trend = page.getByRole('group', { name: 'Trend' });
+  await trend.getByRole('button', { name: 'Smoothed' }).click();
+  await expect(page.getByText(/^Smoothed trend \d/)).toBeVisible();
+  await page.getByRole('button', { name: 'Chart', exact: true }).click();
+  await expect(page.locator('[_echarts_instance_] svg').first()).toContainText('Weight trend');
+
+  await trend.getByRole('checkbox', { name: 'Lead with the trend' }).check();
+  await expect(page.getByText('Weight trend', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText(/^Latest reading \d/)).toBeVisible();
+  // A device preference: it sticks, and the lists follow it.
+  await page.reload();
+  await expect(page.getByText('Weight trend', { exact: true }).first()).toBeVisible();
+  await page.goto('/#/');
+  await expect(page.getByRole('region', { name: 'Log' })).toContainText(/Body Measurements\s+trend \d/);
+  expect(problems).toEqual([]);
+});
+
+test('Today logs a reading or a rating without opening the sheet', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await mockSync(page, noServer);
+  await importSampleData(page);
+  await page.goto('/#/');
+  const log = page.getByRole('region', { name: 'Log' });
+  const weight = log.getByRole('textbox', { name: 'Weight (lb)' });
+  await expect(weight).toHaveAttribute('placeholder', /^Weight: last \d/);
+  await weight.fill('181.4');
+  await weight.press('Enter');
+  await expect(page.getByRole('status').filter({ hasText: 'Logged Weight 181.4 lb' })).toBeVisible();
+  await expect(weight).toHaveValue('');
+
+  // The sample Wellness Check-in leads with Overall Mood, 1 to 5.
+  const mood = log.getByRole('group', { name: 'Overall Mood, 1 to 5' });
+  await mood.getByRole('button', { name: 'Overall Mood 4' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Logged Overall Mood 4' })).toBeVisible();
+  expect(problems).toEqual([]);
+});
+
+test('weigh-ins import from a scale app CSV, leaving out days already logged', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await mockSync(page, noServer);
+  await waitForStarterSet(page);
+  await openSettings(page);
+  const section = page.getByRole('group', { name: 'Weigh-ins from a scale app' });
+  // A Withings-style export in kg, three readings a few days back.
+  const day = (n: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() - n);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+  const csv = `Date,Weight (kg),Fat mass (kg)\n${day(3)} 07:10:00,87.3,19.1\n${day(2)} 07:05:00,87.1,19.0\n${day(1)} 07:02:00,86.9,18.9\n`;
+  await section.getByLabel('Scale CSV file').setInputFiles({ name: 'withings.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
+  await expect(section).toContainText('3 new weigh-ins');
+  await expect(section).toContainText('converted to lb');
+  await section.getByRole('button', { name: 'Import 3 weigh-ins' }).click();
+  await expect(section.getByRole('status')).toContainText('Imported 3 weigh-ins into Body Measurements.');
+
+  // The same file again: nothing new.
+  await section.getByLabel('Scale CSV file').setInputFiles({ name: 'withings.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
+  await expect(section).toContainText('Nothing new');
+  await page.goto('/#/trackables');
+  await expect(page.getByRole('link', { name: /Body Measurements/ })).toContainText('191.6 lb');
+  expect(problems).toEqual([]);
+});
+
+test('on a laptop, single keys move between pages, W opens a weigh-in and ? lists them', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await mockSync(page, noServer);
+  await waitForStarterSet(page);
+  await page.goto('/#/');
+  await expect(page.getByRole('heading', { name: 'Today', level: 1 })).toBeVisible();
+
+  await page.keyboard.press('i');
+  await expect.poll(() => new URL(page.url()).hash).toBe('#/insights');
+  await page.keyboard.press('D');
+  await expect.poll(() => new URL(page.url()).hash).toBe('#/dates');
+
+  await page.keyboard.press('?');
+  const sheet = page.getByRole('dialog');
+  await expect(sheet.getByRole('heading', { name: 'Keyboard shortcuts' })).toBeVisible();
+  await expect(sheet.getByRole('list', { name: 'Keyboard shortcuts' }).getByRole('listitem')).toHaveCount(10);
+  await page.keyboard.press('Escape');
+  await expect(sheet).toHaveCount(0);
+
+  // Typing in a box isn't a shortcut.
+  await page.keyboard.press('s');
+  await expect.poll(() => new URL(page.url()).hash).toBe('#/settings');
+  const box = page.getByRole('textbox').first();
+  await box.click();
+  await page.keyboard.press('t');
+  await expect.poll(() => new URL(page.url()).hash).toBe('#/settings');
+  await box.blur();
+
+  await page.keyboard.press('w');
+  await expect.poll(() => new URL(page.url()).hash).toBe('#/');
+  await expect(page.getByRole('dialog').getByRole('heading', { name: /Body Measurements/ })).toBeVisible();
+  expect(problems).toEqual([]);
+});
+
+test('past days fill in from one table on a trackable page', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await mockSync(page, noServer);
+  await waitForStarterSet(page);
+  await page.goto('/#/trackables');
+  await page.getByRole('link', { name: /Body Measurements/ }).first().click();
+  await page.getByText('Fill in past days').click();
+  const table = page.getByRole('table', { name: 'Fill in past days for Body Measurements' });
+  // The header, then today, then yesterday and so on.
+  await expect(table.getByRole('row')).toHaveCount(8);
+  await table.getByRole('row').nth(2).getByRole('textbox', { name: /^Weight,/ }).fill('182.2');
+  await table.getByRole('row').nth(3).getByRole('textbox', { name: /^Weight,/ }).fill('182.6');
+  await table.getByRole('row').nth(4).getByRole('textbox', { name: /^Weight,/ }).fill('heavy');
+  await expect(page.getByRole('alert')).toContainText("won't be saved");
+  await page.getByRole('button', { name: 'Save 2 entries' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Added 2 entries.' })).toBeVisible();
+  await expect(table.getByRole('row').nth(2)).toContainText('1 already');
+  await expect(table.getByRole('row').nth(3)).toContainText('1 already');
   expect(problems).toEqual([]);
 });

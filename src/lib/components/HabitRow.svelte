@@ -22,7 +22,7 @@
   const strength = $derived(habitStrength(t, habit.entries, habit.fields, now));
   const extras = $derived(
     // Strength once there's something logged; a brand-new habit at 0% would only discourage.
-    habit.offDay ? [] : [habit.goal?.streak, strength != null && habit.entries.length > 0 ? `${Math.round(strength * 100)}% strong` : undefined].filter(Boolean),
+    habit.offDay ? [] : [strength != null && habit.entries.length > 0 ? `${Math.round(strength * 100)}% strong` : undefined, habit.goal?.streak].filter(Boolean),
   );
 </script>
 

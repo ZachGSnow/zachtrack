@@ -139,3 +139,98 @@ export function rollingSeries(byDay: ReadonlyMap<number, number>, days: readonly
     return v == null ? null : Math.round(v * 100) / 100;
   });
 }
+
+// ---------------------------------------------------------------------------
+// The smoothed trend and a goal range (3.54), as Happy Scale and The Hacker's
+// Diet do it: an exponentially smoothed weight that moves a tenth of the way
+// toward each new reading, so a single heavy morning barely shifts it.
+// ---------------------------------------------------------------------------
+
+/** How far the smoothed trend moves toward each reading. */
+export const SMOOTHING = 0.1;
+
+export type TrendMode = 'average' | 'smoothed';
+
+/** The smoothed trend on each of `days`: carried over days without a reading; null before the first. */
+export function smoothedSeries(byDay: ReadonlyMap<number, number>, days: readonly number[], alpha: number = SMOOTHING): (number | null)[] {
+  const readings = [...byDay.entries()].sort((a, b) => a[0] - b[0]);
+  let trend: number | null = null;
+  let i = 0;
+  return days.map((d) => {
+    while (i < readings.length && readings[i][0] <= d) {
+      const v = readings[i][1];
+      trend = trend == null ? v : trend + alpha * (v - trend);
+      i += 1;
+    }
+    return trend == null ? null : Math.round(trend * 100) / 100;
+  });
+}
+
+/** The smoothed trend on `now`'s day, or null with no readings. */
+export function smoothedNow(byDay: ReadonlyMap<number, number>, now: number): number | null {
+  return smoothedSeries(byDay, [startOfDay(now)])[0];
+}
+
+/** The trend in the chosen mode now, and a week earlier, for the header line. */
+export function trendNow(byDay: ReadonlyMap<number, number>, now: number, mode: TrendMode): { current: number; weekAgo: number | null } | null {
+  if (mode === 'average') {
+    const a = weeklyAverages(byDay, now);
+    return a ? { current: a.current, weekAgo: a.previous } : null;
+  }
+  const current = smoothedNow(byDay, now);
+  if (current == null) return null;
+  return { current, weekAgo: smoothedNow(byDay, addDays(startOfDay(now), -AVERAGE_DAYS)) };
+}
+
+/** The trend's slope per week and its standard error, from the same 30-day fit as trendPerWeek. */
+export function trendFit(byDay: ReadonlyMap<number, number>, now: number, days: number = TREND_DAYS): { perWeek: number; sePerWeek: number } | null {
+  const today = startOfDay(now);
+  const since = addDays(today, -(days - 1));
+  const points: Array<[number, number]> = [];
+  for (const [day, v] of byDay) if (day >= since && day <= today) points.push([Math.round((day - since) / DAY_MS), v]);
+  if (points.length < MIN_TREND_POINTS) return null;
+  const n = points.length;
+  const mx = points.reduce((s, [x]) => s + x, 0) / n;
+  const my = points.reduce((s, [, y]) => s + y, 0) / n;
+  const sxx = points.reduce((s, [x]) => s + (x - mx) ** 2, 0);
+  if (sxx === 0) return null;
+  const slope = points.reduce((s, [x, y]) => s + (x - mx) * (y - my), 0) / sxx;
+  const residual = points.reduce((s, [x, y]) => s + (y - (my + slope * (x - mx))) ** 2, 0);
+  const se = Math.sqrt(residual / Math.max(1, n - 2) / sxx);
+  return { perWeek: slope * 7, sePerWeek: se * 7 };
+}
+
+/**
+ * The goal date as a range: the date at the fitted rate, and the dates at the
+ * rate one standard error faster and slower. `latest` is missing when the
+ * slower rate wouldn't reach the goal at all.
+ */
+export function projectGoalRange(
+  current: number,
+  goal: number,
+  fit: { perWeek: number; sePerWeek: number } | null,
+  now: number,
+): (GoalProjection & { earliest?: number; latest?: number }) | null {
+  const p = projectGoal(current, goal, fit?.perWeek ?? null, now);
+  if (!p || p.kind !== 'toward' || !fit) return p;
+  const gap = goal - current;
+  const at = (rate: number) => {
+    if (Math.sign(rate) !== Math.sign(gap) || Math.abs(rate) < FLAT_PER_WEEK) return undefined;
+    const weeks = gap / rate;
+    return weeks > 260 ? undefined : addDays(startOfDay(now), Math.round(weeks * 7));
+  };
+  const faster = fit.perWeek + Math.sign(fit.perWeek) * fit.sePerWeek;
+  const slower = fit.perWeek - Math.sign(fit.perWeek) * fit.sePerWeek;
+  return { ...p, earliest: at(faster), latest: at(slower) };
+}
+
+/** " (Feb 20 to Apr 30)", " (Feb 20 or later)" without a slower date, or "" when the range is a single day. */
+export function describeRange(p: { at: number; earliest?: number; latest?: number }): string {
+  const fmt = (ms: number) => {
+    const d = new Date(ms);
+    const sameYear = d.getFullYear() === new Date().getFullYear();
+    return d.toLocaleDateString(undefined, sameYear ? { month: 'short', day: 'numeric' } : { month: 'short', year: 'numeric' });
+  };
+  if (p.earliest == null || (p.latest != null && p.earliest === p.latest)) return '';
+  return p.latest != null ? ` (${fmt(p.earliest)} to ${fmt(p.latest)})` : ` (${fmt(p.earliest)} or later)`;
+}

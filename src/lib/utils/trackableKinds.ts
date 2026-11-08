@@ -1,7 +1,7 @@
 import type { FieldDefinition, TrackableDefinition, TrackableDisplayMode } from '../db';
 import { addDays, DAY_MS, formatDateTime, formatShortDate, startOfDay } from './time';
 import { computeFieldValuesByDay, formatTimeSinceAdaptive, type TimestampedValues } from './trackableStats';
-import { describeTrend, rollingAverage, trendPerWeek, weeklyAverages } from './measurement';
+import { describeTrend, rollingAverage, trendNow, trendPerWeek, type TrendMode } from './measurement';
 
 /**
  * What a trackable is, which decides what its card and detail page lead with.
@@ -148,11 +148,21 @@ function pickField(kind: TrackableKind, fields: readonly FieldDefinition[]): Fie
 }
 
 /** What the card and the detail header show for a trackable of this kind. */
+/** How a measurement reads its trend (3.54): the 7-day average or the smoothed trend, and whether it leads. Per device. */
+export interface MeasurementView {
+  trend: TrendMode;
+  /** Lead with the trend instead of the latest scale reading. */
+  leadWithTrend: boolean;
+}
+
+export const DEFAULT_MEASUREMENT_VIEW: MeasurementView = { trend: 'average', leadWithTrend: false };
+
 export function summarize(
   kind: TrackableKind,
   entries: readonly TimestampedValues[],
   fields: readonly FieldDefinition[],
   now: number = Date.now(),
+  view: MeasurementView = DEFAULT_MEASUREMENT_VIEW,
 ): KindSummary {
   const times = entries.map((e) => e.timestamp).sort((a, b) => a - b);
   const last = times.at(-1);
@@ -168,21 +178,26 @@ export function summarize(
       const sub: string[] = [];
       const subChanges: Array<number | null> = [];
       let cardAvg = '';
+      let trendValue: number | null = null;
       if (field.kind === 'number') {
-        // Through the noise: the 7-day average against the week before, and
-        // the 30-day trend (utils/measurement.ts), not one reading minus another.
+        // Through the noise: the 7-day average (or the smoothed trend) against
+        // the week before, and the 30-day trend (utils/measurement.ts), not one
+        // reading minus another.
         const byDay = computeFieldValuesByDay(entries as TimestampedValues[], field);
-        const averages = weeklyAverages(byDay, now);
-        if (averages) {
+        const t = trendNow(byDay, now, view.trend);
+        if (t) {
+          const delta = t.weekAgo == null ? null : t.current - t.weekAgo;
           const change =
-            averages.change == null
+            delta == null
               ? ''
-              : Math.abs(averages.change) < 0.05
+              : Math.abs(delta) < 0.05
                 ? ', same as the week before'
-                : `, ${averages.change > 0 ? '\u25b2' : '\u25bc'}${formatNumber(Math.abs(averages.change))} vs the week before`;
-          sub.push(`7-day average ${withUnit(field, averages.current)}${change}`);
-          subChanges.push(averages.change);
-          cardAvg = ` \u00b7 avg ${formatNumber(averages.current)}`;
+                : `, ${delta > 0 ? '\u25b2' : '\u25bc'}${formatNumber(Math.abs(delta))} vs the week before`;
+          const name = view.trend === 'smoothed' ? 'Smoothed trend' : '7-day average';
+          sub.push(`${name} ${withUnit(field, t.current)}${change}`);
+          subChanges.push(delta);
+          cardAvg = ` \u00b7 ${view.trend === 'smoothed' ? 'trend' : 'avg'} ${formatNumber(t.current)}`;
+          trendValue = t.current;
         }
         const perWeek = trendPerWeek(byDay, now);
         const trend = describeTrend(perWeek, field.unit);
@@ -190,6 +205,13 @@ export function summarize(
           sub.push(trend);
           subChanges.push(perWeek);
         }
+      }
+      // Leading with the trend (3.54) puts the scale reading second, for anyone a daily number upsets.
+      if (view.leadWithTrend && trendValue != null) {
+        sub.push(`Latest reading ${withUnit(field, v)}, ${formatDateTime(latest.timestamp)}`);
+        subChanges.push(null);
+        const trendText = withUnit(field, trendValue);
+        return { card: `trend ${trendText} \u00b7 ${since} ago`, label: `${field.name} trend`, value: trendText, sub, subChanges };
       }
       sub.push(formatDateTime(latest.timestamp));
       subChanges.push(null);

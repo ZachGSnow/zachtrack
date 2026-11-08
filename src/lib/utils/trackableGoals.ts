@@ -241,9 +241,12 @@ export function goalStatus(
 }
 
 /** The list card's line when a goal is set: the goal status first, then what the kind adds. */
-export function goalCardLine(status: GoalStatus, type: TrackableGoalType, kindCard: string): string {
-  if (type === 'dailyTotal' || type === 'perDay' || type === 'avoid') return status.streak ? `${status.text} \u00b7 ${status.streak}` : status.text;
-  return `${status.text} \u00b7 ${kindCard}`;
+export function goalCardLine(status: GoalStatus, type: TrackableGoalType, kindCard: string, strength?: number | null): string {
+  // Never zero (3.53): how established the habit is comes before the streak, which one missed day resets.
+  const strong = strength != null ? `${Math.round(strength * 100)}% strong` : null;
+  if (type === 'avoid') return status.streak ? `${status.text} \u00b7 ${status.streak}` : status.text;
+  if (type === 'dailyTotal' || type === 'perDay') return [status.text, strong, status.streak].filter(Boolean).join(' \u00b7 ');
+  return [status.text, strong ?? kindCard].filter(Boolean).join(' \u00b7 ');
 }
 
 export const GOAL_STATE_COLORS: Record<GoalState, string | undefined> = {

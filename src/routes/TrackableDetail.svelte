@@ -4,10 +4,12 @@
   import { push, link } from 'svelte-spa-router';
   import { db, type TrackableEntry, type FieldDefinition } from '../lib/db';
   import { computeFieldTodayTotal, computeFieldValuesByDay } from '../lib/utils/trackableStats';
-  import { changeTone, describeProjection, goalDirection, projectGoal, rollingAverage, trendPerWeek, weeklyAverages } from '../lib/utils/measurement';
+  import { changeTone, describeProjection, describeRange, goalDirection, projectGoalRange, trendFit, trendNow } from '../lib/utils/measurement';
+  import { measurementView } from '../lib/stores/measurementView.svelte';
   import { kindStats, resolveKind, summarize } from '../lib/utils/trackableKinds';
   import { describeGoal, GOAL_STATE_COLORS, goalStats, goalStatus } from '../lib/utils/trackableGoals';
-  import { trackableInsights } from '../lib/utils/insights';
+  import { goalFastFactor, trackableInsights } from '../lib/utils/insights';
+  import { goalMet } from '../lib/utils/fastingJourney';
   import { DATE_KIND_ITEM, DATE_KIND_LABELS, dateKindOf, describeDate } from '../lib/utils/dates';
   import { rangeStartFor, type ChartRange } from '../lib/utils/stats';
   import {
@@ -34,6 +36,7 @@
   import IntervalTrendChart from '../lib/components/charts/IntervalTrendChart.svelte';
   import HabitHistory from '../lib/components/HabitHistory.svelte';
   import HelpLink from '../lib/components/HelpLink.svelte';
+  import BackfillGrid from '../lib/components/BackfillGrid.svelte';
   import TrackableFieldsChart from '../lib/components/charts/TrackableFieldsChart.svelte';
 
   let { params }: { params: { id: string } } = $props();
@@ -53,6 +56,7 @@
   // For insights comparing this trackable with the others.
   const allTrackables = liveQuery(() => db.trackableDefinitions.toArray());
   const allEntries = liveQuery(() => db.trackableEntries.toArray());
+  const allFasts = liveQuery(() => db.fasts.toArray());
 
   type TrendsView = 'table' | 'chart';
 
@@ -137,7 +141,7 @@
     return () => clearInterval(timer);
   });
 
-  const summary = $derived(summarize(kind, $entries ?? [], attachedFields, now));
+  const summary = $derived(summarize(kind, $entries ?? [], attachedFields, now, measurementView.view));
   // A trackable with a goal shows how the goal is going; the rest show the kind's figures.
   const stats = $derived(($trackable && !isAges && goalStats($trackable, $entries ?? [], attachedFields, now)) || kindStats(kind, $entries ?? [], attachedFields, now));
   const goal = $derived($trackable && !isAges ? goalStatus($trackable, $entries ?? [], attachedFields, now) : null);
@@ -149,7 +153,7 @@
   const goodDirection = $derived.by(() => {
     const field = bodyFieldIds.weight ? attachedFields.find((f) => f.id === bodyFieldIds.weight) : undefined;
     if (kind !== 'measurement' || !field) return null;
-    return goalDirection(rollingAverage(computeFieldValuesByDay($entries ?? [], field), now), settingsStore.data.goalWeightLb);
+    return goalDirection(trendNow(computeFieldValuesByDay($entries ?? [], field), now, measurementView.view.trend)?.current, settingsStore.data.goalWeightLb);
   });
   const TONE = { good: 'text-brand', bad: 'text-warn' } as const;
   function toneClass(change: number | null | undefined): string {
@@ -162,9 +166,12 @@
     const field = bodyFieldIds.weight ? attachedFields.find((f) => f.id === bodyFieldIds.weight) : undefined;
     if (kind !== 'measurement' || !goalWeight || !field) return null;
     const byDay = computeFieldValuesByDay($entries ?? [], field);
-    const averages = weeklyAverages(byDay, now);
-    if (!averages) return null;
-    return describeProjection(projectGoal(averages.current, goalWeight, trendPerWeek(byDay, now), now), goalWeight, field.unit);
+    const t = trendNow(byDay, now, measurementView.view.trend);
+    if (!t) return null;
+    // The date as a range (3.54): at the fitted rate, and one standard error faster and slower.
+    const p = projectGoalRange(t.current, goalWeight, trendFit(byDay, now), now);
+    const text = describeProjection(p, goalWeight, field.unit);
+    return text && p?.kind === 'toward' ? `${text}${describeRange(p)}` : text;
   });
 
   /** Hides one comparison on every device (settings.mutedInsights, synced). Plain copies for IndexedDB (ARCHITECTURE.md 4.4). */
@@ -179,6 +186,9 @@
     const others = ($allTrackables ?? [])
       .filter((o) => o.id !== t.id && !o.archived && o.displayMode !== 'ages')
       .map((o) => ({ trackable: o, entries: ($allEntries ?? []).filter((e) => e.trackableId === o.id) }));
+    // Goal fasts count as a factor too (3.55), when there are any.
+    const fasting = goalFastFactor($allFasts ?? [], (f) => goalMet(f, now));
+    if (fasting.entries.length) others.push(fasting as (typeof others)[number]);
     return trackableInsights(t, $entries ?? [], attachedFields, others, now, new Set(settingsStore.data.mutedInsights ?? []));
   });
 
@@ -317,6 +327,22 @@
             {/if}
           </div>
 
+          {#if kind === 'measurement' && attachedFields.some((f) => f.kind === 'number')}
+            <!-- How a reading's trend is read, on this device (3.54). -->
+            <div class="-mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-text-muted" role="group" aria-label="Trend">
+              <SegmentedControl
+                label="Trend"
+                options={[{ id: 'average', label: '7-day average' }, { id: 'smoothed', label: 'Smoothed' }]}
+                value={measurementView.view.trend}
+                onchange={(trend) => measurementView.set({ trend })}
+              />
+              <label class="flex items-center gap-1.5">
+                <input type="checkbox" class="h-4 w-4" style="accent-color: var(--color-brand);" checked={measurementView.view.leadWithTrend} onchange={(e) => measurementView.set({ leadWithTrend: (e.target as HTMLInputElement).checked })} />
+                Lead with the trend
+              </label>
+            </div>
+          {/if}
+
           {#if goal && goalText}
             <div class="rounded-xl border p-3 border-border bg-surface">
               <div class="flex items-baseline justify-between gap-2">
@@ -410,7 +436,7 @@
             {#if showTrendsTable}
               <DataTable metrics={trendMetrics} {granularity} {rangeStart} />
             {:else}
-              <TrackableFieldsChart entries={$entries ?? []} fields={attachedFields} {range} weightFieldId={bodyFieldIds.weight} bodyFatByDay={trendMetrics.find((d) => d.id.endsWith(':navy-body-fat'))?.valuesByDay} />
+              <TrackableFieldsChart entries={$entries ?? []} fields={attachedFields} {range} weightFieldId={bodyFieldIds.weight} bodyFatByDay={trendMetrics.find((d) => d.id.endsWith(':navy-body-fat'))?.valuesByDay} trendMode={measurementView.view.trend} hideReadings={measurementView.view.leadWithTrend} />
             {/if}
           </div>
 
@@ -419,6 +445,8 @@
             <OccurrenceBucketChart entries={$entries ?? []} {range} color={$trackable.color} />
             <IntervalTrendChart entries={$entries ?? []} color={$trackable.color} />
           {/if}
+
+          <BackfillGrid trackable={$trackable} fields={attachedFields} entries={$entries ?? []} />
 
           <TagFilter items={$entries ?? []} bind:selected={tagFilter} />
           <EntriesTable entries={listedEntries} fields={attachedFields} onSelect={openLogEdit} />

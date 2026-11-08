@@ -1,7 +1,7 @@
 <script lang="ts">
   import { link } from 'svelte-spa-router';
   import type { FastRecord, FieldDefinition, TrackableDefinition, TrackableEntry } from '../db';
-  import { trackableInsights } from '../utils/insights';
+  import { goalFastFactor, trackableInsights } from '../utils/insights';
   import { settingsStore } from '../stores/settings.svelte';
   import { goalStatus } from '../utils/trackableGoals';
   import { computeFastStats } from '../utils/stats';
@@ -35,7 +35,10 @@
   const muted = $derived(new Set(settingsStore.data.mutedInsights ?? []));
 
   const rows = $derived.by(() => {
-    const others = tracked.map((t) => ({ trackable: t, entries: byTrackable.get(t.id) ?? [] }));
+    const others: Array<{ trackable: Pick<TrackableDefinition, 'id' | 'name' | 'insightsHidden'>; entries: TrackableEntry[] | { timestamp: number }[] }> = tracked.map((t) => ({ trackable: t, entries: byTrackable.get(t.id) ?? [] }));
+    // Goal fasts as a factor (3.55).
+    const fasting = goalFastFactor(fasts, (f) => goalMet(f, now));
+    if (fasting.entries.length) others.push(fasting);
     return tracked
       .map((t) => {
         const own = byTrackable.get(t.id) ?? [];

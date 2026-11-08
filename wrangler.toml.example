@@ -19,3 +19,9 @@ ACCESS_TEAM_DOMAIN = "your-team.cloudflareaccess.com"
 # Optional but recommended: the Access application's AUD tag
 # (Zero Trust > Access > Applications > your app > Overview).
 # ACCESS_AUD = "<your-access-aud-tag>"
+
+# Optional: the nightly backup bucket (README "Backups"), so Today can say when the
+# last server backup ran (/api/backup-status). Leave it out if you don't run the backup Worker.
+# [[r2_buckets]]
+# binding = "BACKUPS"
+# bucket_name = "zachtrack-backups"

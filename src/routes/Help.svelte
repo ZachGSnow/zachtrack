@@ -19,6 +19,7 @@
     { id: 'insights', title: 'Insights' },
     { id: 'fasting', title: 'Fasting' },
     { id: 'data', title: 'Tables, comparing and your files' },
+    { id: 'keyboard', title: 'On a laptop: keyboard shortcuts and filling in past days' },
     { id: 'sync', title: 'Sync and privacy' },
     { id: 'sync-page', title: 'Your devices, checking sync and signing out' },
   ];
@@ -87,13 +88,18 @@
       </p>
       <ul>
         <li>
+          <strong>Since you were last here:</strong> after half a day or more away, a short list of what happened meanwhile: a fast
+          that reached its goal, daily goals missed, dates that went by, and changes that synced in from your other devices.
+          Dismiss hides it until the next time.
+        </li>
+        <li>
           <strong>Fasting:</strong> the running fast with its goal progress and zone, or, between fasts, your eating window and
           when the next fast is due, with one tap to start today's method (from your weekly plan, else the default). "More
           options" opens the timer for starting earlier or picking another method.
         </li>
         <li>
           <strong>Habits:</strong> every trackable with a goal, most urgent first, each with where it stands, its streak, how
-          strong the habit is, and its check button. They're grouped into morning, afternoon and evening by when you usually log
+          strong the habit is (shown first, since a missed day only dents it), and its check button. They're grouped into morning, afternoon and evening by when you usually log
           them. Done ones sink to the bottom; rest, skipped and paused days are greyed out and don't count. A trackable you log
           most days without a goal gets a suggested one, with "Not now" to hide it for a month.
         </li>
@@ -102,14 +108,25 @@
           little instead of resetting it, like a streak would. Rest, skipped and paused days leave it alone.
         </li>
         <li>
+          <strong>A habit that slipped:</strong> when a habit that was going well has gone a week without being met, a card offers
+          three ways back instead of a broken streak: pause it for a week, make the goal smaller for now, or start again. "Not
+          now" hides it for two weeks.
+        </li>
+        <li>
           <strong>Weekly review:</strong> on Sundays (the week so far) and Mondays (the week just ended), habits met, your weight's
           7-day average against the week before, and fasts. Dismiss hides it until next week.
         </li>
         <li>
           <strong>Log:</strong> the trackables without a goal that you've logged in the last 30 days, with their latest reading
-          and a "+". Anything quieter than that stays on the Trackables list.
+          and a "+". A reading like Weight has a box to type into and press Enter, and a check-in has its rating as taps, so
+          the usual entries take no sheet at all. Anything quieter than that stays on the Trackables list.
         </li>
         <li><strong>Coming up:</strong> the next two weeks of birthdays, anniversaries, holidays and countdowns.</li>
+        <li>
+          <strong>Your data:</strong> whether your entries are safe: when this device last synced, when the server last made its
+          nightly backup, and when you last exported a file here. It turns amber when this device holds the only copy or a
+          backup is overdue, with a button to export one now.
+        </li>
       </ul>
     </section>
 
@@ -125,7 +142,10 @@
           <strong>Latest value:</strong> a reading like Weight. With a goal weight in Settings, changes toward it are green and
           away from it amber, and the chart draws the 7-day average through your readings. Shows the latest value, then its 7-day average against the week
           before and the trend per week over 30 days, so one high morning doesn't read as a gain. A new entry starts from your
-          last readings: change what moved.
+          last readings: change what moved. On its page, <strong>Trend</strong> picks a 7-day average or a smoothed trend (a
+          weighted average where each reading moves it a little, so it follows you without jumping), and "Lead with the trend"
+          shows the trend first and the scale's reading second. With a goal weight, the page says when you'd reach it as a
+          range of dates, since the pace wobbles.
         </li>
         <li><strong>Daily total:</strong> a field that adds up, like Calories or Water. Shows today's total and your daily average.</li>
         <li><strong>Check-in:</strong> a rating or yes/no. Shows whether you logged today and your streak.</li>
@@ -180,7 +200,9 @@
         <li>
           <strong>Export to calendar</strong> on the Dates page downloads an .ics file. Import it into Google Calendar (Settings >
           Import) or any calendar app: birthdays, anniversaries and holidays repeat there on their own. The file is made on
-          your device; nothing is uploaded. Importing again later adds copies, so delete the old calendar first.
+          your device; nothing is uploaded. Importing again later adds copies, so delete the old calendar first. Tick
+          "with reminders" to add an alert to each one, as many days ahead as its own reminder in the app. A February 29 birthday
+          falls on February 28 in other years.
         </li>
       </ul>
     </section>
@@ -245,7 +267,8 @@
         <li>
           <strong>On days with:</strong> how its value (its first rating or number field, or whether you logged it) differs on days
           you also logged another trackable, with the number of days on each side. "On days after" does the same for the day
-          after, like a late meal in the next morning's weight.
+          after, like a late meal in the next morning's weight. "On days with a goal fast" compares days a fast that met its goal
+          ended against the rest.
         </li>
         <li>
           <strong>Hide</strong> next to a comparison hides it on every device; Settings > Hidden comparisons brings it back. To keep
@@ -317,6 +340,27 @@
         Settings > Your data: <strong>Export data</strong> saves everything as a JSON file, the one to restore from;
         <strong>Import file</strong> merges one back in (it never deletes); <strong>Export CSV</strong> gives one row per value
         for a spreadsheet. These files are your health data, so keep them somewhere private.
+      </p>
+      <p>
+        <strong>Weigh-ins from a scale app:</strong> the app can't read Apple Health or Health Connect, so it takes the CSV file
+        your scale's app exports instead (Renpho, Withings, Fitbit, Garmin, Eufy, Google Fit and the like). It finds the date and
+        weight columns itself, converts kg or stone to your unit, shows what it will add, and leaves out days you already
+        logged the same weight.
+      </p>
+    </section>
+
+    <section id="help-keyboard">
+      <h2>On a laptop: keyboard shortcuts and filling in past days</h2>
+      <p class="mb-2">
+        Single keys move around when you aren't typing in a box: <kbd>T</kbd> Today, <kbd>F</kbd> the fasting timer,
+        <kbd>J</kbd> Journey, <kbd>H</kbd> fasting History, <kbd>L</kbd> the Trackables list, <kbd>D</kbd> Dates,
+        <kbd>I</kbd> Insights, <kbd>S</kbd> Settings, <kbd>W</kbd> a weigh-in, and <kbd>?</kbd> shows the list. They never use
+        Ctrl, Alt or Cmd, so the browser's own shortcuts still work.
+      </p>
+      <p>
+        <strong>Fill in past days</strong> on a trackable's page opens a table of the last 7 or 14 days with a cell for each
+        field, for catching up after a trip in one go. Tab moves between cells, each filled day becomes one entry at noon, and
+        the last column shows what a day already has.
       </p>
     </section>
 

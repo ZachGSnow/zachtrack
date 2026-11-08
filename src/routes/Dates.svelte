@@ -34,8 +34,11 @@
   const datesTrackables = $derived(($trackables ?? []).filter((t) => !t.archived && t.displayMode === 'ages'));
 
   // Every date as an .ics file (utils/ics.ts), made here and downloaded; nothing is uploaded.
+  // Reminders in the file let the phone's own calendar alert, at each trackable's lead time (3.56).
+  let withReminders = $state(false);
+
   function exportCalendar() {
-    const ics = datesToIcs($trackables ?? [], $entries ?? [], Date.now());
+    const ics = datesToIcs($trackables ?? [], $entries ?? [], Date.now(), { reminders: withReminders });
     const url = URL.createObjectURL(new Blob([ics], { type: 'text/calendar;charset=utf-8' }));
     const a = document.createElement('a');
     a.href = url;
@@ -125,6 +128,10 @@
     <div class="-mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-text-muted">
       <button class="whitespace-nowrap font-semibold text-brand" onclick={exportCalendar}>Export to calendar</button>
       <span>for Google Calendar or any calendar app</span>
+      <label class="flex items-center gap-1 whitespace-nowrap">
+        <input type="checkbox" bind:checked={withReminders} class="h-3.5 w-3.5" style="accent-color: var(--color-brand);" />
+        with reminders
+      </label>
     </div>
   {/if}
 

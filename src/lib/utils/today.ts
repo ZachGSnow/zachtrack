@@ -1,8 +1,9 @@
 import type { FieldDefinition, TrackableDefinition, TrackableEntry } from '../db';
-import { goalStatus, offDayReason, type GoalStatus } from './trackableGoals';
-import { resolveKind, summarize, type TrackableKind } from './trackableKinds';
+import { goalField, goalStatus, offDayReason, type GoalStatus } from './trackableGoals';
+import { computeFieldValuesByDay } from './trackableStats';
+import { resolveKind, summarize, type MeasurementView, type TrackableKind } from './trackableKinds';
 import { upcomingDates, type DateItem } from './dates';
-import { DAY_MS, startOfDay } from './time';
+import { addDays, DAY_MS, startOfDay } from './time';
 
 // What the Today screen shows (routes/Today.svelte): the habits with a goal,
 // the trackables you've been logging lately, and the dates coming up. Pure,
@@ -88,6 +89,7 @@ export function todayLogs(
   entries: readonly TrackableEntry[],
   now: number,
   days: number = LOG_RECENT_DAYS,
+  view?: MeasurementView,
 ): TodayLog[] {
   const byId = entriesByTrackable(entries);
   const since = now - days * DAY_MS;
@@ -100,7 +102,7 @@ export function todayLogs(
     const own = (byId.get(t.id) ?? []).filter((e) => e.timestamp <= now);
     const lastAt = own.reduce((max, e) => Math.max(max, e.timestamp), 0);
     if (lastAt < since) continue;
-    logs.push({ trackable: t, fields: attached, entries: own, kind, summary: summarize(kind, own, attached, now).card, lastAt });
+    logs.push({ trackable: t, fields: attached, entries: own, kind, summary: summarize(kind, own, attached, now, view).card, lastAt });
   }
   return logs.sort((a, b) => b.lastAt - a.lastAt || a.trackable.name.localeCompare(b.trackable.name));
 }
@@ -204,4 +206,65 @@ export function groupByTimeOfDay(habits: readonly TodayHabit[], now: number): Ar
     groups.set(t, [...(groups.get(t) ?? []), h]);
   }
   return TIME_OF_DAY_ORDER.filter((t) => groups.has(t)).map((time) => ({ time, habits: groups.get(time)! }));
+}
+
+// ---------------------------------------------------------------------------
+// Lapsed habits (3.53): a habit that was going well and has stopped gets a
+// gentle card on Today offering to pause it, lower the goal, or start again,
+// instead of a streak quietly reading zero.
+// ---------------------------------------------------------------------------
+
+export interface LapsedHabit {
+  habit: TodayHabit;
+  /** Days met of the scheduled ones before the lapse, e.g. 22 of 30. */
+  before: { met: number; of: number };
+  /** A lower goal to offer, when there is one. */
+  lowerTo?: number;
+}
+
+/** The last LAPSE_DAYS scheduled days with nothing met, after at least half met in the BEFORE_DAYS before them. */
+export const LAPSE_DAYS = 7;
+const BEFORE_DAYS = 30;
+
+export function lapsedHabits(habits: readonly TodayHabit[], now: number): LapsedHabit[] {
+  const today = startOfDay(now);
+  const out: LapsedHabit[] = [];
+  for (const h of habits) {
+    const t = h.trackable;
+    if (h.offDay || (t.goalType !== 'perDay' && t.goalType !== 'dailyTotal') || !t.goalValue) continue;
+    const met = metOn(h);
+    // From whichever is first, the trackable or its entries (an import can bring older ones).
+    const since = Math.min(startOfDay(t.createdAt), ...h.entries.map((e) => startOfDay(e.timestamp)));
+    const window = (from: number, days: number) => {
+      let m = 0;
+      let of = 0;
+      for (let i = 1; i <= days; i++) {
+        const day = addDays(today, -(from + i));
+        if (offDayReason(t, day) || day < since) continue;
+        of += 1;
+        if (met(day)) m += 1;
+      }
+      return { met: m, of };
+    };
+    const recent = window(0, LAPSE_DAYS);
+    const before = window(LAPSE_DAYS, BEFORE_DAYS);
+    if (recent.of >= 3 && recent.met === 0 && before.of >= 7 && before.met * 2 >= before.of) {
+      const lowerTo = t.goalType === 'perDay' ? (t.goalValue > 1 ? t.goalValue - 1 : undefined) : Math.round(t.goalValue * 0.75);
+      out.push({ habit: h, before, ...(lowerTo && lowerTo < t.goalValue ? { lowerTo } : {}) });
+    }
+  }
+  return out;
+}
+
+/** Whether a daily goal was met on a day: its field's total, or how many entries. */
+function metOn(h: TodayHabit): (day: number) => boolean {
+  const t = h.trackable;
+  const field = t.goalType === 'dailyTotal' ? goalField(h.fields) : undefined;
+  if (field) {
+    const totals = computeFieldValuesByDay(h.entries, field);
+    return (day) => (totals.get(day) ?? 0) >= t.goalValue!;
+  }
+  const counts = new Map<number, number>();
+  for (const e of h.entries) counts.set(startOfDay(e.timestamp), (counts.get(startOfDay(e.timestamp)) ?? 0) + 1);
+  return (day) => (counts.get(day) ?? 0) >= t.goalValue!;
 }

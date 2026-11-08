@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { FieldDefinition } from '../src/lib/db';
-import { insightKey, trackableInsights } from '../src/lib/utils/insights';
+import { GOAL_FAST_ID, goalFastFactor, insightKey, trackableInsights } from '../src/lib/utils/insights';
 import type { TimestampedValues } from '../src/lib/utils/trackableStats';
 
 // America/New_York (vitest config). 2026-10-26 is a Monday.
@@ -115,5 +115,26 @@ describe('insight controls', () => {
     expect(comparisons(trackableInsights(base, entries, [mood], [{ trackable: { id: 'g', name: 'Gym', insightsHidden: true }, entries: gym }], NOW))).toEqual([]);
     // The other insights stay.
     expect(trackableInsights({ ...base, insightsHidden: true }, entries, [mood], others, NOW).find((i) => i.label === 'Last 30 days')).toBeTruthy();
+  });
+});
+
+describe('fasting as a factor', () => {
+  it('compares a value the day after a goal fast with other days', () => {
+    // Weight every morning for 40 days, 1 lb lower the morning after an evening goal fast (every other day).
+    const weight: FieldDefinition = { id: 'f-w', name: 'Weight', kind: 'number', unit: 'lb', createdAt: 1, updatedAt: 1 };
+    const fasts: Array<{ startTime: number; endTime: number; targetHours: number }> = [];
+    const entries: TimestampedValues[] = [];
+    for (let n = 0; n < 41; n++) {
+      if (n % 2 === 0 && n > 0) fasts.push({ startTime: daysAgo(n, 20), endTime: daysAgo(n, 20) + 16 * 3600_000, targetHours: 16 });
+      if (n < 40) entries.push({ timestamp: daysAgo(n, 7), values: { 'f-w': (n + 1) % 2 === 0 ? 189 : 190 } });
+    }
+    const factor = goalFastFactor(fasts, () => true);
+    expect(factor.trackable.id).toBe(GOAL_FAST_ID);
+    const insights = trackableInsights({ ...base, name: 'Body' }, entries, [weight], [factor], NOW);
+    const after = insights.find((i) => i.label === 'On days after')!;
+    expect(after.text).toMatch(/^Weight averages 189 lb after a goal fast \(\d+ days\), 190 lb otherwise \(\d+\)$/);
+    expect(after.key).toBe(insightKey('t', GOAL_FAST_ID, 1));
+    // Running fasts and ones that missed their goal don't count.
+    expect(goalFastFactor([{ startTime: 1 }, { startTime: 2, endTime: 3 }], (f) => f.startTime === 2).entries).toEqual([{ timestamp: 2 }]);
   });
 });

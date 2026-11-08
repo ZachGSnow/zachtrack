@@ -1,7 +1,11 @@
 <script lang="ts">
-  import Router, { link } from 'svelte-spa-router';
+  import Router, { link, push } from 'svelte-spa-router';
   import { wrap } from 'svelte-spa-router/wrap';
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
+  import { SHORTCUTS, shortcutFor } from './lib/utils/keyboard';
+  import { weighInTrackable } from './lib/weighIn';
+  import { quickLog } from './lib/stores/quickLog.svelte';
+  import BottomSheet from './lib/components/BottomSheet.svelte';
   import CircleHelp from '@lucide/svelte/icons/circle-help';
   import Settings from '@lucide/svelte/icons/settings';
   import BottomNav from './lib/components/BottomNav.svelte';
@@ -15,6 +19,7 @@
   import { syncStore } from './lib/stores/sync.svelte';
   import { attentionStore } from './lib/stores/attention.svelte';
   import { starterStore } from './lib/stores/starter.svelte';
+  import { visitStore } from './lib/stores/visit.svelte';
   import ZoneInfoSheet from './lib/components/ZoneInfoSheet.svelte';
   import SyncStatus from './lib/components/SyncStatus.svelte';
 
@@ -40,6 +45,7 @@
     fastTimer.init();
     settingsStore.init();
     attentionStore.init();
+    visitStore.init();
     // Try an initial sync pull before offering the starter set, so a second
     // device picks up trackables/fields another device already created and
     // synced instead of being offered a duplicate set. If the server is there
@@ -53,7 +59,28 @@
       }
     })();
   });
+
+  // Keyboard shortcuts on a laptop (utils/keyboard.ts): a key to each page, W for a weigh-in, ? for the list.
+  let shortcutsOpen = $state(false);
+  async function onKey(e: KeyboardEvent) {
+    if (shortcutsOpen && e.key !== '?') return;
+    const action = shortcutFor({ key: e.key, ctrlKey: e.ctrlKey, metaKey: e.metaKey, altKey: e.altKey, target: e.target as HTMLElement | null, defaultPrevented: e.defaultPrevented });
+    if (!action || document.querySelector('[role="dialog"]') && action.type !== 'help') return;
+    e.preventDefault();
+    if (action.type === 'go') push(action.href);
+    else if (action.type === 'help') shortcutsOpen = !shortcutsOpen;
+    else {
+      const holder = await weighInTrackable(settingsStore.data);
+      if (!holder) return;
+      // Today hosts the entry sheet.
+      push('/');
+      await tick();
+      void quickLog.log(holder);
+    }
+  }
 </script>
+
+<svelte:window onkeydown={onKey} />
 
 <!-- Phone: one column at phone width with tabs at the bottom. From lg (1024px) up:
      a sidebar and content that uses the width, up to 1400px. -->
@@ -85,3 +112,18 @@
 </div>
 
 <ZoneInfoSheet />
+
+<BottomSheet bind:open={shortcutsOpen}>
+  <div class="space-y-3">
+    <h2 class="text-lg font-semibold text-text">Keyboard shortcuts</h2>
+    <ul class="grid grid-cols-1 gap-1 text-sm sm:grid-cols-2" aria-label="Keyboard shortcuts">
+      {#each SHORTCUTS as s (s.key)}
+        <li class="flex items-center gap-3">
+          <kbd class="inline-flex h-7 min-w-7 items-center justify-center rounded-md border border-border bg-surface-2 px-1.5 font-mono text-xs text-text">{s.key.toUpperCase()}</kbd>
+          <span class="text-text">{s.label}</span>
+        </li>
+      {/each}
+    </ul>
+    <p class="text-xs text-text-muted">Not while typing in a box. Esc closes a sheet.</p>
+  </div>
+</BottomSheet>

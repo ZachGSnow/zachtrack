@@ -2,7 +2,7 @@
   import type { EChartsOption } from 'echarts';
   import type { FieldDefinition, TrackableEntry } from '../../db';
   import { computeFieldSeries, computeFieldValuesByDay, fieldSeriesDays } from '../../utils/trackableStats';
-  import { rollingSeries } from '../../utils/measurement';
+  import { rollingSeries, smoothedSeries, type TrendMode } from '../../utils/measurement';
   import type { ChartRange } from '../../utils/stats';
   import { computeBMI } from '../../utils/health';
   import { BODY_FAT_COLOR } from '../../utils/metrics';
@@ -18,6 +18,8 @@
     range,
     weightFieldId,
     bodyFatByDay,
+    trendMode = 'average',
+    hideReadings = false,
   }: {
     entries: TrackableEntry[];
     fields: FieldDefinition[];
@@ -25,6 +27,10 @@
     weightFieldId?: string;
     /** Navy body-fat % by day, when it can be worked out (see buildNavyBodyFatMetric). */
     bodyFatByDay?: Map<number, number>;
+    /** The weight field's trend line: the 7-day average or the smoothed trend (3.54). */
+    trendMode?: TrendMode;
+    /** Leave the daily readings out and draw only the trend. */
+    hideReadings?: boolean;
   } = $props();
 
 
@@ -77,7 +83,9 @@
   // The weight field draws its 7-day average as a line through the day's readings (dots), so
   // one heavy morning reads as noise against the trend (utils/measurement.ts).
   const weightAverage = $derived(
-    weightField ? rollingSeries(computeFieldValuesByDay(entries, weightField), fieldSeriesDays(entries, weightField, range)) : null,
+    weightField
+      ? (trendMode === 'smoothed' ? smoothedSeries : rollingSeries)(computeFieldValuesByDay(entries, weightField), fieldSeriesDays(entries, weightField, range))
+      : null,
   );
 
   const categories = $derived(fields.length ? (fieldSeriesById.get(fields[0].id)?.categories ?? []) : []);
@@ -106,11 +114,11 @@
           data: fieldSeriesById.get(f.id)?.values ?? [],
           smooth: false,
           connectNulls: true,
-          showSymbol: true,
+          showSymbol: !(isWeight && hideReadings),
           symbolSize: isWeight ? 6 : 5,
           itemStyle: { color: colorFor(f) },
-          // The weight field's readings are dots on a faint line; its average is the bold line.
-          lineStyle: { color: colorFor(f), width: isWeight ? 1 : 2, opacity: isWeight ? 0.25 : 1 },
+          // The weight field's readings are dots on a faint line (or hidden); its trend is the bold line.
+          lineStyle: { color: colorFor(f), width: isWeight ? 1 : 2, opacity: isWeight ? (hideReadings ? 0 : 0.25) : 1 },
           ...(f.id === weightField?.id && settingsStore.data.goalWeightLb
             ? {
                 markLine: {
@@ -126,7 +134,7 @@
           return [
             base,
             {
-              name: `${f.name} 7-day avg`,
+              name: `${f.name} ${trendMode === 'smoothed' ? 'trend' : '7-day avg'}`,
               type: 'line' as const,
               data: weightAverage,
               smooth: true,

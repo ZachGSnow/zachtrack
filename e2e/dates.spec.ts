@@ -78,6 +78,13 @@ test('the US holiday pack adds holidays that follow their rules', async ({ page 
   expect(ics.startsWith('BEGIN:VCALENDAR')).toBe(true);
   expect(ics).toContain('SUMMARY:Thanksgiving');
   expect(ics).toContain('BYMONTH=11;BYDAY=4TH');
+  expect(ics).not.toContain('VALARM');
+
+  // With reminders, each event gets an alarm at the trackable's lead time (3 days for holidays).
+  await page.getByRole('checkbox', { name: 'with reminders' }).check();
+  const [again] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Export to calendar' }).click()]);
+  const withAlarms = await (await again.createReadStream()).toArray().then((chunks) => Buffer.concat(chunks).toString('utf8'));
+  expect(withAlarms).toContain('TRIGGER:-P3D');
 });
 
 test('a renewal repeats every few years, and a one-off date that passed moves to Past', async ({ page }) => {

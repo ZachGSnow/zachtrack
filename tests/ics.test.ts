@@ -65,3 +65,23 @@ describe('calendar export', () => {
     expect(escapeText('a;b,c\\d\ne')).toBe('a\\;b\\,c\\\\d\\ne');
   });
 });
+
+describe('calendar export extras', () => {
+  it('repeats a Feb 29 birthday on the last day of February', () => {
+    const ics = datesToIcs([trackables[0]], [{ id: 'leap', trackableId: 'b', timestamp: day(2000, 2, 29), note: 'Leap' }], NOW);
+    expect(ics).toContain('DTSTART;VALUE=DATE:20000229');
+    expect(ics).toContain('RRULE:FREQ=YEARLY;BYMONTH=2;BYMONTHDAY=-1');
+  });
+
+  it('adds reminders at each trackable\'s lead time only when asked', () => {
+    const t = [{ ...trackables[0], dateLeadDays: 3 }, { ...trackables[2], dateLeadDays: 0 }];
+    const e = [entries[0], { ...entries[2] }];
+    expect(datesToIcs(t, e, NOW)).not.toContain('VALARM');
+    const ics = datesToIcs(t, e, NOW, { reminders: true });
+    const alex = ics.split('BEGIN:VEVENT').find((x) => x.includes('UID:e1@'))!;
+    expect(alex).toContain('BEGIN:VALARM');
+    expect(alex).toContain('TRIGGER:-P3D');
+    const thanks = ics.split('BEGIN:VEVENT').find((x) => x.includes('UID:e3@'))!;
+    expect(thanks).toContain('TRIGGER:PT9H');
+  });
+});

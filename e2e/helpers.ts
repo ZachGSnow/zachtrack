@@ -91,7 +91,7 @@ export async function importSampleData(page: Page) {
   await waitForStarterSet(page);
   const file = buildSampleExport(await readStarterDefinitions(page), new Date());
   await openSettings(page);
-  await page.locator('input[type=file]').setInputFiles({
+  await page.locator('input[type=file][accept*=json]').setInputFiles({
     name: 'sample-export.json',
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify(file)),

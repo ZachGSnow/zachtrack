@@ -11,6 +11,8 @@ export interface Env {
   ACCESS_TEAM_DOMAIN?: string;
   /** The Access application's AUD tag. Optional, checked when set. */
   ACCESS_AUD?: string;
+  /** The nightly backup bucket, read-only use: /api/backup-status lists it. Optional. */
+  BACKUPS?: R2Bucket;
 }
 
 export function jsonResponse(body: unknown, status = 200): Response {
