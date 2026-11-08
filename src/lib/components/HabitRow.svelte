@@ -2,7 +2,7 @@
   import { link } from 'svelte-spa-router';
   import type { TodayHabit } from '../utils/today';
   import { checkState } from '../utils/quickCheck';
-  import { GOAL_STATE_COLORS } from '../utils/trackableGoals';
+  import { GOAL_STATE_COLORS, habitStrength } from '../utils/trackableGoals';
   import { readableGraphic } from '../utils/color';
   import { themeStore } from '../stores/theme.svelte';
   import { quickLog } from '../stores/quickLog.svelte';
@@ -18,6 +18,12 @@
   const OFF: Record<NonNullable<TodayHabit['offDay']>, string> = { rest: 'Rest day', skipped: 'Skipped today', paused: 'Paused' };
   const line = $derived(habit.offDay ? OFF[habit.offDay] : (habit.goal?.text ?? ''));
   const color = $derived(habit.offDay ? undefined : GOAL_STATE_COLORS[habit.goal?.state ?? 'ok']);
+  // How established it is (utils/trackableGoals.ts habitStrength), next to the streak.
+  const strength = $derived(habitStrength(t, habit.entries, habit.fields, now));
+  const extras = $derived(
+    // Strength once there's something logged; a brand-new habit at 0% would only discourage.
+    habit.offDay ? [] : [habit.goal?.streak, strength != null && habit.entries.length > 0 ? `${Math.round(strength * 100)}% strong` : undefined].filter(Boolean),
+  );
 </script>
 
 <li class="flex items-center gap-3 py-1.5" class:opacity-60={habit.offDay != null}>
@@ -26,7 +32,7 @@
     <span class="min-w-0">
       <span class="block truncate text-sm font-medium text-text">{t.name}</span>
       <span class="block truncate text-xs text-text-muted" style={color ? `color: ${color};` : ''}>
-        {line}{habit.goal?.streak && !habit.offDay ? ` \u00b7 ${habit.goal.streak}` : ''}
+        {[line, ...extras].join(' \u00b7 ')}
       </span>
     </span>
   </a>

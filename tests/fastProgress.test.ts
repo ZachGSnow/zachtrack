@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { endSummary, fastTimeline, latestMilestone, longFastGuidance, refeedingNote, startedAgo } from '../src/lib/utils/fastProgress';
+import { endSummary, fastTimeline, latestMilestone, longFastGuidance, refeedingNote, startedAgo, waterServing, waterTarget } from '../src/lib/utils/fastProgress';
 
 // America/New_York (vitest config).
 const oct = (d: number, h: number, m = 0) => new Date(2026, 9, d, h, m).getTime();
@@ -73,5 +73,25 @@ describe('long fasts', () => {
   it('refeeding advice for a fast of a day or more', () => {
     expect(refeedingNote(23.9)).toBeNull();
     expect(refeedingNote(24)).toMatch(/^Break a fast this long gently/);
+  });
+});
+
+describe('water during a long fast', () => {
+  it("sizes a glass in the field's unit", () => {
+    expect(waterServing('oz')).toBe(16);
+    expect(waterServing('ml')).toBe(500);
+    expect(waterServing('L')).toBe(0.5);
+    expect(waterServing('cups')).toBe(2);
+    expect(waterServing('kcal')).toBeNull();
+    expect(waterServing(undefined)).toBeNull();
+  });
+
+  it('finds the Water field that adds up, in a trackable still in use', () => {
+    const water = { id: 'w', name: 'Water', kind: 'number', unit: 'oz', aggregation: 'sum' };
+    const nutrition = { id: 'n', fieldIds: ['c', 'w'] };
+    expect(waterTarget([water], [nutrition])).toEqual({ field: water, trackable: nutrition, amount: 16 });
+    expect(waterTarget([{ ...water, aggregation: 'last' }], [nutrition])).toBeNull();
+    expect(waterTarget([water], [{ ...nutrition, archived: true }])).toBeNull();
+    expect(waterTarget([{ ...water, unit: 'glasses' }], [nutrition])).toBeNull();
   });
 });

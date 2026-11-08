@@ -147,9 +147,33 @@ test('a long fast shows hydration and the 48-hour caution, and ending it says ho
   await expect(card).toContainText('electrolytes');
   await expect(card).toContainText('Past 48 hours');
   await expect(card).toContainText('General information, not medical advice.');
+  // A glass of water in one tap, into the starter Nutrition trackable's Water field (oz).
+  await card.getByRole('button', { name: 'Log 16 oz water' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Logged 16 oz water' })).toBeVisible();
 
   await page.getByRole('button', { name: 'End Fast' }).click();
   await expect(page.getByLabel('Fast summary')).toContainText('Break a fast this long gently');
+});
+
+test('History has a month calendar with weekly totals, and a day opens its fast', async ({ page }) => {
+  await page.goto('/#/history');
+  await page.getByRole('button', { name: '+ Log a past fast' }).click();
+  await page.getByRole('button', { name: '16:8', exact: true }).click();
+  await page.getByLabel('Started', { exact: true }).fill(await hoursAgo(page, 20));
+  await page.getByLabel('Ended', { exact: true }).fill(await hoursAgo(page, 3));
+  await page.getByRole('button', { name: 'Save fast' }).click();
+  await expect(page.getByText('Duration: 17h')).toBeVisible();
+
+  const calendar = page.getByRole('region', { name: 'Fasting calendar' });
+  await expect(calendar.getByRole('group', { name: 'Days' })).toBeVisible();
+  await expect(calendar.getByRole('list', { name: 'Weekly totals' })).toContainText('1/1');
+  await expect(calendar.getByRole('button', { name: 'Next month' })).toBeDisabled();
+  // The fast's start day has an entry; tapping it opens the fast.
+  await calendar.getByRole('button', { name: /1 entry/ }).first().click();
+  await expect(page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: '16:8' }) })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await calendar.getByRole('button', { name: 'Previous month' }).click();
+  await expect(calendar.getByRole('button', { name: 'Next month' })).toBeEnabled();
 });
 
 test('between fasts the week strip shows the plan, the zones hide behind a link, and a lapse offers a gentler restart', async ({ page }) => {

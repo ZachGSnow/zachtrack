@@ -233,6 +233,8 @@ export const GOAL_STATE_COLORS: Record<GoalState, string | undefined> = {
 export interface GoalStat {
   label: string;
   value: string;
+  /** Unused for goals; shared shape with a kind's stat tile (trackableKinds.KindStat). */
+  change?: number;
 }
 
 const plural = (n: number, word: string) => `${n} ${n === 1 ? word : `${word}s`}`;
@@ -263,6 +265,11 @@ export function goalStats(
   const times = entries.map((e) => e.timestamp).sort((a, b) => a - b);
   const dash = '\u2014';
   const since30 = addDays(today, -29);
+  // How established the habit is (habitStrength below), first on every goal but avoid.
+  const strengthTile = (): GoalStat => {
+    const strength = habitStrength(trackable, entries, fields, now);
+    return { label: 'Strength', value: strength == null ? dash : `${Math.round(strength * 100)}%` };
+  };
 
   if (type === 'dailyTotal' || type === 'perDay') {
     const valueOn = dailyValueOn(type, entries, fields);
@@ -287,8 +294,8 @@ export function goalStats(
     }
     const current = goalStatus(trackable, entries, fields, now)?.streak?.match(/^(\d+) /)?.[1] ?? '0';
     return [
-      { label: 'Met, last 30 days', value: scheduled ? `${metCount} of ${scheduled}` : dash },
-      { label: 'Rate (30d)', value: scheduled ? `${Math.round((metCount / scheduled) * 100)}%` : dash },
+      strengthTile(),
+      { label: 'Met, last 30 days', value: scheduled ? `${metCount} of ${scheduled} (${Math.round((metCount / scheduled) * 100)}%)` : dash },
       { label: 'Current streak', value: plural(Number(current), 'day') },
       { label: 'Best streak', value: plural(best, 'day') },
     ];
@@ -319,7 +326,7 @@ export function goalStats(
     let current = count >= goal! ? 1 : 0;
     for (let w = addDays(weekStart, -7); w >= firstWeek && daysIn(w) >= goal!; w = addDays(w, -7)) current += 1;
     return [
-      { label: 'This week', value: `${count} of ${goal}` },
+      strengthTile(),
       { label: 'Weeks met (12)', value: weeks ? `${metWeeks} of ${weeks}` : dash },
       { label: 'Current streak', value: plural(current, 'week') },
       { label: 'Best streak', value: plural(best, 'week') },
@@ -327,7 +334,6 @@ export function goalStats(
   }
 
   if (type === 'everyDays') {
-    const status = goalStatus(trackable, entries, fields, now);
     // Each interval between two logs, on time when it's within the goal; the last 90 days by the later log.
     const since90 = addDays(today, -89);
     let recent = 0;
@@ -344,7 +350,7 @@ export function goalStats(
       best = Math.max(best, run);
     }
     return [
-      { label: 'Next', value: status?.text ?? dash },
+      strengthTile(),
       { label: 'On time (90d)', value: recent ? `${recentOnTime} of ${recent}` : dash },
       { label: 'Current streak', value: `${run} on time` },
       { label: 'Best streak', value: `${best} on time` },
@@ -361,4 +367,55 @@ export function goalStats(
     { label: 'Last 30 days', value: plural(times.filter((t) => t >= since30).length, 'slip') },
     { label: 'Last 90 days', value: plural(times.filter((t) => t >= addDays(today, -89)).length, 'slip') },
   ];
+}
+
+// ---------------------------------------------------------------------------
+// Habit strength (3.48): a forgiving score in the style of Loop Habit
+// Tracker. Each day moves it toward 1 when the goal was met and toward 0 when
+// it wasn't, by an amount that depends on how often the goal asks for it, so
+// one missed day costs a little instead of resetting a streak to zero. Off
+// days (rest, skipped, paused) leave it alone; today counts only once it's
+// met, since it's still open.
+// ---------------------------------------------------------------------------
+
+/** How many times a day the goal asks for: 1 for daily goals, N/7 for N a week, 1/N for every N days. */
+function perDayFrequency(type: TrackableGoalType, goal: number): number {
+  if (type === 'perWeek') return Math.min(1, goal / 7);
+  if (type === 'everyDays') return 1 / Math.max(1, goal);
+  return 1;
+}
+
+/** 0 to 1, or null for an avoid goal or no goal. */
+export function habitStrength(
+  trackable: Pick<TrackableDefinition, 'goalType' | 'goalValue' | 'createdAt'> & Partial<Scheduled>,
+  entries: readonly TimestampedValues[],
+  fields: readonly FieldDefinition[],
+  now: number = Date.now(),
+): number | null {
+  const type = trackable.goalType;
+  const goal = trackable.goalValue;
+  if (!type || type === 'avoid' || goal == null || goal <= 0) return null;
+  const today = startOfDay(now);
+  const times = entries.map((e) => e.timestamp).filter((t) => t <= now).sort((a, b) => a - b);
+  const first = Math.min(startOfDay(trackable.createdAt ?? now), times.length ? startOfDay(times[0]) : today);
+  // Loop's multiplier: the decay per day for this frequency.
+  const keep = Math.pow(0.5, Math.sqrt(perDayFrequency(type, goal)) / 13);
+  // How much each day counts: a share of a daily goal, or logged at all.
+  let doneOn: (day: number) => number;
+  if (type === 'dailyTotal' || type === 'perDay') {
+    const valueOn = dailyValueOn(type, entries, fields);
+    if (!valueOn) return null;
+    doneOn = (d) => Math.min(1, valueOn(d) / goal);
+  } else {
+    const logged = new Set(times.map(startOfDay));
+    doneOn = (d) => (logged.has(d) ? 1 : 0);
+  }
+  let score = 0;
+  for (let d = first; d <= today; d = addDays(d, 1)) {
+    const done = doneOn(d);
+    if (offDayReason(trackable, d) && done === 0) continue;
+    if (d === today && done < 1) continue;
+    score = score * keep + done * (1 - keep);
+  }
+  return score;
 }

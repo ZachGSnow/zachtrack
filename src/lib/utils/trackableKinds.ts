@@ -66,11 +66,15 @@ export interface KindSummary {
   label: string;
   value: string;
   sub: string[];
+  /** For a measurement: the change each `sub` line describes (null for none), so a page with a goal can colour it. */
+  subChanges?: Array<number | null>;
 }
 
 export interface KindStat {
   label: string;
   value: string;
+  /** The change the value describes, when it is one (a measurement's per-week trend). */
+  change?: number;
 }
 
 const nf1 = new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 });
@@ -162,6 +166,7 @@ export function summarize(
     if (latest) {
       const v = Number(latest.values![field.id]);
       const sub: string[] = [];
+      const subChanges: Array<number | null> = [];
       let cardAvg = '';
       if (field.kind === 'number') {
         // Through the noise: the 7-day average against the week before, and
@@ -176,14 +181,20 @@ export function summarize(
                 ? ', same as the week before'
                 : `, ${averages.change > 0 ? '\u25b2' : '\u25bc'}${formatNumber(Math.abs(averages.change))} vs the week before`;
           sub.push(`7-day average ${withUnit(field, averages.current)}${change}`);
+          subChanges.push(averages.change);
           cardAvg = ` \u00b7 avg ${formatNumber(averages.current)}`;
         }
-        const trend = describeTrend(trendPerWeek(byDay, now), field.unit);
-        if (trend) sub.push(trend);
+        const perWeek = trendPerWeek(byDay, now);
+        const trend = describeTrend(perWeek, field.unit);
+        if (trend) {
+          sub.push(trend);
+          subChanges.push(perWeek);
+        }
       }
       sub.push(formatDateTime(latest.timestamp));
+      subChanges.push(null);
       const value = withUnit(field, v);
-      return { card: `${value}${cardAvg} \u00b7 ${since} ago`, label: `Latest ${field.name}`, value, sub };
+      return { card: `${value}${cardAvg} \u00b7 ${since} ago`, label: `Latest ${field.name}`, value, sub, subChanges };
     }
   }
 
@@ -260,6 +271,7 @@ export function kindStats(
       {
         label: 'Per week (30d)',
         value: perWeek == null ? dash : Math.abs(perWeek) < 0.05 ? 'level' : `${perWeek > 0 ? '+' : '\u2212'}${formatNumber(Math.abs(perWeek))}${unit}`,
+        ...(perWeek == null ? {} : { change: perWeek }),
       },
       { label: '90-day low', value: recent.length ? withUnit(field, Math.min(...recent)) : dash },
       { label: '90-day high', value: recent.length ? withUnit(field, Math.max(...recent)) : dash },

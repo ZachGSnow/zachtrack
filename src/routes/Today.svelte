@@ -1,8 +1,14 @@
 <script lang="ts">
   import { liveQuery } from 'dexie';
   import { link } from 'svelte-spa-router';
-  import { db } from '../lib/db';
-  import { DATES_WITHIN_DAYS, LOG_RECENT_DAYS, todayDates, todayHabits, todayLogs } from '../lib/utils/today';
+  import { db, updateTrackable } from '../lib/db';
+  import { DATES_WITHIN_DAYS, LOG_RECENT_DAYS, groupByTimeOfDay, suggestGoals, TIME_OF_DAY_LABEL, todayDates, todayHabits, todayLogs, type GoalSuggestion } from '../lib/utils/today';
+  import { weeklyReview } from '../lib/utils/weeklyReview';
+  import { takeShortcut } from '../lib/utils/shortcuts';
+  import { resolveBodyFieldIds } from '../lib/utils/health';
+  import { loadPrefs, savePrefs } from '../lib/utils/prefs';
+  import { settingsStore } from '../lib/stores/settings.svelte';
+  import Button from '../lib/components/ui/Button.svelte';
   import { dateItemKey } from '../lib/utils/dates';
   import { readableGraphic } from '../lib/utils/color';
   import { themeStore } from '../lib/stores/theme.svelte';
@@ -33,8 +39,56 @@
   const logs = $derived(todayLogs($trackables ?? [], $allFields ?? [], $allEntries ?? [], now));
   const dates = $derived(todayDates($trackables ?? [], $allEntries ?? [], now));
   const hasDates = $derived(($trackables ?? []).some((t) => !t.archived && t.displayMode === 'ages'));
+  const groups = $derived(groupByTimeOfDay(habits, now));
   const counted = $derived(habits.filter((h) => !h.offDay));
+
+  // The weekly review (utils/weeklyReview.ts): Sunday and Monday, dismissible per week on this device.
+  const recentFasts = liveQuery(() => db.fasts.where('startDay').aboveOrEqual(Date.now() - 16 * 24 * 3600_000).toArray());
+  const REVIEW_KEY = 'weekly-review';
+  let reviewDismissed = $state(Number(loadPrefs<{ week: unknown }>(REVIEW_KEY, { week: 0 }).week) || 0);
+  const review = $derived(
+    weeklyReview(
+      $trackables ?? [],
+      $allFields ?? [],
+      $allEntries ?? [],
+      $recentFasts ?? [],
+      resolveBodyFieldIds($allFields ?? [], settingsStore.data).weight,
+      now,
+    ),
+  );
+  const showReview = $derived(review != null && review.weekStart !== reviewDismissed && (review.habits || review.weight || review.fasts.count));
+  function dismissReview() {
+    if (!review) return;
+    reviewDismissed = review.weekStart;
+    savePrefs(REVIEW_KEY, { week: review.weekStart });
+  }
+  const nf1 = new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 });
+  const weekLabel = (start: number) => new Date(start).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   const done = $derived(counted.filter((h) => h.goal?.state === 'done').length);
+
+  // Goal suggestions (utils/today.ts): "Not now" hides one on this device for 30 days.
+  const SNOOZE_KEY = 'goal-suggestions';
+  let snoozed = $state<Record<string, number>>(loadPrefs<Record<string, number>>(SNOOZE_KEY, {}));
+  const suggestions = $derived(suggestGoals($trackables ?? [], $allEntries ?? [], now).filter((s) => !(snoozed[s.trackable.id] > now)));
+  function snooze(id: string) {
+    snoozed = { ...snoozed, [id]: Date.now() + 30 * 24 * 3600_000 };
+    savePrefs(SNOOZE_KEY, snoozed);
+  }
+  async function adopt(s: GoalSuggestion) {
+    await updateTrackable(s.trackable.id, { goalType: s.goalType, goalValue: s.goalValue });
+  }
+
+  // The "Log weight" home-screen shortcut: the entry sheet for the trackable holding the weight
+  // field (the one BMI follows), prefilled from the last reading, once everything has loaded.
+  let shortcutChecked = false;
+  $effect(() => {
+    if (shortcutChecked || $trackables === undefined || $allFields === undefined || !settingsStore.ready) return;
+    shortcutChecked = true;
+    if (!takeShortcut('log-weight')) return;
+    const weightId = resolveBodyFieldIds($allFields, settingsStore.data).weight;
+    const holder = weightId ? $trackables.filter((t) => t.fieldIds.includes(weightId)).sort((a, b) => Number(!!a.archived) - Number(!!b.archived))[0] : undefined;
+    if (holder) void quickLog.log(holder);
+  });
 
   const dateLine = $derived(new Date(now).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }));
   const when = (at: number) => new Date(at).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
@@ -45,6 +99,43 @@
     <h1 class="text-xl font-semibold text-text">Today</h1>
     <p class="text-sm text-text-muted">{dateLine}</p>
   </div>
+
+  {#if showReview && review}
+    <div class="lg:col-span-2">
+      <Card tone="muted" padding="p-4" label="Weekly review">
+        <div class="flex items-baseline justify-between gap-2">
+          <p class="text-xs font-semibold tracking-wide text-text-muted uppercase">
+            {review.partial ? 'This week so far' : `Week of ${weekLabel(review.weekStart)}`}
+          </p>
+          <button class="text-xs text-text-muted" onclick={dismissReview}>Dismiss</button>
+        </div>
+        <ul class="mt-2 grid gap-2 text-sm sm:grid-cols-3">
+          {#if review.habits}
+            <li>
+              <span class="block text-xs text-text-muted">Habits</span>
+              <span class="font-heading text-lg font-semibold text-text">{review.habits.met} of {review.habits.of}</span>
+              <span class="text-xs text-text-muted"> met</span>
+            </li>
+          {/if}
+          {#if review.weight}
+            {@const change = review.weight.change}
+            <li>
+              <span class="block text-xs text-text-muted">Weight, 7-day average</span>
+              <span class="font-heading text-lg font-semibold text-text">{nf1.format(review.weight.average)}{review.weight.unit ? ` ${review.weight.unit}` : ''}</span>
+              {#if change != null}
+                <span class="text-xs text-text-muted"> {Math.abs(change) < 0.05 ? 'same as the week before' : `${change > 0 ? '\u25b2' : '\u25bc'}${nf1.format(Math.abs(change))} on the week`}</span>
+              {/if}
+            </li>
+          {/if}
+          <li>
+            <span class="block text-xs text-text-muted">Fasts</span>
+            <span class="font-heading text-lg font-semibold text-text">{review.fasts.count}</span>
+            <span class="text-xs text-text-muted"> {review.fasts.count === 1 ? 'fast' : 'fasts'}, {review.fasts.goal} to goal</span>
+          </li>
+        </ul>
+      </Card>
+    </div>
+  {/if}
 
   <div class="flex flex-col gap-4">
     <FastNow {now} />
@@ -57,8 +148,29 @@
           {/if}
         {/snippet}
       </SectionHeading>
+      {#if suggestions.length > 0}
+        <!-- At most three, the most regular first, so they don't push the habits themselves down. -->
+        <Card tone="brand" padding="px-3 py-2" label="Suggested goals">
+          <p class="text-xs font-semibold tracking-wide text-brand uppercase">Make these habits?</p>
+          <ul class="divide-y divide-border">
+            {#each suggestions.slice(0, 3) as s (s.trackable.id)}
+              <li class="flex items-center gap-3 py-2" aria-label="Suggested goal for {s.trackable.name}">
+                <span class="text-lg" aria-hidden="true">{s.trackable.icon}</span>
+                <span class="min-w-0 flex-1">
+                  <span class="block truncate text-sm font-medium text-text">{s.trackable.name}</span>
+                  <span class="block truncate text-xs text-text-muted">{s.reason}</span>
+                </span>
+                <Button variant="primary" size="sm" class="shrink-0 whitespace-nowrap" onclick={() => adopt(s)}>{s.label}</Button>
+                <button class="shrink-0 text-xs text-text-muted" onclick={() => snooze(s.trackable.id)} aria-label="Not now: {s.trackable.name}">Not now</button>
+              </li>
+            {/each}
+          </ul>
+        </Card>
+      {/if}
       {#if $trackables === undefined}
         <p class="text-sm text-text-muted">Loading&hellip;</p>
+      {:else if habits.length === 0 && suggestions.length > 0}
+        <!-- The suggestions above stand in for the empty state. -->
       {:else if habits.length === 0}
         <EmptyState title="No goals yet" text="Give a trackable a goal in its Edit sheet and it shows up here each day with a check button.">
           {#snippet action()}
@@ -67,11 +179,19 @@
         </EmptyState>
       {:else}
         <Card padding="px-3 py-1">
-          <ul class="divide-y divide-border">
-            {#each habits as h (h.trackable.id)}
-              <HabitRow habit={h} {now} />
-            {/each}
-          </ul>
+          <!-- Grouped by when each is usually logged (utils/today.ts timeOfDay), headings only when there's more than one group. -->
+          {#each groups as g (g.time)}
+            <div aria-label="{TIME_OF_DAY_LABEL[g.time]} habits" role="group">
+              {#if groups.length > 1}
+                <p class="pt-2 text-[11px] font-semibold tracking-wide text-text-muted uppercase">{TIME_OF_DAY_LABEL[g.time]}</p>
+              {/if}
+              <ul class="divide-y divide-border">
+                {#each g.habits as h (h.trackable.id)}
+                  <HabitRow habit={h} {now} />
+                {/each}
+              </ul>
+            </div>
+          {/each}
         </Card>
         <HabitMatrix {habits} {now} />
       {/if}

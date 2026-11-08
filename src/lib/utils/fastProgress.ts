@@ -111,3 +111,35 @@ export function refeedingNote(hours: number): string | null {
   if (hours < 24) return null;
   return 'Break a fast this long gently: start with a small meal with some protein, salt and water, and wait an hour or two before a large or high-carb meal.';
 }
+
+// ---------------------------------------------------------------------------
+// Water during a long fast (3.49): a one-tap serving into the Water field.
+// ---------------------------------------------------------------------------
+
+/** A glass of water in the field's unit, or null for a unit it can't size. */
+export function waterServing(unit: string | undefined): number | null {
+  const u = (unit ?? '').trim().toLowerCase();
+  if (u === 'oz' || u === 'fl oz') return 16;
+  if (u === 'ml') return 500;
+  if (u === 'l' || u === 'liter' || u === 'liters' || u === 'litre' || u === 'litres') return 0.5;
+  if (u === 'cup' || u === 'cups') return 2;
+  return null;
+}
+
+/**
+ * The field a water serving goes into and the trackable holding it: a number
+ * field named Water that adds up same-day entries, in a trackable that isn't
+ * archived, with a unit waterServing can size.
+ */
+export function waterTarget<F extends { id: string; name: string; kind: string; unit?: string; aggregation?: string }, T extends { id: string; fieldIds: readonly string[]; archived?: boolean }>(
+  fields: readonly F[],
+  trackables: readonly T[],
+): { field: F; trackable: T; amount: number } | null {
+  for (const field of fields) {
+    if (field.kind !== 'number' || field.aggregation !== 'sum' || field.name.trim().toLowerCase() !== 'water') continue;
+    const amount = waterServing(field.unit);
+    const trackable = trackables.find((t) => !t.archived && t.fieldIds.includes(field.id));
+    if (amount != null && trackable) return { field, trackable, amount };
+  }
+  return null;
+}

@@ -117,3 +117,25 @@ export function describeProjection(p: GoalProjection | null, goal: number, unit:
     }
   }
 }
+
+/** Which way is good for a measurement with a goal: down when the goal is below the current average. */
+export type GoodDirection = 'up' | 'down';
+
+export function goalDirection(current: number | null | undefined, goal: number | null | undefined): GoodDirection | null {
+  if (current == null || goal == null || Math.abs(goal - current) < 0.25) return null;
+  return goal < current ? 'down' : 'up';
+}
+
+/** Whether a change is toward the goal (`good`), away from it (`bad`), or neither. Tiny changes are neither. */
+export function changeTone(change: number | null | undefined, direction: GoodDirection | null): 'good' | 'bad' | null {
+  if (change == null || direction == null || Math.abs(change) < 0.05) return null;
+  return (change < 0) === (direction === 'down') ? 'good' : 'bad';
+}
+
+/** A 7-day average for each of `days` (local start-of-days), from a field's values by day; null where the week had none. */
+export function rollingSeries(byDay: ReadonlyMap<number, number>, days: readonly number[], window: number = AVERAGE_DAYS): (number | null)[] {
+  return days.map((d) => {
+    const v = rollingAverage(byDay, d, window);
+    return v == null ? null : Math.round(v * 100) / 100;
+  });
+}

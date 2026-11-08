@@ -286,3 +286,59 @@ export function restartSuggestion(
     presetHours: gentler.targetHours!,
   };
 }
+
+// ---------------------------------------------------------------------------
+// History as a month calendar (3.49).
+// ---------------------------------------------------------------------------
+
+export interface FastMonth {
+  /** Weeks (Monday to Sunday) covering the month, as rows; days outside the month are `outside`. */
+  rows: GridDay[][];
+  /** Each row's fasts started that week: how many, how many met their goal, and the hours. */
+  totals: Array<{ fasts: number; goal: number; hours: number }>;
+}
+
+/** The month containing `monthStart`, for History's calendar: each day shaded by its best fast's progress toward its goal. */
+export function fastMonth(fasts: readonly Fast[], monthStart: number, now: number): FastMonth {
+  const today = startOfDay(now);
+  const first = new Date(monthStart);
+  const month = first.getMonth();
+  const firstOfMonth = new Date(first.getFullYear(), month, 1).getTime();
+  const lastOfMonth = new Date(first.getFullYear(), month + 1, 0).getTime();
+  const start = bucketStart(firstOfMonth, 'week');
+  const end = addDays(bucketStart(lastOfMonth, 'week'), 6);
+  const byDay = new Map<number, Fast[]>();
+  for (const f of fasts) {
+    if (f.startTime > now) continue;
+    const d = startOfDay(f.startTime);
+    byDay.set(d, [...(byDay.get(d) ?? []), f]);
+  }
+  const rows: GridDay[][] = [];
+  const totals: FastMonth['totals'] = [];
+  for (let d = start; d <= end; d = addDays(d, 1)) {
+    if (rows.length === 0 || rows[rows.length - 1].length === 7) {
+      rows.push([]);
+      totals.push({ fasts: 0, goal: 0, hours: 0 });
+    }
+    const own = byDay.get(d) ?? [];
+    const future = d > today;
+    const inMonth = new Date(d).getMonth() === month;
+    rows[rows.length - 1].push({
+      day: d,
+      level: future ? 0 : own.reduce((best, f) => Math.max(best, Math.min(1, fastHours(f, now) / goalHours(f))), 0),
+      count: own.length,
+      isToday: d === today,
+      outside: future || !inMonth,
+      future,
+      missed: false,
+      off: null,
+    });
+    const total = totals[totals.length - 1];
+    for (const f of own) {
+      total.fasts += 1;
+      total.hours += fastHours(f, now);
+      if (goalMet(f, now)) total.goal += 1;
+    }
+  }
+  return { rows, totals };
+}

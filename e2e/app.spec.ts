@@ -251,7 +251,7 @@ test('a goal shows progress and due dates, and a trackable without fields logs i
 test('the home-screen shortcuts are in the manifest, and Start fast starts the default method once', async ({ page, request }) => {
   const problems = watchForProblems(page);
   const manifest = await (await request.get('/manifest.webmanifest')).json();
-  expect(manifest.shortcuts.map((s: { url: string }) => s.url)).toEqual(['/?shortcut=start-fast#/fasting', '/#/trackables', '/#/journey']);
+  expect(manifest.shortcuts.map((s: { url: string }) => s.url)).toEqual(['/?shortcut=log-weight#/', '/?shortcut=start-fast#/fasting', '/#/trackables', '/#/journey']);
 
   await mockSync(page, noServer);
   await waitForStarterSet(page);
@@ -325,11 +325,11 @@ test('trackables can be pinned, archived and reordered, and lists filter by tag'
   for (const text of await rows.allTextContents()) expect(text).toContain('#gym');
   await page.goto('/#/history');
   await page.getByRole('button', { name: /^#weekend/ }).click();
-  const fastItems = page.locator('main li');
+  const fastItems = page.getByRole('list', { name: 'Fasts' }).getByRole('listitem');
   await expect(fastItems.first()).toContainText('#weekend');
   for (const text of await fastItems.allTextContents()) expect(text).toContain('#weekend');
   await page.getByRole('button', { name: 'All', exact: true }).click();
-  expect(await fastItems.count()).toBeGreaterThan(await page.locator('main li', { hasText: '#weekend' }).count());
+  expect(await fastItems.count()).toBeGreaterThan(await fastItems.filter({ hasText: '#weekend' }).count());
   expect(problems).toEqual([]);
 });
 
@@ -718,9 +718,14 @@ test('Today shows the fast, habits with a goal and recent logs, and checks a hab
   await page.getByRole('textbox', { name: 'Times per day' }).fill('1');
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByText('Goal: Once a day')).toBeVisible();
+  // A habit's page leads its tiles with how established it is.
+  await expect(page.getByText('Strength', { exact: true })).toBeVisible();
 
   await page.goto('/#/');
   await expect(page.getByRole('heading', { name: 'Today', level: 1 })).toBeVisible();
+  // The weekly review shows on Sundays and Mondays only.
+  const weekday = new Date().getDay();
+  await expect(page.getByRole('region', { name: 'Weekly review' })).toHaveCount(weekday === 0 || weekday === 1 ? 1 : 0);
   // The sample data has a 16:8 fast running past its goal.
   const fasting = page.getByRole('region', { name: 'Fasting' });
   await expect(fasting).toContainText('Fasting \u00b7 16:8');
@@ -730,10 +735,12 @@ test('Today shows the fast, habits with a goal and recent logs, and checks a hab
   const habits = page.getByRole('region', { name: 'Habits' });
   await expect(habits).toContainText('Male Health');
   await expect(habits).toContainText('0 of 1 done');
+  // Strength shows once there's something logged: here after the check below.
   await habits.getByRole('button', { name: 'Check Male Health for today' }).click();
   await expect(page.getByRole('status')).toContainText('Logged Male Health');
   await expect(habits).toContainText('1 of 1 done');
   await expect(habits.getByRole('button', { name: 'Uncheck Male Health for today' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(habits).toContainText(/\d+% strong/);
 
   // Last 7 days: one cell per day; a tap on an earlier day fills it in, a second tap takes it back.
   const week = page.getByRole('region', { name: 'Last 7 days' });
@@ -853,5 +860,50 @@ test('a trackable unlogged for six weeks is offered for archiving, and Not now s
   await page.reload();
   await expect(page.getByText('Sleep', { exact: true })).toBeVisible();
   await expect(quiet).toHaveCount(0);
+  expect(problems).toEqual([]);
+});
+
+test('the weight chart draws its 7-day average, and changes are coloured toward the goal weight', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await mockSync(page, noServer);
+  await importSampleData(page);
+  await page.goto('/#/trackables');
+  await page.getByRole('link', { name: /Body Measurements/ }).click();
+  // The sample settings have a goal weight below the sample weights, so a change is good or bad, not neutral.
+  await expect(page.getByText(/^7-day average \d/)).toHaveClass(/text-(brand|warn)/);
+  await page.getByRole('button', { name: 'Chart', exact: true }).click();
+  await expect(page.locator('[_echarts_instance_] svg').first()).toContainText('Weight 7-day avg');
+  expect(problems).toEqual([]);
+});
+
+test('the Log weight shortcut opens the weigh-in sheet from the last reading, and Today suggests goals', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await mockSync(page, noServer);
+  await importSampleData(page);
+
+  await page.goto('/?shortcut=log-weight#/');
+  const sheet = page.getByRole('dialog');
+  await expect(sheet.getByRole('heading', { name: /Body Measurements/ })).toBeVisible();
+  await expect(sheet.getByRole('textbox', { name: 'Weight (lb)' })).not.toHaveValue('');
+  await expect.poll(() => new URL(page.url()).search).toBe('');
+  await page.keyboard.press('Escape');
+
+  // The sample data logs Sleep every day without a goal: Today offers one, and one tap sets it.
+  const suggested = page.getByRole('region', { name: 'Suggested goals' });
+  // At most three at a time, the most regular first.
+  await expect(suggested.getByRole('listitem')).toHaveCount(3);
+  const sleep = suggested.getByRole('listitem', { name: 'Suggested goal for Sleep' });
+  await expect(sleep).toContainText(/1[0-4] of the last 14 days/);
+  await sleep.getByRole('button', { name: 'Every day' }).click();
+  await expect(sleep).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Habits' }).getByRole('link', { name: /Sleep/ }).first()).toBeVisible();
+
+  // Not now hides an offer on this device.
+  const nutrition = suggested.getByRole('listitem', { name: 'Suggested goal for Nutrition' });
+  await nutrition.getByRole('button', { name: /^Not now/ }).click();
+  await expect(nutrition).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Today', level: 1 })).toBeVisible();
+  await expect(nutrition).toHaveCount(0);
   expect(problems).toEqual([]);
 });

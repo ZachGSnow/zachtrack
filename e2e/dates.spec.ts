@@ -62,6 +62,16 @@ test('the US holiday pack adds holidays that follow their rules', async ({ page 
   await upcoming.getByRole('button', { name: /Thanksgiving/ }).click();
   await expect(page.getByRole('combobox', { name: 'Repeats' })).toHaveValue('nthWeekday');
   await expect(page.getByText('4th Thursday of November')).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  // Export to calendar downloads them as an .ics file with repeat rules.
+  await page.goto('/#/dates');
+  const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Export to calendar' }).click()]);
+  expect(download.suggestedFilename()).toBe('zachtrack-dates.ics');
+  const ics = await (await download.createReadStream()).toArray().then((chunks) => Buffer.concat(chunks).toString('utf8'));
+  expect(ics.startsWith('BEGIN:VCALENDAR')).toBe(true);
+  expect(ics).toContain('SUMMARY:Thanksgiving');
+  expect(ics).toContain('BYMONTH=11;BYDAY=4TH');
 });
 
 test('a renewal repeats every few years, and a one-off date that passed moves to Past', async ({ page }) => {
@@ -113,7 +123,7 @@ test('dates due soon go under Needs attention, the next two weeks under Coming u
   await expect(page.getByRole('link', { name: /22,000 days old/ }).first()).toBeVisible();
 
   // The calendar marks Dad's day; tapping it lists him.
-  await page.getByRole('button', { name: 'Calendar' }).click();
+  await page.getByRole('button', { name: 'Calendar', exact: true }).click();
   const dadDay = await page.evaluate(() => {
     const t = new Date();
     t.setDate(t.getDate() + 10);

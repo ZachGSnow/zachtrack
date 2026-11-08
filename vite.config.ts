@@ -49,6 +49,13 @@ export default defineConfig({
         // Long-press the installed app's icon (Android) for these. See src/lib/utils/shortcuts.ts.
         shortcuts: [
           {
+            name: 'Log weight',
+            short_name: 'Log weight',
+            description: 'Log a weigh-in, starting from your last reading',
+            url: '/?shortcut=log-weight#/',
+            icons: [{ src: '/pwa-192.png', sizes: '192x192', type: 'image/png' }],
+          },
+          {
             name: 'Start a fast',
             short_name: 'Start fast',
             description: 'Start a fast with your default method',
