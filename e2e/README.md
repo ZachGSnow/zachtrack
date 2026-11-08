@@ -2,7 +2,8 @@
 
 Playwright tests against the production build, served by `wrangler pages dev`
 so the real service worker, `public/_headers` (CSP) and the sync Function are
-used. Chromium at Pixel 7 size, in `America/New_York`.
+used. Chromium at Pixel 7 size, in `America/New_York`, and the test runner's
+own clock is set to the same zone so "today" in a test matches the browser.
 
 ```bash
 npx playwright install chromium   # once
