@@ -51,7 +51,7 @@ describe('measurement', () => {
   });
 
   it('describes trends and projections in words', () => {
-    expect(describeTrend(-0.7, 'lb')).toBe('▼0.7 lb/wk over the last 30 days');
+    expect(describeTrend(-0.7, 'lb')).toBe('\u25bc0.7 lb/wk over the last 30 days');
     expect(describeTrend(0.03, 'lb')).toBe('About level over the last 30 days');
     expect(describeTrend(null, 'lb')).toBeNull();
     expect(describeProjection({ kind: 'away' }, 176, 'lb')).toBe('Moving away from your goal of 176 lb');

@@ -35,7 +35,7 @@
   {#if $fasts === undefined}
     <p class="text-sm text-text-muted">Loading&hellip;</p>
   {:else if $fasts.length === 0}
-    <EmptyState icon="❄️" title="No fasts yet" text="Start one from the Timer, or log a past one with the button above." class="mt-4" />
+    <EmptyState icon="&#x2744;&#xFE0F;" title="No fasts yet" text="Start one from the Timer, or log a past one with the button above." class="mt-4" />
   {:else}
     <TagFilter items={$fasts} bind:selected={tagFilter} />
     <ul class="flex flex-col gap-2">

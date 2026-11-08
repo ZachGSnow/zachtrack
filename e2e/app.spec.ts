@@ -723,7 +723,7 @@ test('Today shows the fast, habits with a goal and recent logs, and checks a hab
   await expect(page.getByRole('heading', { name: 'Today', level: 1 })).toBeVisible();
   // The sample data has a 16:8 fast running past its goal.
   const fasting = page.getByRole('region', { name: 'Fasting' });
-  await expect(fasting).toContainText('Fasting · 16:8');
+  await expect(fasting).toContainText('Fasting \u00b7 16:8');
   await expect(fasting.getByRole('progressbar', { name: 'Progress to goal' })).toBeVisible();
   await expect(fasting).toContainText(/Goal reached at/);
 
@@ -750,7 +750,7 @@ test('Today shows the fast, habits with a goal and recent logs, and checks a hab
   // The sample data weighs in most mornings: Body Measurements is under Log with its latest reading and 7-day average,
   // and a new entry starts from the last readings.
   const log = page.getByRole('region', { name: 'Log' });
-  await expect(log).toContainText(/Body Measurements\s+\d+(\.\d+)? lb · avg \d+(\.\d+)?/);
+  await expect(log).toContainText(/Body Measurements\s+\d+(\.\d+)? lb \u00b7 avg \d+(\.\d+)?/);
   await log.getByRole('button', { name: 'Log Body Measurements' }).click();
   const sheet = page.getByRole('dialog');
   await expect(sheet.getByRole('textbox', { name: 'Weight (lb)' })).not.toHaveValue('');
@@ -779,7 +779,7 @@ test('Today starts a fast in one tap with today\'s method', async ({ page }) => 
   const fasting = page.getByRole('region', { name: 'Fasting' });
   await expect(fasting).toContainText('No fast running');
   await fasting.getByRole('button', { name: 'Start 16:8' }).click();
-  await expect(fasting).toContainText('Fasting · 16:8');
+  await expect(fasting).toContainText('Fasting \u00b7 16:8');
   await expect(fasting.getByRole('progressbar', { name: 'Progress to goal' })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Habits' })).toContainText('No goals yet');
   expect(problems).toEqual([]);

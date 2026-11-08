@@ -108,7 +108,7 @@
   {#if $trackables === undefined}
     <p class="text-sm text-text-muted">Loading&hellip;</p>
   {:else if datesTrackables.length === 0}
-    <EmptyState icon="📅" title="No dates yet" text={'On Trackables, tap "+ New" and pick Birthdays, Anniversaries, US holidays or Countdowns.'} class="mt-4" />
+    <EmptyState icon="&#x1F4C5;" title="No dates yet" text={'On Trackables, tap "+ New" and pick Birthdays, Anniversaries, US holidays or Countdowns.'} class="mt-4" />
   {:else if view === 'list'}
     {#if items.length === 0}
       <p class="text-sm text-text-muted">Nothing in the next year.</p>

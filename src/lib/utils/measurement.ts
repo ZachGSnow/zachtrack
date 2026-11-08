@@ -89,13 +89,13 @@ export function projectGoal(current: number, goal: number, perWeek: number | nul
 const nf1 = new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 });
 const nf2 = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
 
-/** "▼0.3 lb/wk over 30 days", "about level over 30 days". */
+/** "\u25bc0.3 lb/wk over 30 days", "about level over 30 days". */
 export function describeTrend(perWeek: number | null, unit: string | undefined): string | null {
   if (perWeek == null) return null;
   const u = unit ? ` ${unit}` : '';
   if (Math.abs(perWeek) < FLAT_PER_WEEK) return `About level over the last ${TREND_DAYS} days`;
   const n = Math.abs(perWeek) < 1 ? nf2.format(Math.abs(perWeek)) : nf1.format(Math.abs(perWeek));
-  return `${perWeek > 0 ? '▲' : '▼'}${n}${u}/wk over the last ${TREND_DAYS} days`;
+  return `${perWeek > 0 ? '\u25b2' : '\u25bc'}${n}${u}/wk over the last ${TREND_DAYS} days`;
 }
 
 /** "At this rate, 176 lb around Mar 14", "Moving away from 176 lb", "At your goal of 176 lb". */

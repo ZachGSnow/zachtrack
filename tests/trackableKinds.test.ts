@@ -117,7 +117,7 @@ describe('stat cards', () => {
     expect(kindStats('event', events, [], oct(30))[1].value).toBe('14d');
     expect(kindStats('measurement', [], [weight], oct(30)).map((s) => s.label)).toEqual(['7-day avg', 'Per week (30d)', '90-day low', '90-day high']);
     const daily: TimestampedValues[] = Array.from({ length: 20 }, (_, i) => ({ timestamp: oct(1 + i), values: { 'f-w': 185 - i * 0.1 } }));
-    expect(kindStats('measurement', daily, [weight], oct(20, 18)).map((s) => s.value)).toEqual(['183.4 lb', '−0.7 lb', '183.1 lb', '185 lb']);
+    expect(kindStats('measurement', daily, [weight], oct(20, 18)).map((s) => s.value)).toEqual(['183.4 lb', '\u22120.7 lb', '183.1 lb', '185 lb']);
     expect(kindStats('checkin', events, [mood], oct(30))[0].label).toBe('Current streak');
   });
 });

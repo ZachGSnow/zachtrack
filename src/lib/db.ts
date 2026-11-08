@@ -820,7 +820,7 @@ const STARTER_FIELDS: StarterField[] = [
   { name: 'Chest', kind: 'number', unit: 'in' },
   { name: 'Systolic BP', kind: 'number' },
   { name: 'Diastolic BP', kind: 'number' },
-  { name: 'Temperature', kind: 'number', unit: '°F' },
+  { name: 'Temperature', kind: 'number', unit: '\u00b0F' },
   { name: 'Calories', kind: 'number', unit: 'kcal', aggregation: 'sum' },
   { name: 'Protein', kind: 'number', unit: 'g', aggregation: 'sum' },
   { name: 'Carbs', kind: 'number', unit: 'g', aggregation: 'sum' },
@@ -856,27 +856,27 @@ export interface StarterTrackable {
 }
 
 export const STARTER_TRACKABLES: StarterTrackable[] = [
-  { name: 'Body Measurements', icon: '⚖️', color: '#a855f7', fields: ['Weight', 'Waist', 'Neck', 'Hip', 'Chest'], blurb: 'Weight and tape measurements; BMI and body fat follow.' },
-  { name: 'Vitals', icon: '❤️', color: '#ef4444', fields: ['Systolic BP', 'Diastolic BP', 'Temperature'], blurb: 'Blood pressure and temperature.' },
+  { name: 'Body Measurements', icon: '\u2696\ufe0f', color: '#a855f7', fields: ['Weight', 'Waist', 'Neck', 'Hip', 'Chest'], blurb: 'Weight and tape measurements; BMI and body fat follow.' },
+  { name: 'Vitals', icon: '\u2764\ufe0f', color: '#ef4444', fields: ['Systolic BP', 'Diastolic BP', 'Temperature'], blurb: 'Blood pressure and temperature.' },
   {
     name: 'Nutrition',
-    icon: '🍽️',
+    icon: '\u{1F37D}\ufe0f',
     color: '#f97316',
     fields: ['Calories', 'Protein', 'Carbs', 'Fat', 'Caffeine', 'Alcohol', 'Water', 'Supplements Taken'],
     blurb: 'Calories, macros, caffeine, alcohol, water and supplements.',
   },
-  { name: 'Sleep', icon: '😴', color: '#818cf8', fields: ['Sleep Hours', 'Sleep Quality'], blurb: 'Hours and quality.' },
+  { name: 'Sleep', icon: '\u{1F634}', color: '#818cf8', fields: ['Sleep Hours', 'Sleep Quality'], blurb: 'Hours and quality.' },
   {
     name: 'Wellness Check-in',
-    icon: '🙂',
+    icon: '\u{1F642}',
     color: '#eab308',
     fields: ['Overall Mood', 'Stress', 'Focus', 'Sickness', 'Pain', 'Bowel Movement'],
     blurb: 'Mood, stress, focus, sickness, pain and digestion, 1 to 5.',
   },
-  { name: 'Activity', icon: '🏃', color: '#22d3ee', fields: ['Duration', 'Exertion', 'Calories Burned', 'Steps'], blurb: 'Duration, exertion, calories burned and steps.' },
+  { name: 'Activity', icon: '\u{1F3C3}', color: '#22d3ee', fields: ['Duration', 'Exertion', 'Calories Burned', 'Steps'], blurb: 'Duration, exertion, calories burned and steps.' },
   // Logged with a Flow rating, but the timing between cycles is what matters.
-  { name: 'Menstrual Cycle', icon: '🌸', color: '#ec4899', fields: ['Flow'], displayMode: 'event', blurb: 'Flow, and the time between cycles.' },
-  { name: 'Male Health', icon: '💧', color: '#38bdf8', fields: [], blurb: 'One tap, no fields.' },
+  { name: 'Menstrual Cycle', icon: '\u{1F338}', color: '#ec4899', fields: ['Flow'], displayMode: 'event', blurb: 'Flow, and the time between cycles.' },
+  { name: 'Male Health', icon: '\u{1F4A7}', color: '#38bdf8', fields: [], blurb: 'One tap, no fields.' },
 ];
 
 /** Creates the named starter trackables (and the fields they need) that don't exist yet. */

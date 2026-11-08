@@ -261,7 +261,7 @@ export function goalStats(
   if (!type || (type !== 'avoid' && (goal == null || goal <= 0))) return null;
   const today = startOfDay(now);
   const times = entries.map((e) => e.timestamp).sort((a, b) => a - b);
-  const dash = '—';
+  const dash = '\u2014';
   const since30 = addDays(today, -29);
 
   if (type === 'dailyTotal' || type === 'perDay') {

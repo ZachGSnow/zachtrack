@@ -26,7 +26,7 @@
     <span class="min-w-0">
       <span class="block truncate text-sm font-medium text-text">{t.name}</span>
       <span class="block truncate text-xs text-text-muted" style={color ? `color: ${color};` : ''}>
-        {line}{habit.goal?.streak && !habit.offDay ? ` · ${habit.goal.streak}` : ''}
+        {line}{habit.goal?.streak && !habit.offDay ? ` \u00b7 ${habit.goal.streak}` : ''}
       </span>
     </span>
   </a>
