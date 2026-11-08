@@ -45,7 +45,7 @@ export function sinceLastVisit(i: AwayInput): AwayLine[] {
     const goalAt = f.startTime + goalHours(f) * 3600_000;
     const reached = f.endTime == null || f.endTime >= goalAt;
     if (reached && goalAt > i.lastActive && goalAt <= i.now) {
-      lines.push({ icon: '⏱️', text: `Your ${f.presetLabel ?? 'count-up'} fast reached its goal ${weekday(goalAt)} at ${formatClockTime(goalAt)}` });
+      lines.push({ icon: '\u23F1\uFE0F', text: `Your ${f.presetLabel ?? 'count-up'} fast reached its goal ${weekday(goalAt)} at ${formatClockTime(goalAt)}` });
     }
   }
 
