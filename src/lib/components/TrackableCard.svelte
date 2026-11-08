@@ -2,7 +2,7 @@
   import { link } from 'svelte-spa-router';
   import type { FieldDefinition, TrackableDefinition, TrackableEntry } from '../db';
   import { resolveKind, summarize } from '../utils/trackableKinds';
-  import { GOAL_STATE_COLORS, goalCardLine } from '../utils/trackableGoals';
+  import { GOAL_STATE_COLORS, goalCardLine, habitStrength } from '../utils/trackableGoals';
   import { checkState } from '../utils/quickCheck';
   import { describeDate } from '../utils/dates';
   import { habitGridWeeks } from '../utils/habitGrid';
@@ -82,7 +82,7 @@
           ? 'Nothing coming up'
           : 'Nothing added yet'
       : goal && trackable.goalType
-        ? goalCardLine(goal, trackable.goalType, summarize(kind, entries, attachedFields, now).card)
+        ? goalCardLine(goal, trackable.goalType, summarize(kind, entries, attachedFields, now).card, entries.length ? habitStrength(trackable, entries, attachedFields, now) : null)
         : summarize(kind, entries, attachedFields, now).card,
   );
 </script>

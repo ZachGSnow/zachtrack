@@ -2,12 +2,13 @@
   import { liveQuery } from 'dexie';
   import { link } from 'svelte-spa-router';
   import { db, updateTrackable } from '../lib/db';
-  import { DATES_WITHIN_DAYS, LOG_RECENT_DAYS, groupByTimeOfDay, suggestGoals, TIME_OF_DAY_LABEL, todayDates, todayHabits, todayLogs, type GoalSuggestion } from '../lib/utils/today';
+  import { DATES_WITHIN_DAYS, LOG_RECENT_DAYS, groupByTimeOfDay, lapsedHabits, suggestGoals, TIME_OF_DAY_LABEL, todayDates, todayHabits, todayLogs, type GoalSuggestion } from '../lib/utils/today';
   import { weeklyReview } from '../lib/utils/weeklyReview';
   import { sinceLastVisit } from '../lib/utils/sinceLastVisit';
   import { visitStore } from '../lib/stores/visit.svelte';
   import DataSafetyCard from '../lib/components/DataSafetyCard.svelte';
   import AwayCard from '../lib/components/AwayCard.svelte';
+  import LapsedHabitCard from '../lib/components/LapsedHabitCard.svelte';
   import { takeShortcut } from '../lib/utils/shortcuts';
   import { resolveBodyFieldIds } from '../lib/utils/health';
   import { loadPrefs, savePrefs } from '../lib/utils/prefs';
@@ -44,6 +45,15 @@
   const dates = $derived(todayDates($trackables ?? [], $allEntries ?? [], now));
   const hasDates = $derived(($trackables ?? []).some((t) => !t.archived && t.displayMode === 'ages'));
   const groups = $derived(groupByTimeOfDay(habits, now));
+
+  // Habits that slipped after going well (3.53); "Start again" hides the card for 14 days on this device.
+  const LAPSE_KEY = 'lapsed-dismissed';
+  let lapseDismissed = $state<Record<string, number>>(loadPrefs<Record<string, number>>(LAPSE_KEY, {}));
+  const lapsed = $derived(lapsedHabits(habits, now).filter((l) => !(lapseDismissed[l.habit.trackable.id] > now)));
+  function dismissLapse(id: string) {
+    lapseDismissed = { ...lapseDismissed, [id]: Date.now() + 14 * 24 * 3600_000 };
+    savePrefs(LAPSE_KEY, lapseDismissed);
+  }
   const counted = $derived(habits.filter((h) => !h.offDay));
 
   // The weekly review (utils/weeklyReview.ts): Sunday and Monday, dismissible per week on this device.
@@ -174,6 +184,9 @@
           {/if}
         {/snippet}
       </SectionHeading>
+      {#each lapsed as l (l.habit.trackable.id)}
+        <LapsedHabitCard lapsed={l} onDismiss={() => dismissLapse(l.habit.trackable.id)} />
+      {/each}
       {#if suggestions.length > 0}
         <!-- At most three, the most regular first, so they don't push the habits themselves down. -->
         <Card tone="brand" padding="px-3 py-2" label="Suggested goals">

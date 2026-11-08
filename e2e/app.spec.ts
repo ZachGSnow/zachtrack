@@ -1019,3 +1019,50 @@ test('after a long gap, Today says what happened since you were last here', asyn
   await expect(away).toHaveCount(0);
   expect(problems).toEqual([]);
 });
+
+test('a habit that slipped after going well gets a gentle card on Today, and Pause a week clears it', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await mockSync(page, noServer);
+  await waitForStarterSet(page);
+  // Male Health logged every day from 30 to 8 days ago, then nothing: planted in the test browser's database.
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve, reject) => {
+        const open = indexedDB.open('snowfast');
+        open.onerror = () => reject(open.error);
+        open.onsuccess = () => {
+          const db = open.result;
+          const read = db.transaction('trackableDefinitions', 'readonly').objectStore('trackableDefinitions').getAll();
+          read.onsuccess = () => {
+            const male = read.result.find((t: { name: string }) => t.name === 'Male Health');
+            const tx = db.transaction('trackableEntries', 'readwrite');
+            for (let n = 8; n <= 30; n++) {
+              const d = new Date();
+              d.setDate(d.getDate() - n);
+              d.setHours(21, 0, 0, 0);
+              tx.objectStore('trackableEntries').put({ id: `planted-${n}`, trackableId: male.id, timestamp: d.getTime(), createdAt: Date.now(), updatedAt: Date.now() });
+            }
+            tx.oncomplete = () => {
+              db.close();
+              resolve();
+            };
+            tx.onerror = () => reject(tx.error);
+          };
+        };
+      }),
+  );
+  await page.reload();
+  await page.getByRole('link', { name: /Male Health/ }).click();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.getByRole('combobox', { name: /^Goal/ }).selectOption('perDay');
+  await page.getByRole('textbox', { name: 'Times per day' }).fill('1');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.getByText('Goal: Once a day')).toBeVisible();
+
+  await page.goto('/#/');
+  const card = page.getByRole('region', { name: 'Male Health has slipped' });
+  await expect(card).toContainText('after 23 of 23 days before');
+  await card.getByRole('button', { name: 'Pause a week' }).click();
+  await expect(card).toHaveCount(0);
+  expect(problems).toEqual([]);
+});
