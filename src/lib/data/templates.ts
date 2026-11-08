@@ -29,6 +29,8 @@ export const TEMPLATES: TrackableTemplate[] = [
   { name: 'Journal', icon: '\u{1F4D3}', color: '#f97316', fields: [], goalType: 'perDay', goalValue: 1 },
   { name: 'Mood', icon: '\u{1F642}', color: '#ec4899', fields: [{ name: 'Mood', kind: 'rating', ratingMax: 5, aggregation: 'average' }], goalType: 'everyDays', goalValue: 1 },
   { name: 'No alcohol', icon: '\u{1F6AB}', color: '#ef4444', fields: [], goalType: 'avoid' },
+  // One tap at night; the next morning's weight then compares "on days after".
+  { name: 'Late meal', icon: '\u{1F319}', color: '#f59e0b', fields: [] },
   { name: 'Birthdays', icon: '\u{1F382}', color: '#ec4899', fields: [], dateKind: 'birthday' },
   { name: 'Anniversaries', icon: '\u{1F48D}', color: '#f43f5e', fields: [], dateKind: 'anniversary' },
   { name: 'US holidays', icon: '\u{1F389}', color: '#f59e0b', fields: [], dateKind: 'holiday', holidayPack: true },

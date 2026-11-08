@@ -9,6 +9,7 @@
 
   const TOPICS = [
     { id: 'getting-started', title: 'Getting started' },
+    { id: 'today', title: 'Today' },
     { id: 'trackables', title: 'Trackables and what they show' },
     { id: 'dates', title: 'Dates: birthdays, holidays and countdowns' },
     { id: 'goals', title: 'Goals' },
@@ -34,10 +35,10 @@
 <div class="mx-auto flex w-full flex-1 flex-col gap-6 px-5 py-6 lg:max-w-3xl">
   <h1 class="text-xl font-semibold text-text">Help</h1>
 
-  <nav aria-label="Help topics" class="rounded-2xl border p-4" style="border-color: var(--color-border); background: var(--color-surface);">
+  <nav aria-label="Help topics" class="rounded-2xl border p-4 border-border bg-surface">
     <ul class="grid gap-1 text-sm sm:grid-cols-2">
       {#each TOPICS as t (t.id)}
-        <li><a href="/help/{t.id}" use:link class="hover:underline" style="color: var(--color-brand);">{t.title}</a></li>
+        <li><a href="/help/{t.id}" use:link class="hover:underline text-brand">{t.title}</a></li>
       {/each}
     </ul>
   </nav>
@@ -46,9 +47,9 @@
     <section id="help-getting-started">
       <h2>Getting started</h2>
       <p class="mb-2">
-        Three tabs: <strong>Fasting</strong> (the timer, Journey with your stats, and History of past fasts),
-        <strong>Trackables</strong> (the list, and Dates), and <strong>Insights</strong>. Switch a tab's pages with the buttons at
-        the top of the page; on a laptop they're listed in the sidebar.
+        Four tabs: <strong>Today</strong> (what to do now), <strong>Fasting</strong> (the timer, Journey with your stats, and
+        History of past fasts), <strong>Trackables</strong> (the list, and Dates), and <strong>Insights</strong>. Switch a tab's
+        pages with the buttons at the top of the page; on a laptop they're listed in the sidebar.
       </p>
       <ol>
         <li>
@@ -58,6 +59,10 @@
         <li>
           <strong>Start a fast.</strong> On Fasting, pick a method (16:8 and so on, or "+ Your own" for a length of your own) and
           tap Start Fast. Tap the time to correct when it started.
+        </li>
+        <li>
+          <strong>Pick a starting set.</strong> A fresh install offers eight starter trackables (Body Measurements, Sleep, Wellness
+          Check-in and so on). Keep the ones you will log, or start empty; "+ New" adds more any time.
         </li>
         <li>
           <strong>Track something.</strong> On Trackables, tap "+ New" and pick a template (Water, Workout, Weigh-in...) or make
@@ -75,6 +80,29 @@
       </ol>
     </section>
 
+    <section id="help-today">
+      <h2>Today</h2>
+      <p class="mb-2">
+        The app opens on Today: what to do now, gathered from every part of it. Each row links to where the rest lives.
+      </p>
+      <ul>
+        <li>
+          <strong>Fasting:</strong> the running fast with its goal progress and zone, or, between fasts, your eating window and
+          when the next fast is due, with one tap to start today's method (from your weekly plan, else the default). "More
+          options" opens the timer for starting earlier or picking another method.
+        </li>
+        <li>
+          <strong>Habits:</strong> every trackable with a goal, most urgent first, each with where it stands and its check button.
+          Done ones sink to the bottom; rest, skipped and paused days are greyed out and don't count.
+        </li>
+        <li>
+          <strong>Log:</strong> the trackables without a goal that you've logged in the last 30 days, with their latest reading
+          and a "+". Anything quieter than that stays on the Trackables list.
+        </li>
+        <li><strong>Coming up:</strong> the next two weeks of birthdays, anniversaries, holidays and countdowns.</li>
+      </ul>
+    </section>
+
     <section id="help-trackables">
       <h2>Trackables and what they show</h2>
       <p>
@@ -83,7 +111,11 @@
       </p>
       <ul>
         <li><strong>Time since:</strong> no fields, so when it happens is the point. Shows how long ago and the usual gap.</li>
-        <li><strong>Latest value:</strong> a reading like Weight. Shows the latest value and how it changed over about a week.</li>
+        <li>
+          <strong>Latest value:</strong> a reading like Weight. Shows the latest value, then its 7-day average against the week
+          before and the trend per week over 30 days, so one high morning doesn't read as a gain. A new entry starts from your
+          last readings: change what moved.
+        </li>
         <li><strong>Daily total:</strong> a field that adds up, like Calories or Water. Shows today's total and your daily average.</li>
         <li><strong>Check-in:</strong> a rating or yes/no. Shows whether you logged today and your streak.</li>
         <li>
@@ -160,6 +192,10 @@
 
     <section id="help-grid">
       <h2>The habit grid</h2>
+      <p class="mb-2">
+        Today shows every habit's last 7 days in one place. Tap a day to log it, or to take a logged day back off; a trackable with
+        fields opens the entry sheet for that day.
+      </p>
       <p>
         One square per day, weeks as columns, Monday at the top. The color shows how far that day went toward the goal: a
         partly filled square is part of a daily total or a times-per-day goal. For an avoid goal it's inverted, so clean days
@@ -202,7 +238,9 @@
       <p>
         The ring fills toward your fast's target and the markers are metabolic zones; tap one, or a zone card, to read about
         it. Under the timer: when the fast started, when the goal is and how long is left, and the next zone. One fast per
-        start day.
+        start day. This week sits under it as a dot per day: filled for a goal fast, half for one that fell short, hollow
+        for a rest day. Between fasts the zones wait behind "About the zones", and after a fortnight without a goal fast a
+        card sums up your year and offers a shorter method to come back with.
       </p>
       <ul>
         <li><strong>Forgot to start?</strong> Under Started, pick 30m, 1h or 2h ago, or a time, before Start Fast. Tap the timer to correct the start later.</li>

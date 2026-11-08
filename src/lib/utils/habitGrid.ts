@@ -78,6 +78,8 @@ function gridFor(
   start: number,
   length: number,
   today: number,
+  /** Days before the trackable existed are tappable too (the week matrix: a habit set up today may have been done yesterday). */
+  anyPastDay = false,
 ): GridDay[] {
   const counts = new Map<number, number>();
   for (const e of entries) {
@@ -86,7 +88,7 @@ function gridFor(
   }
   const loggedDays = [...counts.keys()].sort((a, b) => a - b);
   // A trackable can be created after entries it was given (an import), so start at whichever is first.
-  const since = Math.min(startOfDay(trackable.createdAt), loggedDays[0] ?? Number.POSITIVE_INFINITY);
+  const since = anyPastDay ? Number.NEGATIVE_INFINITY : Math.min(startOfDay(trackable.createdAt), loggedDays[0] ?? Number.POSITIVE_INFINITY);
 
   const type = trackable.goalType;
   const goal = trackable.goalValue;
@@ -117,4 +119,16 @@ function missedDays(loggedDays: number[], everyDays: number, today: number): Set
     if ((next == null || next > due) && due < today) out.add(due);
   }
   return out;
+}
+
+/** The `length` days ending today, as one row: the Today screen's "Last 7 days" matrix (HabitMatrix.svelte). */
+export function habitGridDays(
+  trackable: GridTrackable,
+  entries: readonly TimestampedValues[],
+  fields: readonly FieldDefinition[],
+  length: number,
+  now: number = Date.now(),
+): GridDay[] {
+  const today = startOfDay(now);
+  return gridFor(trackable, entries, fields, addDays(today, -(length - 1)), length, today, true);
 }

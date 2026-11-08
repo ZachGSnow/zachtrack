@@ -93,7 +93,7 @@
   }
 </script>
 
-<div class="rounded-2xl border p-4" style="border-color: var(--color-border); background: var(--color-surface);">
+<div class="rounded-2xl border p-4 border-border bg-surface">
   <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
     <p class="flex items-center gap-1.5 text-sm font-medium text-text-muted"><span>History</span> <HelpLink topic="grid" label="the habit grid" /></p>
     <SegmentedControl options={PERIODS} bind:value={period} />
@@ -113,7 +113,7 @@
   {/if}
 
   {#if selected}
-    <div class="mt-3 rounded-xl border p-3" style="border-color: var(--color-border);">
+    <div class="mt-3 rounded-xl border p-3 border-border">
       <div class="flex items-center justify-between gap-2">
         <p class="text-sm font-medium text-text">
           {new Date(selected.day).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
@@ -134,7 +134,7 @@
         </ul>
       {/if}
       <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1">
-        <button class="text-xs font-semibold" style="color: var(--color-brand);" onclick={addForSelected}>
+        <button class="text-xs font-semibold text-brand" onclick={addForSelected}>
           + Add an entry for this day
         </button>
         {#if trackable.goalType && trackable.goalType !== 'avoid'}

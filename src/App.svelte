@@ -2,8 +2,11 @@
   import Router, { link } from 'svelte-spa-router';
   import { wrap } from 'svelte-spa-router/wrap';
   import { onMount } from 'svelte';
+  import CircleHelp from '@lucide/svelte/icons/circle-help';
+  import Settings from '@lucide/svelte/icons/settings';
   import BottomNav from './lib/components/BottomNav.svelte';
   import SectionTabs from './lib/components/SectionTabs.svelte';
+  import Today from './routes/Today.svelte';
   import Fasting from './routes/Fasting.svelte';
   import Trackables from './routes/Trackables.svelte';
   import History from './routes/History.svelte';
@@ -11,12 +14,14 @@
   import { settingsStore } from './lib/stores/settings.svelte';
   import { syncStore } from './lib/stores/sync.svelte';
   import { attentionStore } from './lib/stores/attention.svelte';
-  import { seedDefaultTrackablesIfEmpty } from './lib/db';
+  import { starterStore } from './lib/stores/starter.svelte';
   import ZoneInfoSheet from './lib/components/ZoneInfoSheet.svelte';
   import SyncStatus from './lib/components/SyncStatus.svelte';
 
   const routes = {
-    '/': Fasting,
+    '/': Today,
+    // The timer, which was the home until Today arrived (v1.15.0).
+    '/fasting': Fasting,
     '/trackables': Trackables,
     // Lazy-loaded: these pull in ECharts, so keep them out of the initial bundle.
     '/trackables/:id': wrap({ asyncComponent: () => import('./routes/TrackableDetail.svelte') }),
@@ -35,16 +40,16 @@
     fastTimer.init();
     settingsStore.init();
     attentionStore.init();
-    // Try an initial sync pull before seeding defaults, so a second device
-    // picks up trackables/fields another device already created and synced,
-    // instead of generating its own duplicate default set. If the server is
-    // there but unreachable right now, wait for the first successful sync.
+    // Try an initial sync pull before offering the starter set, so a second
+    // device picks up trackables/fields another device already created and
+    // synced instead of being offered a duplicate set. If the server is there
+    // but unreachable right now, wait for the first successful sync.
     (async () => {
       const outcome = await syncStore.init();
       if (outcome === 'failed') {
-        syncStore.onceSynced(() => void seedDefaultTrackablesIfEmpty());
+        syncStore.onceSynced(() => void starterStore.offer());
       } else {
-        await seedDefaultTrackablesIfEmpty();
+        await starterStore.offer();
       }
     })();
   });
@@ -61,17 +66,15 @@
       <a
         href="/help"
         use:link
-        class="flex h-7 w-7 items-center justify-center rounded-full border text-sm font-semibold"
-        style="border-color: var(--color-border); color: var(--color-text-muted); background: var(--color-surface-2);"
+        class="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface-2 text-text-muted"
         aria-label="Help"
-      >?</a>
+      ><CircleHelp size={18} aria-hidden="true" /></a>
       <a
         href="/settings"
         use:link
-        class="flex h-7 w-7 items-center justify-center rounded-full border text-sm"
-        style="border-color: var(--color-border); color: var(--color-text-muted); background: var(--color-surface-2);"
+        class="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface-2 text-text-muted"
         aria-label="Settings"
-      >&#9881;</a>
+      ><Settings size={18} aria-hidden="true" /></a>
     </header>
     <main class="flex flex-1 flex-col">
       <SectionTabs />

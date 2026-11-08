@@ -1,6 +1,7 @@
 import type { FieldDefinition, TrackableDefinition, TrackableDisplayMode } from '../db';
 import { addDays, DAY_MS, formatDateTime, formatShortDate, startOfDay } from './time';
 import { computeFieldValuesByDay, formatTimeSinceAdaptive, type TimestampedValues } from './trackableStats';
+import { describeTrend, rollingAverage, trendPerWeek, weeklyAverages } from './measurement';
 
 /**
  * What a trackable is, which decides what its card and detail page lead with.
@@ -160,16 +161,29 @@ export function summarize(
     const latest = readings.at(-1);
     if (latest) {
       const v = Number(latest.values![field.id]);
-      const weekBefore = [...readings].reverse().find((r) => r.timestamp <= latest.timestamp - 6 * DAY_MS);
       const sub: string[] = [];
-      if (weekBefore && field.kind === 'number') {
-        const d = v - Number(weekBefore.values![field.id]);
-        const arrow = Math.abs(d) < 0.05 ? 'no change' : `${d > 0 ? '\u25b2' : '\u25bc'}${formatNumber(Math.abs(d))}`;
-        sub.push(`${arrow} since ${formatShortDate(weekBefore.timestamp)}`);
+      let cardAvg = '';
+      if (field.kind === 'number') {
+        // Through the noise: the 7-day average against the week before, and
+        // the 30-day trend (utils/measurement.ts), not one reading minus another.
+        const byDay = computeFieldValuesByDay(entries as TimestampedValues[], field);
+        const averages = weeklyAverages(byDay, now);
+        if (averages) {
+          const change =
+            averages.change == null
+              ? ''
+              : Math.abs(averages.change) < 0.05
+                ? ', same as the week before'
+                : `, ${averages.change > 0 ? '\u25b2' : '\u25bc'}${formatNumber(Math.abs(averages.change))} vs the week before`;
+          sub.push(`7-day average ${withUnit(field, averages.current)}${change}`);
+          cardAvg = ` \u00b7 avg ${formatNumber(averages.current)}`;
+        }
+        const trend = describeTrend(trendPerWeek(byDay, now), field.unit);
+        if (trend) sub.push(trend);
       }
       sub.push(formatDateTime(latest.timestamp));
       const value = withUnit(field, v);
-      return { card: `${value} \u00b7 ${since} ago`, label: `Latest ${field.name}`, value, sub };
+      return { card: `${value}${cardAvg} \u00b7 ${since} ago`, label: `Latest ${field.name}`, value, sub };
     }
   }
 
@@ -237,12 +251,16 @@ export function kindStats(
   if (kind === 'measurement' && field && field.kind === 'number') {
     const readings = entries.filter((e) => e.values?.[field.id] != null).sort((a, b) => a.timestamp - b.timestamp);
     const recent = readings.filter((r) => r.timestamp >= startOfDay(addDays(startOfDay(now), -89))).map((r) => Number(r.values![field.id]));
-    const latest = readings.at(-1);
-    const monthAgo = latest ? [...readings].reverse().find((r) => r.timestamp <= latest.timestamp - 29 * DAY_MS) : undefined;
-    const change = latest && monthAgo ? Number(latest.values![field.id]) - Number(monthAgo.values![field.id]) : null;
+    const byDay = computeFieldValuesByDay(entries as TimestampedValues[], field);
+    const avg = rollingAverage(byDay, now);
+    const perWeek = trendPerWeek(byDay, now);
+    const unit = field.unit ? ` ${field.unit}` : '';
     return [
-      { label: 'Readings', value: String(readings.length) },
-      { label: '30-day change', value: change == null ? dash : `${change > 0 ? '+' : change < 0 ? '\u2212' : ''}${formatNumber(Math.abs(change))}` },
+      { label: '7-day avg', value: avg == null ? dash : withUnit(field, avg) },
+      {
+        label: 'Per week (30d)',
+        value: perWeek == null ? dash : Math.abs(perWeek) < 0.05 ? 'level' : `${perWeek > 0 ? '+' : '\u2212'}${formatNumber(Math.abs(perWeek))}${unit}`,
+      },
       { label: '90-day low', value: recent.length ? withUnit(field, Math.min(...recent)) : dash },
       { label: '90-day high', value: recent.length ? withUnit(field, Math.max(...recent)) : dash },
     ];

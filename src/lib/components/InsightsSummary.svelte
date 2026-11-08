@@ -58,11 +58,11 @@
   const fasts30 = $derived(fasts.filter((f) => f.endTime != null && f.startTime >= now - 30 * 24 * 3600_000));
 </script>
 
-<section class="rounded-2xl border p-4" style="border-color: var(--color-border); background: var(--color-surface);" aria-labelledby="insights-overview">
+<section class="rounded-2xl border p-4 border-border bg-surface" aria-labelledby="insights-overview">
   <h2 id="insights-overview" class="mb-2 text-sm font-semibold text-text">Overview</h2>
   <ul class="flex flex-col">
     {#if fasts.length}
-      <li class="border-t py-2 first:border-t-0" style="border-color: var(--color-border);">
+      <li class="border-t py-2 first:border-t-0 border-border">
         <a href="/journey" use:link class="flex items-start gap-3">
           <span class="w-6 text-center text-lg">&#x23F1;&#xFE0F;</span>
           <span class="min-w-0 flex-1 text-sm">
@@ -76,7 +76,7 @@
       </li>
     {/if}
     {#each rows as r (r.trackable.id)}
-      <li class="border-t py-2 first:border-t-0" style="border-color: var(--color-border);">
+      <li class="border-t py-2 first:border-t-0 border-border">
         <a href="/trackables/{r.trackable.id}" use:link class="flex items-start gap-3">
           <span class="w-6 text-center text-lg">{r.trackable.icon}</span>
           <span class="min-w-0 flex-1 text-sm">
@@ -90,7 +90,7 @@
   </ul>
 </section>
 
-<section class="rounded-2xl border p-4" style="border-color: var(--color-border); background: var(--color-surface);" aria-labelledby="insights-patterns">
+<section class="rounded-2xl border p-4 border-border bg-surface" aria-labelledby="insights-patterns">
   <h2 id="insights-patterns" class="mb-2 text-sm font-semibold text-text">Patterns</h2>
   {#if patterns.length === 0}
     <p class="text-sm text-text-muted">None clear yet. Patterns show once there are at least 5 days on each side of a comparison and the difference is large.</p>

@@ -10,7 +10,7 @@
     type FieldDefinition,
     type DateRepeat,
   } from '../db';
-  import { toDatetimeLocal, fromDatetimeLocal, toDateInputValue, fromDateInputValue } from '../utils/time';
+  import { toDatetimeLocal, fromDatetimeLocal, toDateInputValue, fromDateInputValue, formatDateTime } from '../utils/time';
   import { DATE_KIND_ITEM, dateKindOf, defaultRepeat, describeRepeat, ordinal } from '../utils/dates';
   import { WEEKDAY_NAMES } from '../utils/trackableGoals';
   import TagInput from './TagInput.svelte';
@@ -108,6 +108,9 @@
     error = '';
   });
 
+  /** When a new entry's number fields were filled from the last entry, that entry's time. */
+  let prefilledFrom = $state<number | null>(null);
+
   $effect(() => {
     if (!open || !trackable || $allFields === undefined) return;
     const key = `${trackable.id}|${entry?.id ?? `new@${defaultTimestamp ?? ''}`}`;
@@ -122,7 +125,31 @@
       else inputs[f.id] = typeof raw === 'boolean' ? raw : false;
     }
     fieldInputs = inputs;
+    prefilledFrom = null;
+    // A new entry starts from the last one for readings (number fields that
+    // keep their latest value, like Weight or Waist), since the next reading
+    // is usually close and a tape measurement means four numbers. Totals
+    // (sum) and averages start empty: each entry is its own amount.
+    if (!entry) void prefillFromLast(trackable.id, fields.filter((f) => f.kind === 'number' && (f.aggregation ?? 'last') === 'last'), key);
   });
+
+  async function prefillFromLast(trackableId: string, readings: FieldDefinition[], key: string) {
+    if (readings.length === 0) return;
+    const own = await db.trackableEntries.where('trackableId').equals(trackableId).toArray();
+    // The sheet may have moved on to another entry while the query ran.
+    if (key !== fieldsKey) return;
+    const filled: Record<string, string> = {};
+    let from = 0;
+    for (const f of readings) {
+      const last = own.filter((e) => e.values?.[f.id] != null).sort((a, b) => b.timestamp - a.timestamp)[0];
+      if (!last || fieldInputs[f.id]) continue;
+      filled[f.id] = String(last.values![f.id]);
+      from = Math.max(from, last.timestamp);
+    }
+    if (!from) return;
+    fieldInputs = { ...fieldInputs, ...filled };
+    prefilledFrom = from;
+  }
 
   function setRating(fieldId: string, value: number) {
     fieldInputs = { ...fieldInputs, [fieldId]: fieldInputs[fieldId] === value ? 0 : value };
@@ -217,15 +244,14 @@
           type="text"
           bind:value={note}
           placeholder={item.namePlaceholder}
-          class="w-full rounded-lg border bg-transparent p-2 text-text placeholder:text-text-muted"
-          style="border-color: var(--color-border);"
+          class="w-full rounded-lg border bg-transparent p-2 text-text placeholder:text-text-muted border-border"
         />
       </label>
 
       {#if dateKind === 'holiday' || dateKind === 'countdown'}
         <label class="block text-sm">
           <span class="mb-1 block text-text-muted">Repeats</span>
-          <select bind:value={repeatChoice} class="w-full rounded-lg border bg-transparent p-2 text-text" style="border-color: var(--color-border);">
+          <select bind:value={repeatChoice} class="w-full rounded-lg border bg-transparent p-2 text-text border-border">
             {#if dateKind === 'holiday'}
               <option value="yearly">Same date every year</option>
               <option value="nthWeekday">A weekday of a month (e.g. 4th Thursday)</option>
@@ -242,25 +268,25 @@
         {#if repeatChoice === 'everyMonths' || repeatChoice === 'everyYears'}
           <label class="block text-sm">
             <span class="mb-1 block text-text-muted">Every how many {repeatChoice === 'everyYears' ? 'years' : 'months'}</span>
-            <input type="text" inputmode="numeric" bind:value={repeatCount} class="w-full rounded-lg border bg-transparent p-2 text-text" style="border-color: var(--color-border);" />
+            <input type="text" inputmode="numeric" bind:value={repeatCount} class="w-full rounded-lg border bg-transparent p-2 text-text border-border" />
           </label>
         {:else if repeatChoice === 'nthWeekday'}
           <div class="grid grid-cols-3 gap-2 text-sm">
-            <select bind:value={ruleNth} aria-label="Which" class="rounded-lg border bg-transparent p-2 text-text" style="border-color: var(--color-border);">
+            <select bind:value={ruleNth} aria-label="Which" class="rounded-lg border bg-transparent p-2 text-text border-border">
               {#each [1, 2, 3, 4, 5] as n (n)}<option value={n}>{ordinal(n)}</option>{/each}
               <option value={-1}>Last</option>
             </select>
-            <select bind:value={ruleWeekday} aria-label="Weekday" class="rounded-lg border bg-transparent p-2 text-text" style="border-color: var(--color-border);">
+            <select bind:value={ruleWeekday} aria-label="Weekday" class="rounded-lg border bg-transparent p-2 text-text border-border">
               {#each WEEKDAY_NAMES as w, i (w)}<option value={i}>{w}</option>{/each}
             </select>
-            <select bind:value={ruleMonth} aria-label="Month" class="rounded-lg border bg-transparent p-2 text-text" style="border-color: var(--color-border);">
+            <select bind:value={ruleMonth} aria-label="Month" class="rounded-lg border bg-transparent p-2 text-text border-border">
               {#each MONTH_NAMES as m, i (m)}<option value={i}>{m}</option>{/each}
             </select>
           </div>
         {:else if repeatChoice === 'easter'}
           <label class="block text-sm">
             <span class="mb-1 block text-text-muted">Days from Easter (0 = Easter Sunday, -2 = Good Friday)</span>
-            <input type="text" inputmode="numeric" bind:value={easterOffset} class="w-full rounded-lg border bg-transparent p-2 text-text" style="border-color: var(--color-border);" />
+            <input type="text" inputmode="numeric" bind:value={easterOffset} class="w-full rounded-lg border bg-transparent p-2 text-text border-border" />
           </label>
         {/if}
         {#if !usesDate}
@@ -275,8 +301,7 @@
           <input
             type="date"
             bind:value={dateLocal}
-            class="w-full rounded-lg border bg-transparent p-2 text-text"
-            style="border-color: var(--color-border);"
+            class="w-full rounded-lg border bg-transparent p-2 text-text border-border"
           />
         </label>
       {/if}
@@ -286,8 +311,7 @@
         <input
           type="datetime-local"
           bind:value={dateLocal}
-          class="w-full rounded-lg border bg-transparent p-2 text-text"
-          style="border-color: var(--color-border);"
+          class="w-full rounded-lg border bg-transparent p-2 text-text border-border"
         />
       </label>
     {/if}
@@ -301,8 +325,7 @@
             inputmode="decimal"
             value={fieldInputs[field.id] ?? ''}
             oninput={(e) => (fieldInputs = { ...fieldInputs, [field.id]: (e.target as HTMLInputElement).value })}
-            class="w-full rounded-lg border bg-transparent p-2 text-text"
-            style="border-color: var(--color-border);"
+            class="w-full rounded-lg border bg-transparent p-2 text-text border-border"
           />
         </label>
       {:else if field.kind === 'rating'}
@@ -314,7 +337,7 @@
                 type="button"
                 class="flex-1 rounded-lg border py-2 text-sm"
                 style={fieldInputs[field.id] === n
-                  ? 'background: var(--color-brand); color: #06140c; border-color: var(--color-brand);'
+                  ? 'background: var(--color-brand); color: var(--color-brand-fg); border-color: var(--color-brand);'
                   : 'border-color: var(--color-border); color: var(--color-text-muted);'}
                 onclick={() => setRating(field.id, n)}
               >{n}</button>
@@ -324,20 +347,22 @@
       {:else}
         <button
           type="button"
-          class="flex w-full items-center justify-between rounded-lg border p-2 text-sm"
-          style="border-color: var(--color-border);"
+          class="flex w-full items-center justify-between rounded-lg border p-2 text-sm border-border"
           onclick={() => toggleBoolean(field.id)}
         >
           <span class="text-text-muted">{field.name}</span>
           <span
             class="rounded-full px-3 py-1 text-xs font-semibold"
             style={fieldInputs[field.id]
-              ? 'background: var(--color-brand); color: #06140c;'
+              ? 'background: var(--color-brand); color: var(--color-brand-fg);'
               : 'background: var(--color-surface-2); color: var(--color-text-muted);'}
           >{fieldInputs[field.id] ? 'Yes' : 'No'}</span>
         </button>
       {/if}
     {/each}
+    {#if prefilledFrom}
+      <p class="-mt-2 text-xs text-text-muted">Readings start from your last entry ({formatDateTime(prefilledFrom)}); change what moved.</p>
+    {/if}
 
     {#if !isAges}
       <div>
@@ -350,27 +375,24 @@
         <textarea
           bind:value={note}
           rows="2"
-          class="w-full resize-none rounded-lg border bg-transparent p-2 text-text"
-          style="border-color: var(--color-border);"
+          class="w-full resize-none rounded-lg border bg-transparent p-2 text-text border-border"
         ></textarea>
       </label>
     {/if}
 
     {#if error}
-      <p class="text-sm" style="color: #f87171;">{error}</p>
+      <p class="text-sm text-danger">{error}</p>
     {/if}
 
     <div class="flex gap-2">
       {#if entry}
         <button
-          class="flex-1 rounded-xl border py-2.5 text-sm font-medium"
-          style="border-color: #ef444460; color: #f87171;"
+          class="flex-1 rounded-xl border py-2.5 text-sm font-medium border-danger-line text-danger"
           onclick={handleDelete}
         >Delete</button>
       {/if}
       <button
-        class="flex-1 rounded-xl py-2.5 text-sm font-semibold"
-        style="background: var(--color-brand); color: #06140c;"
+        class="flex-1 rounded-xl py-2.5 text-sm font-semibold bg-brand text-brand-fg"
         onclick={handleSave}
       >Save</button>
     </div>

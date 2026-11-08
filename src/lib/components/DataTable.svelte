@@ -55,7 +55,7 @@
   ]);
 </script>
 
-<div class="rounded-2xl border" style="border-color: var(--color-border); background: var(--color-surface);">
+<div class="rounded-2xl border border-border bg-surface">
   <div class="flex items-center justify-between gap-2 px-3 pt-3 pb-2">
     <p class="text-xs text-text-muted">{hint}</p>
     {#if metrics.length > 0}

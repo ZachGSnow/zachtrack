@@ -6,6 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 <p>
+  <img src="docs/screenshots/today.png" alt="Today with the running fast, a habit to check, the last seven days and what has been logged" width="200">
   <img src="docs/screenshots/fasting.png" alt="Fasting timer with a 16:8 fast past its goal, its start, goal and next zone, and the current zone" width="200">
   <img src="docs/screenshots/journey.png" alt="Journey with goal streaks, this week against last, and the fasting days grid" width="200">
   <img src="docs/screenshots/trackables.png" alt="Trackables list showing each one's latest value or when it was last logged" width="200">
@@ -35,7 +36,9 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
   notifications. Between fasts the tab shows the eating window, and History
   logs a fast you didn't time. An optional daily start time counts down to
   your next fast, and a weekly plan gives each weekday its own method and
-  time or a rest day. Long fasts get hydration and electrolyte prompts,
+  time or a rest day, and the timer shows this week as a dot per day. After
+  a fortnight without a goal fast, a card sums up the year and offers a
+  shorter method to come back with. Long fasts get hydration and electrolyte prompts,
   cautions at 48 and 72 hours, and refeeding advice when they end. Journey has a goal streak (days a fast met its goal), this
   week against last, a habit grid of fasting days, and a weight-after-fasting
   insight next to the table and charts.
@@ -43,24 +46,28 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
   rating (custom scale) or yes/no fields. Each field chooses how several
   entries on one day combine (`sum` for Water, `last` for Weight, `average`).
   Each trackable leads with what matters for its kind, picked automatically
-  from its fields and changeable: time since (events), latest value and
-  change (readings like Weight), today's total (Calories, Water) or logged
+  from its fields and changeable: time since (events), latest value with its
+  7-day average and weekly trend (readings like Weight, and a goal-weight
+  date at that rate), today's total (Calories, Water) or logged
   today with a streak (check-ins). Optional goals: a daily total, N times a
   week, every N days (with due and overdue) or avoid, each with its own
   streak; times per day too, and daily goals can apply on chosen weekdays,
   with days skipped or the goal paused for a holiday without breaking the
   streak. A trackable with a goal gets a habit-grid strip on its card and a
   check button for today; each trackable's page has the full grid by week,
-  month, six months or year. A trackable without fields logs in one tap,
+  month, six months or year. Today shows every habit's last 7 days in one
+  matrix, with a tap to fill in a day, and a habit's page has tiles for days
+  met, the rate, and the current and best streaks. A trackable without fields logs in one tap,
   with undo. The list
   sorts by what's due (or your own order, or A-Z), with pinning and
   archiving; fasts and entries can be filtered by tag. In-app reminders
   instead of notifications: a Needs attention list of overdue and due goals,
   and badges on the Trackables and Fasting tabs. Each trackable's page adds
   plain-language insights: goal consistency, best weekday, and how a value
-  differs on days with your other trackables.
+  differs on days with your other trackables, or the day after them (a
+  late meal in the next morning's weight).
   A starter set (Body Measurements, Vitals, Nutrition, Sleep, Wellness,
-  Activity, Menstrual Cycle, Male Health) is created on a new install and is
+  Activity, Menstrual Cycle, Male Health) is offered on a new install and is
   fully editable, including each field's name, unit and rating scale.
 - **Dates:** birthdays with live ages, anniversaries, holidays (including
   rules like the 4th Thursday of November, and Easter), and countdowns or
@@ -69,7 +76,8 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
   Dates show under Needs attention a few days ahead, the next two weeks
   under Coming up, and the next year on a Dates page with a list and a
   month calendar.
-- **Three tabs:** Fasting (Timer, Journey, History), Trackables (List,
+- **Four tabs:** Today (what to do now: the fast, habits due, what to log
+  and dates coming up), Fasting (Timer, Journey, History), Trackables (List,
   Dates) and Insights, with each tab's pages switched at the top of the page
   on a phone and listed in the sidebar on a laptop. Insights opens with an
   overview of fasting and every trackable, the clearest patterns and a year
@@ -83,6 +91,7 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
   measurements logged together.
 - **Help** in the app: Getting started and short guides to each feature,
   with "?" links where questions come up.
+- **Light and dark themes** that follow the device, or your pick in Settings.
 - **Phone and laptop layouts:** a tab bar on phones; on wider screens a
   sidebar, content that uses the width, and dialogs instead of bottom sheets.
 - **Offline and installable** (service worker, Android/Chrome PWA), with
@@ -116,8 +125,8 @@ npm run dev
 ```
 
 Open the printed URL. Without a sync backend the app runs local-only: data
-stays in the browser's IndexedDB, the starter trackables are created on first
-launch, and the sync pill reads "Local only" instead of an error. Export and
+stays in the browser's IndexedDB, the first launch offers a starter set to pick
+from, and the sync pill reads "Local only" instead of an error. Export and
 import (Settings > Your data) move data between local-only installs.
 
 ## Deploy your own (Cloudflare)
@@ -227,7 +236,8 @@ of synced folders, and delete it when done.
   (same-origin only, no framing), HSTS and related headers; sync responses
   are never cached.
 
-Stack: Vite, Svelte 5 (runes), TypeScript, Tailwind CSS 4, Dexie,
+Stack: Vite, Svelte 5 (runes), TypeScript, Tailwind CSS 4, Inter and Manrope
+(self-hosted), lucide icons, culori, Dexie,
 vite-plugin-pwa, ECharts, Cloudflare Pages + Functions + D1 + Access.
 
 [ARCHITECTURE.md](ARCHITECTURE.md) covers the design decisions, the sync

@@ -66,7 +66,7 @@
           class="border px-3 py-1.5 text-sm font-medium transition-colors {mine ? 'rounded-l-full border-r-0' : 'rounded-full'}"
           class:selected={selectedId === preset.id}
           style={selectedId === preset.id
-            ? 'background: var(--color-brand); color: #06140c; border-color: var(--color-brand);'
+            ? 'background: var(--color-brand); color: var(--color-brand-fg); border-color: var(--color-brand);'
             : 'background: var(--color-surface-2); color: var(--color-text); border-color: var(--color-border);'}
           onclick={() => (selectedId = preset.id)}
         >
@@ -76,7 +76,7 @@
           <button
             class="rounded-r-full border py-1.5 pr-2.5 pl-1.5 text-sm text-text-muted"
             style={selectedId === preset.id
-              ? 'background: var(--color-brand); color: #06140c; border-color: var(--color-brand);'
+              ? 'background: var(--color-brand); color: var(--color-brand-fg); border-color: var(--color-brand);'
               : 'background: var(--color-surface-2); border-color: var(--color-border);'}
             onclick={() => removePreset(preset.id)}
             aria-label="Remove {preset.label}"
@@ -86,14 +86,13 @@
     {/each}
     {#if !adding}
       <button
-        class="rounded-full border border-dashed px-3 py-1.5 text-sm font-medium text-text-muted"
-        style="border-color: var(--color-border);"
+        class="rounded-full border border-dashed px-3 py-1.5 text-sm font-medium text-text-muted border-border"
         onclick={() => (adding = true)}
       >+ Your own</button>
     {/if}
   </div>
   {#if error && !adding}
-    <p class="mt-1 text-xs" style="color: #f87171;">{error}</p>
+    <p class="mt-1 text-xs text-danger">{error}</p>
   {/if}
   {#if adding}
     <div class="mt-2 flex items-center gap-2">
@@ -104,20 +103,19 @@
           inputmode="decimal"
           bind:value={hoursDraft}
           placeholder="15"
-          class="w-16 rounded-lg border bg-transparent p-1.5 text-center text-text placeholder:text-text-muted"
-          style="border-color: var(--color-border);"
+          class="w-16 rounded-lg border bg-transparent p-1.5 text-center text-text placeholder:text-text-muted border-border"
           aria-label="Hours"
         />
         hours
       </label>
-      <button class="rounded-lg px-3 py-1.5 text-sm font-semibold" style="background: var(--color-brand); color: #06140c;" onclick={addPreset}>Save</button>
+      <button class="rounded-lg px-3 py-1.5 text-sm font-semibold bg-brand text-brand-fg" onclick={addPreset}>Save</button>
       <button class="text-sm text-text-muted" onclick={() => {
         adding = false;
         error = '';
       }}>Cancel</button>
     </div>
     {#if error}
-      <p class="mt-1 text-xs" style="color: #f87171;">{error}</p>
+      <p class="mt-1 text-xs text-danger">{error}</p>
     {/if}
   {/if}
   {#if selectedId}

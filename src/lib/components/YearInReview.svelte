@@ -18,7 +18,7 @@
   const days = (n: number) => `${nf.format(n)} ${n === 1 ? 'day' : 'days'}`;
 </script>
 
-<section class="rounded-2xl border p-4" style="border-color: var(--color-border); background: var(--color-surface);" aria-labelledby="year-review">
+<section class="rounded-2xl border p-4 border-border bg-surface" aria-labelledby="year-review">
   <div class="mb-3 flex items-center justify-between gap-2">
     <h2 id="year-review" class="text-sm font-semibold text-text">Year in review</h2>
     {#if options.length > 1}
@@ -36,7 +36,7 @@
       { label: 'Entries logged', value: nf.format(r.logging.entries), sub: `on ${days(r.logging.daysLogged)}` },
       { label: 'Busiest month', value: r.busiestMonth ?? '-', sub: '' },
     ] as tile (tile.label)}
-      <div class="rounded-xl border p-3" style="border-color: var(--color-border);">
+      <div class="rounded-xl border p-3 border-border">
         <p class="text-xs text-text-muted">{tile.label}</p>
         <p class="mt-1 text-lg font-semibold text-text">{tile.value}</p>
         {#if tile.sub}<p class="text-xs text-text-muted">{tile.sub}</p>{/if}

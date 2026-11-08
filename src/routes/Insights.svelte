@@ -16,6 +16,8 @@
   import { settingsStore } from '../lib/stores/settings.svelte';
   import { resolveBodyFieldIds } from '../lib/utils/health';
   import EChart from '../lib/components/EChart.svelte';
+  import { themeStore } from '../lib/stores/theme.svelte';
+  import { chartColors } from '../lib/utils/theme';
   import DataTable from '../lib/components/DataTable.svelte';
   import SegmentedControl from '../lib/components/SegmentedControl.svelte';
   import InsightsSummary from '../lib/components/InsightsSummary.svelte';
@@ -58,7 +60,9 @@
     savePrefs(PREFS_KEY, { range, granularity, view, visible });
   });
 
-  const PALETTE = ['#22ff88', '#a855f7', '#38bdf8', '#f97316', '#eab308', '#ec4899', '#818cf8', '#10b981', '#f472b6', '#60a5fa', '#ef4444', '#22d3ee'];
+  // Chart colours follow the theme (utils/theme.ts), since ECharts draws with literal colours.
+  const ct = $derived(chartColors(themeStore.effective));
+  const PALETTE = $derived([ct.brand, '#a855f7', '#38bdf8', '#f97316', '#eab308', '#ec4899', '#818cf8', '#10b981', '#f472b6', '#60a5fa', '#ef4444', '#22d3ee']);
 
   // Axis groups that read naturally on the left (count/hour-like); everything else defaults right.
   const LEFT_GROUPS = new Set(['fastingHours', 'fastingTotal', 'occurrence']);
@@ -145,13 +149,13 @@
       top: 44,
       bottom: 30,
     },
-    legend: { textStyle: { color: '#8ba398' }, top: 4 },
+    legend: { textStyle: { color: ct.muted }, top: 4 },
     tooltip: { trigger: 'axis' },
     xAxis: {
       type: 'category',
       data: dayList.map((d) => formatShortDate(d)),
-      axisLine: { lineStyle: { color: '#262e2a' } },
-      axisLabel: { color: '#8ba398' },
+      axisLine: { lineStyle: { color: ct.line } },
+      axisLabel: { color: ct.muted },
     },
     yAxis: axisGroupKeys.map((group) => {
       const isLeft = LEFT_GROUPS.has(group);
@@ -167,9 +171,9 @@
         min,
         max,
         scale: min == null,
-        nameTextStyle: { color: '#8ba398' },
-        axisLabel: { color: '#8ba398' },
-        splitLine: group === 'fastingHours' ? { lineStyle: { color: '#1a201d' } } : { show: false },
+        nameTextStyle: { color: ct.muted },
+        axisLabel: { color: ct.muted },
+        splitLine: group === 'fastingHours' ? { lineStyle: { color: ct.grid } } : { show: false },
       };
     }),
     series: activeDefs.map((def) => ({
@@ -193,8 +197,8 @@
         ? {
             markLine: {
               symbol: 'none' as const,
-              label: { formatter: 'Goal', color: '#8ba398' },
-              lineStyle: { color: '#8ba398', type: 'dashed' as const, width: 1.5 },
+              label: { formatter: 'Goal', color: ct.muted },
+              lineStyle: { color: ct.muted, type: 'dashed' as const, width: 1.5 },
               data: [{ yAxis: settingsStore.data.goalWeightLb }],
             },
           }
@@ -243,11 +247,11 @@
   {#if view === 'table'}
     <DataTable metrics={activeDefs} {granularity} {rangeStart} />
   {:else if !anyVisible}
-    <p class="rounded-2xl border p-6 text-center text-sm text-text-muted" style="border-color: var(--color-border); background: var(--color-surface);">
+    <p class="rounded-2xl border p-6 text-center text-sm text-text-muted border-border bg-surface">
       Select at least one metric above to see the chart.
     </p>
   {:else}
-    <div class="rounded-2xl border p-2" style="border-color: var(--color-border); background: var(--color-surface);">
+    <div class="rounded-2xl border p-2 border-border bg-surface">
       <EChart {option} height="320px" />
     </div>
   {/if}

@@ -30,6 +30,21 @@ describe('insights', () => {
     expect(insights.find((i) => i.label === 'Last 30 days')!.text).toBe('Logged on 30 of 30 days');
   });
 
+  it('compares the day after another trackable too: a late meal shows in the next morning', () => {
+    // Weight every morning for 45 days; a late meal every third evening adds 2 lb the next morning.
+    const weight: FieldDefinition = { id: 'f-w', name: 'Weight', kind: 'number', unit: 'lb', createdAt: 1, updatedAt: 1 };
+    const lateMeal: TimestampedValues[] = [];
+    const entries: TimestampedValues[] = [];
+    for (let n = 0; n < 46; n++) {
+      if (n % 3 === 0) lateMeal.push({ timestamp: daysAgo(n, 22) });
+      const afterLateMeal = (n + 1) % 3 === 0;
+      if (n < 45) entries.push({ timestamp: daysAgo(n, 7), values: { 'f-w': afterLateMeal ? 192 : 190 } });
+    }
+    const insights = trackableInsights({ ...base, name: 'Body' }, entries, [weight], [{ trackable: { id: 'l', name: 'Late meal' }, entries: lateMeal }], NOW);
+    const after = insights.find((i) => i.label === 'On days after')!;
+    expect(after.text).toBe('Weight averages 192 lb after Late meal (15 days), 190 lb otherwise (30)');
+  });
+
   it('leaves out comparisons with too few days on a side, or no real difference', () => {
     const entries: TimestampedValues[] = Array.from({ length: 30 }, (_, n) => ({ timestamp: daysAgo(n), values: { 'f-m': 4 } }));
     const rare = [{ timestamp: daysAgo(1) }, { timestamp: daysAgo(2) }];

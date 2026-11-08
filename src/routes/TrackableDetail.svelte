@@ -3,9 +3,10 @@
   import { MediaQuery } from 'svelte/reactivity';
   import { push, link } from 'svelte-spa-router';
   import { db, type TrackableEntry, type FieldDefinition } from '../lib/db';
-  import { computeFieldTodayTotal } from '../lib/utils/trackableStats';
+  import { computeFieldTodayTotal, computeFieldValuesByDay } from '../lib/utils/trackableStats';
+  import { describeProjection, projectGoal, trendPerWeek, weeklyAverages } from '../lib/utils/measurement';
   import { kindStats, resolveKind, summarize } from '../lib/utils/trackableKinds';
-  import { describeGoal, GOAL_STATE_COLORS, goalStatus } from '../lib/utils/trackableGoals';
+  import { describeGoal, GOAL_STATE_COLORS, goalStats, goalStatus } from '../lib/utils/trackableGoals';
   import { trackableInsights } from '../lib/utils/insights';
   import { DATE_KIND_ITEM, DATE_KIND_LABELS, dateKindOf, describeDate } from '../lib/utils/dates';
   import { rangeStartFor, type ChartRange } from '../lib/utils/stats';
@@ -19,6 +20,8 @@
   } from '../lib/utils/metrics';
   import { loadPrefs, oneOf, savePrefs } from '../lib/utils/prefs';
   import { settingsStore } from '../lib/stores/settings.svelte';
+  import { themeStore } from '../lib/stores/theme.svelte';
+  import { readableText } from '../lib/utils/color';
   import { resolveBodyFieldIds } from '../lib/utils/health';
   import BottomSheet from '../lib/components/BottomSheet.svelte';
   import DataTable from '../lib/components/DataTable.svelte';
@@ -98,6 +101,8 @@
   const bodyFieldIds = $derived(resolveBodyFieldIds($allFields ?? [], settingsStore.data));
 
   const kind = $derived($trackable ? resolveKind($trackable, attachedFields).kind : 'event');
+  // The trackable's colour as text, readable on this theme (utils/color.ts).
+  const ink = $derived($trackable ? readableText($trackable.color, themeStore.effective) : 'inherit');
   const isAges = $derived(kind === 'ages');
   const showTrendsTable = $derived(attachedFields.length === 0 || trendsView === 'table');
 
@@ -130,9 +135,22 @@
   });
 
   const summary = $derived(summarize(kind, $entries ?? [], attachedFields, now));
-  const stats = $derived(kindStats(kind, $entries ?? [], attachedFields, now));
+  // A trackable with a goal shows how the goal is going; the rest show the kind's figures.
+  const stats = $derived(($trackable && !isAges && goalStats($trackable, $entries ?? [], attachedFields, now)) || kindStats(kind, $entries ?? [], attachedFields, now));
   const goal = $derived($trackable && !isAges ? goalStatus($trackable, $entries ?? [], attachedFields, now) : null);
   const goalText = $derived($trackable ? describeGoal($trackable, attachedFields) : null);
+
+  // The weight field's page: where the 7-day average is heading against the
+  // goal weight in Settings (utils/measurement.ts).
+  const projection = $derived.by(() => {
+    const goalWeight = settingsStore.data.goalWeightLb;
+    const field = bodyFieldIds.weight ? attachedFields.find((f) => f.id === bodyFieldIds.weight) : undefined;
+    if (kind !== 'measurement' || !goalWeight || !field) return null;
+    const byDay = computeFieldValuesByDay($entries ?? [], field);
+    const averages = weeklyAverages(byDay, now);
+    if (!averages) return null;
+    return describeProjection(projectGoal(averages.current, goalWeight, trendPerWeek(byDay, now), now), goalWeight, field.unit);
+  });
 
   const insights = $derived.by(() => {
     const t = $trackable;
@@ -202,7 +220,7 @@
 {#if !$trackable}
   <div class="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
     <p class="text-sm text-text-muted">Loading&hellip;</p>
-    <a href="/trackables" use:link class="text-sm font-medium" style="color: var(--color-brand);">Back to Trackables</a>
+    <a href="/trackables" use:link class="text-sm font-medium text-brand">Back to Trackables</a>
   </div>
 {:else}
   <div class="mx-auto flex w-full flex-1 flex-col gap-5 px-5 py-6 {isAges ? 'lg:max-w-3xl' : ''}">
@@ -217,21 +235,19 @@
     {#if isAges}
       <p class="-mt-3 text-xs text-text-muted">{DATE_KIND_LABELS[dateKind]}</p>
       <button
-        class="w-full rounded-xl py-3 text-base font-semibold"
-        style="background: var(--color-brand); color: #06140c;"
+        class="w-full rounded-xl py-3 text-base font-semibold bg-brand text-brand-fg"
         onclick={() => openLogNew()}
       >+ {DATE_KIND_ITEM[dateKind].add}</button>
 
       {#snippet dateRow(d: (typeof dateItems)[number])}
         <li>
           <button
-            class="w-full rounded-xl border p-3 text-left"
-            style="border-color: var(--color-border); background: var(--color-surface);"
+            class="w-full rounded-xl border p-3 text-left border-border bg-surface"
             onclick={() => openLogEdit(d.entry)}
           >
             <div class="flex items-center justify-between gap-2">
               <span class="text-sm font-semibold text-text">{d.item.name}</span>
-              <span class="shrink-0 text-xs font-medium" style="color: {d.item.daysUntil <= 7 && d.item.daysUntil >= 0 ? $trackable!.color : 'var(--color-text-muted)'};">
+              <span class="shrink-0 text-xs font-medium" style="color: {d.item.daysUntil <= 7 && d.item.daysUntil >= 0 ? ink : 'var(--color-text-muted)'};">
                 {d.item.countdown}
               </span>
             </div>
@@ -267,15 +283,18 @@
             class="rounded-2xl border p-4 text-center"
             style="border-color: {$trackable.color}40; background: linear-gradient(180deg, {$trackable.color}14, transparent);"
           >
-            <p class="text-xs uppercase tracking-wide" style="color: {$trackable.color};">{summary.label}</p>
+            <p class="text-xs uppercase tracking-wide" style="color: {ink};">{summary.label}</p>
             <p class="mt-1 text-3xl font-semibold text-text">{summary.value}</p>
             {#each summary.sub as line, i (i)}
               <p class="mt-1 text-xs text-text-muted">{line}</p>
             {/each}
+            {#if projection}
+              <p class="mt-2 text-xs font-medium" style="color: {ink};">{projection}</p>
+            {/if}
           </div>
 
           {#if goal && goalText}
-            <div class="rounded-xl border p-3" style="border-color: var(--color-border); background: var(--color-surface);">
+            <div class="rounded-xl border p-3 border-border bg-surface">
               <div class="flex items-baseline justify-between gap-2">
                 <p class="text-xs text-text-muted">Goal: {goalText}</p>
                 {#if goal.streak}
@@ -284,7 +303,7 @@
               </div>
               <p class="mt-1 text-base font-semibold" style="color: {GOAL_STATE_COLORS[goal.state] ?? 'var(--color-text)'};">{goal.text}</p>
               {#if goal.progress != null}
-                <div class="mt-2 h-1.5 overflow-hidden rounded-full" style="background: var(--color-border);" role="progressbar" aria-label="Goal progress" aria-valuenow={Math.round(goal.progress * 100)} aria-valuemin="0" aria-valuemax="100">
+                <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-border" role="progressbar" aria-label="Goal progress" aria-valuenow={Math.round(goal.progress * 100)} aria-valuemin="0" aria-valuemax="100">
                   <div class="h-full rounded-full" style="width: {goal.progress * 100}%; background: {GOAL_STATE_COLORS[goal.state] ?? $trackable.color};"></div>
                 </div>
               {/if}
@@ -292,8 +311,7 @@
           {/if}
 
           <button
-            class="w-full rounded-xl py-3 text-base font-semibold"
-            style="background: var(--color-brand); color: #06140c;"
+            class="w-full rounded-xl py-3 text-base font-semibold bg-brand text-brand-fg"
             onclick={() => openLogNew()}
           >Log Entry</button>
 
@@ -319,7 +337,7 @@
 
           <div class="grid grid-cols-2 gap-2">
             {#each stats as stat (stat.label)}
-              <div class="rounded-xl border p-3" style="border-color: var(--color-border); background: var(--color-surface);">
+              <div class="rounded-xl border p-3 border-border bg-surface">
                 <p class="text-xs text-text-muted">{stat.label}</p>
                 <p class="mt-1 text-lg font-semibold text-text">{stat.value}</p>
               </div>
@@ -333,7 +351,7 @@
           {/if}
 
           {#if insights.length > 0}
-            <section class="rounded-2xl border p-4" style="border-color: var(--color-border); background: var(--color-surface);" aria-label="Insights">
+            <section class="rounded-2xl border p-4 border-border bg-surface" aria-label="Insights">
               <p class="mb-2 flex items-center gap-1.5 text-sm font-medium text-text-muted"><span>Insights</span> <HelpLink topic="insights" label="insights" /></p>
               <ul class="flex flex-col gap-1.5">
                 {#each insights as insight, i (i)}

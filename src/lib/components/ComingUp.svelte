@@ -30,10 +30,10 @@
 </script>
 
 {#if datesTrackables.length > 0}
-  <section class="rounded-2xl border p-3" style="border-color: var(--color-border); background: var(--color-surface);" aria-label="Coming up">
+  <section class="rounded-2xl border p-3 border-border bg-surface" aria-label="Coming up">
     <div class="mb-1 flex items-baseline justify-between gap-2">
       <p class="text-xs font-semibold uppercase tracking-wide text-text-muted">Coming up</p>
-      <a href="/dates" use:link class="text-xs font-semibold" style="color: var(--color-brand);">See all dates</a>
+      <a href="/dates" use:link class="text-xs font-semibold text-brand">See all dates</a>
     </div>
     {#if items.length === 0}
       <p class="px-1 py-1 text-sm text-text-muted">Nothing else in the next {WITHIN_DAYS} days.</p>

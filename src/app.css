@@ -1,15 +1,55 @@
 @import 'tailwindcss';
+/* Self-hosted variable fonts (OFL), so the CSP's font-src 'self' holds and the
+   app looks the same on every device. Only the latin files are precached
+   (vite.config.ts); the browser fetches another subset if it ever needs one. */
+@import '@fontsource-variable/inter/wght.css';
+@import '@fontsource-variable/manrope/wght.css';
 
-@theme {
-  --color-bg: #0b0f0e;
-  --color-surface: #121614;
-  --color-surface-2: #1a201d;
-  --color-border: #262e2a;
-  --color-text: #e6f2ec;
-  --color-text-muted: #8ba398;
-  --color-brand: #22ff88;
-  --color-brand-dim: #16a35c;
-  --font-sans: 'Segoe UI', system-ui, Roboto, sans-serif;
+/*
+ * Design tokens. Each colour is written once with light-dark(): the first value
+ * is the light theme, the second the dark one, and `color-scheme` picks which
+ * applies. The theme store (stores/theme.svelte.ts) sets data-theme on <html>
+ * to override the system choice. src/lib/utils/theme.ts repeats the hex values
+ * for code that can't read CSS (the charts); tests/theme.test.ts keeps the two
+ * in step.
+ *
+ * `static` so every token is emitted even where only an inline style uses it.
+ */
+@theme static {
+  /* Surfaces */
+  --color-bg: light-dark(#f4f7f5, #0b0f0e);
+  --color-surface: light-dark(#ffffff, #121614);
+  --color-surface-2: light-dark(#e9efeb, #1a201d);
+  --color-border: light-dark(#d5ddd8, #262e2a);
+  /* Text */
+  --color-text: light-dark(#14201a, #e6f2ec);
+  --color-text-muted: light-dark(#5c7066, #8ba398);
+  /* Brand: the green, and what's drawn on top of it */
+  --color-brand: light-dark(#0b7a42, #22ff88);
+  --color-brand-dim: light-dark(#086232, #16a35c);
+  --color-brand-fg: light-dark(#ffffff, #06140c);
+  --color-brand-soft: color-mix(in oklab, var(--color-brand) 14%, transparent);
+  /* Status */
+  --color-warn: light-dark(#b45309, #fbbf24);
+  --color-warn-soft: color-mix(in oklab, var(--color-warn) 14%, transparent);
+  --color-danger: light-dark(#dc2626, #f87171);
+  --color-danger-soft: color-mix(in oklab, var(--color-danger) 12%, transparent);
+  --color-danger-line: color-mix(in oklab, var(--color-danger) 35%, transparent);
+  --color-info: light-dark(#0e7490, #22d3ee);
+
+  --font-sans: 'Inter Variable', system-ui, sans-serif;
+  --font-heading: 'Manrope Variable', 'Inter Variable', system-ui, sans-serif;
+}
+
+/* System theme unless the user picked one in Settings > Appearance. */
+:root {
+  color-scheme: light dark;
+}
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+:root[data-theme='dark'] {
+  color-scheme: dark;
 }
 
 html,
@@ -22,6 +62,8 @@ body {
   background: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-sans);
+  /* Digits the same width everywhere, so timers and tables don't jitter. */
+  font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
   overscroll-behavior-y: none;
 }
@@ -34,4 +76,19 @@ body {
 
 * {
   -webkit-tap-highlight-color: transparent;
+}
+
+@layer base {
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-heading);
+    letter-spacing: -0.02em;
+  }
+  /* Visible keyboard focus for plain buttons and links (WCAG 2.4.7). Controls
+     with their own ring opt out with outline-none. */
+  :where(button, a, summary, [role='button'], [tabindex='0']):focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+  }
 }

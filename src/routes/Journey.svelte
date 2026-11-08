@@ -73,27 +73,27 @@
     <p class="mt-8 text-center text-sm text-text-muted">Complete a fast to see your journey.</p>
   {:else}
     <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-      <div class="rounded-xl border p-3" style="border-color: var(--color-border); background: var(--color-surface);" title="Days in a row with a fast that met its goal">
+      <div class="rounded-xl border p-3 border-border bg-surface" title="Days in a row with a fast that met its goal">
         <p class="text-xs text-text-muted">Goal streak</p>
         <p class="mt-1 text-lg font-semibold text-text">{stats.currentStreak} <span class="text-sm font-normal text-text-muted">{stats.currentStreak === 1 ? 'day' : 'days'}</span></p>
       </div>
-      <div class="rounded-xl border p-3" style="border-color: var(--color-border); background: var(--color-surface);">
+      <div class="rounded-xl border p-3 border-border bg-surface">
         <p class="text-xs text-text-muted">Longest goal streak</p>
         <p class="mt-1 text-lg font-semibold text-text">{stats.longestStreak} <span class="text-sm font-normal text-text-muted">{stats.longestStreak === 1 ? 'day' : 'days'}</span></p>
       </div>
-      <div class="rounded-xl border p-3" style="border-color: var(--color-border); background: var(--color-surface);">
+      <div class="rounded-xl border p-3 border-border bg-surface">
         <p class="text-xs text-text-muted">Days fasted</p>
         <p class="mt-1 text-lg font-semibold text-text">{stats.daysFasted30} <span class="text-sm font-normal text-text-muted">of 30</span></p>
       </div>
-      <div class="rounded-xl border p-3" style="border-color: var(--color-border); background: var(--color-surface);">
+      <div class="rounded-xl border p-3 border-border bg-surface">
         <p class="text-xs text-text-muted">Average duration</p>
         <p class="mt-1 text-lg font-semibold text-text">{formatHoursShort(stats.averageHours)}</p>
       </div>
-      <div class="rounded-xl border p-3" style="border-color: var(--color-border); background: var(--color-surface);">
+      <div class="rounded-xl border p-3 border-border bg-surface">
         <p class="text-xs text-text-muted">Longest fast</p>
         <p class="mt-1 text-lg font-semibold text-text">{formatHoursShort(stats.longestHours)}</p>
       </div>
-      <div class="rounded-xl border p-3" style="border-color: var(--color-border); background: var(--color-surface);">
+      <div class="rounded-xl border p-3 border-border bg-surface">
         <p class="text-xs text-text-muted">Hit target</p>
         <p class="mt-1 text-lg font-semibold text-text">
           {#if stats.withTarget > 0}
@@ -106,7 +106,7 @@
       </div>
     </div>
 
-    <section class="rounded-2xl border p-4" style="border-color: var(--color-border); background: var(--color-surface);" aria-labelledby="journey-week">
+    <section class="rounded-2xl border p-4 border-border bg-surface" aria-labelledby="journey-week">
       <h2 id="journey-week" class="mb-2 text-sm font-semibold text-text">This week vs last week</h2>
       <table class="w-full text-left text-sm">
         <thead class="text-xs text-text-muted">
@@ -136,16 +136,16 @@
       <p class="mt-2 text-xs text-text-muted">A goal fast reached its target, or {COUNT_UP_GOAL_HOURS}h for a count-up fast. The week starts Monday.</p>
     </section>
 
-    <section class="rounded-2xl border p-4" style="border-color: var(--color-border); background: var(--color-surface);" aria-labelledby="journey-grid">
+    <section class="rounded-2xl border p-4 border-border bg-surface" aria-labelledby="journey-grid">
       <div class="mb-2 flex items-center justify-between gap-2">
         <h2 id="journey-grid" class="text-sm font-semibold text-text">Fasting days</h2>
         <SegmentedControl options={RANGES} bind:value={range} />
       </div>
-      <HabitGrid weeks={grid} color="#22c55e" maxCell={range === 'all' ? 14 : 28} />
+      <HabitGrid weeks={grid} color="var(--color-brand)" maxCell={range === 'all' ? 14 : 28} />
       <p class="mt-2 text-xs text-text-muted">A full square met its goal; a part-filled one got that far toward it.</p>
     </section>
 
-    <section class="rounded-2xl border p-4" style="border-color: var(--color-border); background: var(--color-surface);" aria-labelledby="journey-insights">
+    <section class="rounded-2xl border p-4 border-border bg-surface" aria-labelledby="journey-insights">
       <h2 id="journey-insights" class="mb-2 text-sm font-semibold text-text">Insights</h2>
       <ul class="flex flex-col gap-1 text-sm text-text">
         <li>

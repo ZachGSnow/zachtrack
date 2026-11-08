@@ -49,7 +49,7 @@
     // Rest, skipped and paused days aren't misses: drawn hollow.
     if (d.off && d.level <= 0) return 'transparent';
     // An every-N-days goal fell overdue: a quiet red tint (an outline turned an every-day goal into a wall of boxes).
-    if (d.level <= 0) return d.missed ? 'color-mix(in srgb, #f87171 30%, var(--color-surface-2))' : 'var(--color-surface-2)';
+    if (d.level <= 0) return d.missed ? 'color-mix(in srgb, var(--color-danger) 30%, var(--color-surface-2))' : 'var(--color-surface-2)';
     return `color-mix(in srgb, ${color} ${Math.round(30 + 70 * d.level)}%, var(--color-surface-2))`;
   }
 
@@ -130,7 +130,7 @@
     color: var(--color-text-muted);
   }
   .cell .dark {
-    color: #06140c;
+    color: var(--color-brand-fg);
     font-weight: 600;
   }
   button.cell:focus-visible {

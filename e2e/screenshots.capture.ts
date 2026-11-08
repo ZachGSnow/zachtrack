@@ -18,7 +18,7 @@ test('capture README screenshots', async ({ page }) => {
   await mockSync(page, okSync());
   await importSampleData(page);
   // The fasting timer reads the running fast at startup.
-  await page.goto('/');
+  await page.goto('/#/fasting');
   await page.reload();
 
   await expect(page.getByRole('button', { name: /Synced/ }).locator('visible=true')).toBeVisible();
@@ -81,4 +81,17 @@ test('capture README screenshots', async ({ page }) => {
   await page.goto('/#/dates');
   await expect(page.getByRole('heading', { name: 'Dates', level: 1 })).toBeVisible();
   await shot(page, 'dates');
+
+  // Today: a habit to check (Male Health once a day), the running fast, what's been logged, and the dates just added.
+  await page.goto('/#/trackables');
+  await page.getByRole('link', { name: /Male Health/ }).click();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.getByRole('combobox', { name: /^Goal/ }).selectOption('perDay');
+  await page.getByRole('textbox', { name: 'Times per day' }).fill('1');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.getByText('Goal: Once a day')).toBeVisible();
+  await page.goto('/#/');
+  await expect(page.getByRole('heading', { name: 'Today', level: 1 })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Last 7 days' })).toBeVisible();
+  await shot(page, 'today');
 });

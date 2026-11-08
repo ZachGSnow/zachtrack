@@ -1,18 +1,11 @@
 <script lang="ts">
   import { liveQuery } from 'dexie';
   import { push } from 'svelte-spa-router';
-  import {
-    addTrackableEntry,
-    db,
-    deleteTrackableEntry,
-    updateTrackable,
-    type FieldDefinition,
-    type TrackableDefinition,
-    type TrackableEntry,
-  } from '../lib/db';
+  import { db, updateTrackable, type FieldDefinition, type TrackableDefinition, type TrackableEntry } from '../lib/db';
   import { resolveKind } from '../lib/utils/trackableKinds';
   import { goalStatus } from '../lib/utils/trackableGoals';
-  import { LIST_SORTS, moveInOrder, orderTrackables, type ListSort } from '../lib/utils/trackableList';
+  import { LIST_SORTS, moveInOrder, orderTrackables, QUIET_DAYS, quietTrackables, type ListSort } from '../lib/utils/trackableList';
+  import { formatTimeSinceAdaptive } from '../lib/utils/trackableStats';
   import { loadPrefs, oneOf, savePrefs } from '../lib/utils/prefs';
   import { startOfDay } from '../lib/utils/time';
   import SegmentedControl from '../lib/components/SegmentedControl.svelte';
@@ -23,7 +16,11 @@
   import ComingUp from '../lib/components/ComingUp.svelte';
   import BottomSheet from '../lib/components/BottomSheet.svelte';
   import EditTrackableSheet from '../lib/components/EditTrackableSheet.svelte';
-  import LogTrackableEntrySheet from '../lib/components/LogTrackableEntrySheet.svelte';
+  import QuickLogHost from '../lib/components/QuickLogHost.svelte';
+  import StarterPicker from '../lib/components/StarterPicker.svelte';
+  import EmptyState from '../lib/components/ui/EmptyState.svelte';
+  import { starterStore } from '../lib/stores/starter.svelte';
+  import { quickLog } from '../lib/stores/quickLog.svelte';
 
   const trackables = liveQuery(() => db.trackableDefinitions.orderBy('name').toArray());
   const allFields = liveQuery(() => db.fieldDefinitions.toArray());
@@ -62,6 +59,19 @@
   }
 
   const active = $derived(orderTrackables(($trackables ?? []).filter((t) => !t.archived), sort, urgency));
+
+  // Quiet trackables (utils/trackableList.ts): offered for archiving, unless "Not now" snoozed the offer on this device.
+  const QUIET_PREFS_KEY = 'quiet-trackables';
+  let quietSnoozedUntil = $state(Number(loadPrefs<{ until: unknown }>(QUIET_PREFS_KEY, { until: 0 }).until) || 0);
+  const quiet = $derived(Date.now() < quietSnoozedUntil ? [] : quietTrackables($trackables ?? [], $allEntries ?? [], Date.now()));
+  function snoozeQuiet() {
+    quietSnoozedUntil = Date.now() + 30 * 24 * 3600_000;
+    savePrefs(QUIET_PREFS_KEY, { until: quietSnoozedUntil });
+  }
+  function lastLoggedText(t: TrackableDefinition): string {
+    const last = (entriesByTrackable.get(t.id) ?? []).reduce((max, e) => Math.max(max, e.timestamp), 0);
+    return last ? `last ${formatTimeSinceAdaptive(Date.now() - last)} ago` : 'never logged';
+  }
   const archived = $derived(orderTrackables(($trackables ?? []).filter((t) => t.archived), 'name', () => undefined));
 
   async function move(t: TrackableDefinition, direction: -1 | 1) {
@@ -84,68 +94,14 @@
   let editOpen = $state(false);
   let editingTrackable = $state<TrackableDefinition | null>(null);
 
-  let logOpen = $state(false);
-  let loggingTrackable = $state<TrackableDefinition | null>(null);
-
-
   function openCreate() {
     editingTrackable = null;
     editOpen = true;
   }
 
-  // A trackable with no fields has nothing to fill in, so "+" (or its check
-  // button) logs it right away, the "I just did it" of a days-since app, and
-  // checking it again takes today's entry back off. Either way there are a few
-  // seconds to undo.
-  let undo = $state<{ message: string; revert: () => Promise<unknown> } | null>(null);
-
-  function offerUndo(message: string, revert: () => Promise<unknown>) {
-    clearTimeout(undoTimer);
-    undo = { message, revert };
-    undoTimer = setTimeout(() => (undo = null), 6000);
-  }
-  let undoTimer: ReturnType<typeof setTimeout> | undefined;
-  let quickLogError = $state('');
-
-  async function openQuickLog(t: TrackableDefinition) {
-    if (t.fieldIds.length > 0 || t.displayMode === 'ages') {
-      loggingTrackable = t;
-      logOpen = true;
-      return;
-    }
-    quickLogError = '';
-    try {
-      const entry = await addTrackableEntry({ trackableId: t.id, timestamp: Date.now() });
-      offerUndo(`Logged ${t.name}`, () => deleteTrackableEntry(entry.id));
-    } catch (e) {
-      quickLogError = e instanceof Error ? e.message : 'Could not log it. Please try again.';
-    }
-  }
-
-  /** Unchecks today: removes today's latest entry; Undo puts it back. */
-  async function uncheckToday(t: TrackableDefinition) {
-    const today = startOfDay(Date.now());
-    const latest = (entriesByTrackable.get(t.id) ?? [])
-      .filter((e) => startOfDay(e.timestamp) === today)
-      .sort((a, b) => b.timestamp - a.timestamp)[0];
-    if (!latest) return;
-    quickLogError = '';
-    try {
-      await deleteTrackableEntry(latest.id);
-      const { timestamp, note, tags, values } = latest;
-      offerUndo(`Unchecked ${t.name}`, () => addTrackableEntry({ trackableId: t.id, timestamp, note, tags, values }));
-    } catch (e) {
-      quickLogError = e instanceof Error ? e.message : 'Could not uncheck it. Please try again.';
-    }
-  }
-
-  async function undoQuickLog() {
-    if (!undo) return;
-    const { revert } = undo;
-    undo = null;
-    clearTimeout(undoTimer);
-    await revert();
-  }
+  // "+" and the check buttons log through the shared quick-log store
+  // (stores/quickLog.svelte.ts): a sheet for a trackable with fields, one tap
+  // with undo for one without. QuickLogHost renders the sheet and the toast.
 
   function handleCreated(id: string) {
     push(`/trackables/${id}`);
@@ -156,8 +112,7 @@
   <div class="flex items-center justify-between">
     <h1 class="text-xl font-semibold text-text">Trackables</h1>
     <button
-      class="rounded-full px-3 py-1.5 text-sm font-semibold"
-      style="background: var(--color-brand); color: #06140c;"
+      class="rounded-full px-3 py-1.5 text-sm font-semibold bg-brand text-brand-fg"
       onclick={openCreate}
     >+ New</button>
   </div>
@@ -165,12 +120,16 @@
   {#if $trackables === undefined}
     <p class="text-sm text-text-muted">Loading&hellip;</p>
   {:else if $trackables.length === 0}
-    <p class="mt-8 text-center text-sm text-text-muted">No trackables yet. Tap "+ New" to create your first one.</p>
+    {#if starterStore.pending}
+      <StarterPicker />
+    {:else}
+      <EmptyState title="No trackables yet" text={'Tap "+ New" to create your first one, or start from a template.'} class="mt-4" />
+    {/if}
   {:else}
     {#if attentionStore.items.length > 0}
       <!-- In-app reminders: goals that are overdue or due today, most urgent first. -->
-      <section class="rounded-2xl border p-3" style="border-color: #f8717155; background: #f8717110;" aria-label="Needs attention">
-        <p class="mb-2 text-xs font-semibold uppercase tracking-wide" style="color: #f87171;">Needs attention</p>
+      <section class="rounded-2xl border p-3" style="border-color: var(--color-danger-line); background: var(--color-danger-soft);" aria-label="Needs attention">
+        <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-danger">Needs attention</p>
         <ul class="flex flex-col gap-1">
           {#each attentionStore.items as item (item.key)}
             <li>
@@ -185,10 +144,30 @@
       </section>
     {/if}
     <ComingUp trackables={$trackables ?? []} entries={$allEntries ?? []} />
+    {#if quiet.length > 0}
+      <!-- Trackables that have gone quiet: offer to archive them so they stop crowding the list. -->
+      <section class="rounded-2xl border border-border bg-surface-2 p-3" aria-label="Quiet trackables">
+        <div class="mb-1 flex items-baseline justify-between gap-2">
+          <p class="text-xs font-semibold uppercase tracking-wide text-text-muted">Quiet trackables</p>
+          <button class="text-xs text-text-muted" onclick={snoozeQuiet}>Not now</button>
+        </div>
+        <p class="mb-2 text-xs text-text-muted">Nothing logged in {QUIET_DAYS} days. Archiving keeps every entry; Show archived brings one back.</p>
+        <ul class="flex flex-col gap-1">
+          {#each quiet as t (t.id)}
+            <li class="flex items-center gap-2 px-1 py-1 text-sm">
+              <span class="w-6 text-center">{t.icon}</span>
+              <span class="min-w-0 flex-1 truncate text-text">{t.name}</span>
+              <span class="shrink-0 text-xs text-text-muted">{lastLoggedText(t)}</span>
+              <button class="shrink-0 text-xs font-semibold text-brand" onclick={() => updateTrackable(t.id, { archived: true })} aria-label="Archive {t.name}">Archive</button>
+            </li>
+          {/each}
+        </ul>
+      </section>
+    {/if}
     <div class="flex items-center justify-between gap-2">
       <SegmentedControl options={LIST_SORTS} bind:value={sort} />
       {#if reordering}
-        <button class="text-sm font-semibold" style="color: var(--color-brand);" onclick={() => (reordering = false)}>Done</button>
+        <button class="text-sm font-semibold text-brand" onclick={() => (reordering = false)}>Done</button>
       {:else}
         <div class="flex items-center gap-3">
           <button class="text-sm text-text-muted" onclick={() => (compact = !compact)} aria-pressed={compact}>{compact ? 'Grids' : 'Compact'}</button>
@@ -206,8 +185,8 @@
           trackable={t}
           fields={$allFields ?? []}
           entries={entriesByTrackable.get(t.id) ?? []}
-          onQuickLog={() => openQuickLog(t)}
-          onUncheck={() => uncheckToday(t)}
+          onQuickLog={() => quickLog.log(t)}
+          onUncheck={() => quickLog.uncheck(t, entriesByTrackable.get(t.id) ?? [])}
           onMove={reordering ? (direction) => move(t, direction) : undefined}
           {compact}
         />
@@ -220,7 +199,7 @@
       {#if showArchived}
         <div class="flex flex-col gap-2 opacity-70 lg:grid lg:grid-cols-2 lg:items-start 2xl:grid-cols-3">
           {#each archived as t (t.id)}
-            <TrackableCard trackable={t} fields={$allFields ?? []} entries={entriesByTrackable.get(t.id) ?? []} onQuickLog={() => openQuickLog(t)} />
+            <TrackableCard trackable={t} fields={$allFields ?? []} entries={entriesByTrackable.get(t.id) ?? []} onQuickLog={() => quickLog.log(t)} />
           {/each}
         </div>
       {/if}
@@ -228,25 +207,9 @@
   {/if}
 </div>
 
-{#if undo}
-  <div
-    class="fixed inset-x-0 bottom-20 z-30 lg:bottom-6 mx-auto flex w-[calc(100%-2.5rem)] max-w-md items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm shadow-lg"
-    style="border-color: var(--color-border); background: var(--color-surface);"
-    role="status"
-  >
-    <span class="truncate text-text">{undo.message}</span>
-    <button class="shrink-0 font-semibold" style="color: var(--color-brand);" onclick={undoQuickLog}>Undo</button>
-  </div>
-{/if}
-{#if quickLogError}
-  <p class="px-5 text-sm" style="color: #f87171;">{quickLogError}</p>
-{/if}
+<QuickLogHost />
 
 <BottomSheet bind:open={editOpen}>
   <EditTrackableSheet bind:open={editOpen} trackable={editingTrackable} onSaved={handleCreated} />
-</BottomSheet>
-
-<BottomSheet bind:open={logOpen}>
-  <LogTrackableEntrySheet bind:open={logOpen} trackable={loggingTrackable} />
 </BottomSheet>
 

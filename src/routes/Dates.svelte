@@ -1,4 +1,7 @@
 <script lang="ts">
+  import EmptyState from '../lib/components/ui/EmptyState.svelte';
+  import { readableText } from '../lib/utils/color';
+  import { themeStore } from '../lib/stores/theme.svelte';
   import { liveQuery } from 'dexie';
   import { link } from 'svelte-spa-router';
   import { db } from '../lib/db';
@@ -85,13 +88,13 @@
 
 {#snippet row(d: DateItem)}
   <li>
-    <a href="/trackables/{d.trackableId}" use:link class="flex items-center gap-3 rounded-xl border p-3" style="border-color: var(--color-border); background: var(--color-surface);">
+    <a href="/trackables/{d.trackableId}" use:link class="flex items-center gap-3 rounded-xl border p-3 border-border bg-surface">
       <span class="text-xl">{d.icon}</span>
       <span class="min-w-0 flex-1">
         <span class="block truncate text-sm font-semibold text-text">{d.name}</span>
         <span class="block truncate text-xs text-text-muted">{when(d.at)}{d.detail ? `, ${d.detail.charAt(0).toLowerCase()}${d.detail.slice(1)}` : ''} &middot; {d.trackableName}</span>
       </span>
-      <span class="shrink-0 text-xs font-medium" style="color: {d.daysUntil <= 7 ? d.color : 'var(--color-text-muted)'};">{d.countdown}</span>
+      <span class="shrink-0 text-xs font-medium" style="color: {d.daysUntil <= 7 ? readableText(d.color, themeStore.effective) : 'var(--color-text-muted)'};">{d.countdown}</span>
     </a>
   </li>
 {/snippet}
@@ -105,9 +108,7 @@
   {#if $trackables === undefined}
     <p class="text-sm text-text-muted">Loading&hellip;</p>
   {:else if datesTrackables.length === 0}
-    <p class="mt-8 text-center text-sm text-text-muted">
-      No dates yet. On Trackables, tap "+ New" and pick Birthdays, Anniversaries, US holidays or Countdowns.
-    </p>
+    <EmptyState icon="&#x1F4C5;" title="No dates yet" text={'On Trackables, tap "+ New" and pick Birthdays, Anniversaries, US holidays or Countdowns.'} class="mt-4" />
   {:else if view === 'list'}
     {#if items.length === 0}
       <p class="text-sm text-text-muted">Nothing in the next year.</p>
@@ -121,7 +122,7 @@
       </section>
     {/each}
   {:else}
-    <section aria-label="Calendar" class="rounded-2xl border p-3" style="border-color: var(--color-border); background: var(--color-surface);">
+    <section aria-label="Calendar" class="rounded-2xl border p-3 border-border bg-surface">
       <div class="mb-2 flex items-center justify-between">
         <button class="px-2 text-lg text-text-muted disabled:opacity-30" disabled={monthOffset === 0} onclick={() => monthOffset--} aria-label="Previous month">&lsaquo;</button>
         <h2 class="text-sm font-semibold text-text">{monthLabel}</h2>

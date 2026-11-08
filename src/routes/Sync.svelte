@@ -129,9 +129,9 @@
     <div class="flex items-center justify-between gap-3">
       <span class="text-text">{syncStore.status === 'unauthenticated' && syncStore.signedOut ? 'Signed out' : STATUS_LABELS[syncStore.status]}{syncStore.lastSyncedAt && syncStore.status !== 'local' ? `, last synced ${ago(syncStore.lastSyncedAt)}` : ''}</span>
       {#if syncStore.status === 'unauthenticated'}
-        <button class="rounded-lg px-3 py-1.5 text-sm font-semibold" style="background: var(--color-brand); color: #06140c;" onclick={() => syncStore.reauthenticate()}>Log in again</button>
+        <button class="rounded-lg px-3 py-1.5 text-sm font-semibold bg-brand text-brand-fg" onclick={() => syncStore.reauthenticate()}>Log in again</button>
       {:else if syncStore.status !== 'local'}
-        <button class="rounded-lg border px-3 py-1.5 text-sm text-text-muted" style="border-color: var(--color-border);" onclick={() => syncStore.syncNow().then(() => loadActivity()).catch(() => {})}>Sync now</button>
+        <button class="rounded-lg border px-3 py-1.5 text-sm text-text-muted border-border" onclick={() => syncStore.syncNow().then(() => loadActivity()).catch(() => {})}>Sync now</button>
       {/if}
     </div>
     {#if syncStore.status !== 'local'}
@@ -149,8 +149,7 @@
       <label class="flex-1">
         <span class="sr-only">Device name</span>
         <input
-          class="w-full rounded-lg border px-3 py-2 text-sm text-text"
-          style="border-color: var(--color-border); background: var(--color-surface-2);"
+          class="w-full rounded-lg border px-3 py-2 text-sm text-text border-border bg-surface-2"
           maxlength="40"
           bind:value={nameDraft}
           aria-label="Device name"
@@ -158,14 +157,13 @@
       </label>
       <button
         type="submit"
-        class="rounded-lg border px-3 py-1.5 text-sm text-text-muted"
-        style="border-color: var(--color-border);"
+        class="rounded-lg border px-3 py-1.5 text-sm text-text-muted border-border"
         disabled={!nameDraft.trim() || nameDraft.trim() === syncStore.deviceName}>Rename</button
       >
     </form>
     <p class="text-xs text-text-muted">How this device appears in the device list and the activity. Version v{thisVersion}.</p>
     {#if thisIsOld}
-      <p class="rounded-lg border p-2 text-xs text-amber-400" style="border-color: var(--color-border);">
+      <p class="rounded-lg border p-2 text-xs text-amber-400 border-border">
         Another device runs v{newest}. Close and reopen the app here to update; an older version can clear settings the newer one added when it edits them.
       </p>
     {/if}
@@ -179,7 +177,7 @@
       {:else}
         <ul class="flex flex-col gap-2">
           {#each syncStore.devices as d (d.id)}
-            <li class="flex items-center justify-between gap-3 rounded-lg border p-2" style="border-color: var(--color-border); background: var(--color-surface);">
+            <li class="flex items-center justify-between gap-3 rounded-lg border p-2 border-border bg-surface">
               <div class="min-w-0">
                 <p class="truncate text-text">{d.name}{d.id === syncStore.deviceId ? ' (this device)' : ''}</p>
                 <p class="text-xs text-text-muted">
@@ -196,20 +194,20 @@
           {/each}
         </ul>
       {/if}
-      {#if deviceError}<p class="text-xs" style="color: #f87171;">{deviceError}</p>{/if}
+      {#if deviceError}<p class="text-xs text-danger">{deviceError}</p>{/if}
     </section>
 
     <section class="space-y-2 text-sm" aria-labelledby="sync-activity">
       <h2 id="sync-activity" class="text-sm font-semibold uppercase tracking-wide text-text-muted">Activity on all devices</h2>
       <p class="text-xs text-text-muted">Each sync that changed something, from any device, for 90 days: what kind of records and their names, never the values.</p>
       {#if activityError}
-        <p class="text-xs" style="color: #f87171;">{activityError}</p>
+        <p class="text-xs text-danger">{activityError}</p>
       {:else if events.length === 0 && !loadingActivity}
         <p class="text-xs text-text-muted">No activity yet.</p>
       {/if}
       <ul class="flex flex-col gap-1">
         {#each events as e (e.id)}
-          <li class="overflow-hidden rounded" style="background: var(--color-surface);">
+          <li class="overflow-hidden rounded bg-surface">
             <button
               type="button"
               class="w-full px-2 py-1.5 text-left text-xs leading-snug"
@@ -223,7 +221,7 @@
               </span>
             </button>
             {#if expandedEvent === e.id}
-              <ul class="border-t px-2 py-1 text-xs text-text-muted" style="border-color: var(--color-border);">
+              <ul class="border-t px-2 py-1 text-xs text-text-muted border-border">
                 {#each e.details as line, i (i)}<li>{line}</li>{/each}
               </ul>
             {/if}
@@ -231,7 +229,7 @@
         {/each}
       </ul>
       {#if more}
-        <button class="text-xs font-semibold" style="color: var(--color-brand);" disabled={loadingActivity} onclick={() => loadActivity(true)}>Show older</button>
+        <button class="text-xs font-semibold text-brand" disabled={loadingActivity} onclick={() => loadActivity(true)}>Show older</button>
       {/if}
     </section>
   {/if}
@@ -245,14 +243,12 @@
       </p>
       <div class="flex flex-wrap gap-2">
         <button
-          class="rounded-lg border px-3 py-1.5 text-sm text-text-muted"
-          style="border-color: var(--color-border);"
+          class="rounded-lg border px-3 py-1.5 text-sm text-text-muted border-border"
           disabled={checking}
           onclick={() => run(() => syncStore.checkSync())}>Check sync</button
         >
         <button
-          class="rounded-lg border px-3 py-1.5 text-sm text-text-muted"
-          style="border-color: var(--color-border);"
+          class="rounded-lg border px-3 py-1.5 text-sm text-text-muted border-border"
           disabled={checking}
           onclick={() => run(() => syncStore.fullResync())}>Full resync</button
         >
@@ -260,10 +256,10 @@
       {#if checking}
         <p class="text-xs text-text-muted" role="status">Checking...</p>
       {:else if checkError}
-        <p class="text-xs" style="color: #f87171;">{checkError}</p>
+        <p class="text-xs text-danger">{checkError}</p>
       {:else if syncStore.lastCheck}
         {@const c = syncStore.lastCheck}
-        <div class="rounded-lg border p-2 text-xs" style="border-color: var(--color-border); background: var(--color-surface);" role="status">
+        <div class="rounded-lg border p-2 text-xs border-border bg-surface" role="status">
           {#if c.unsupported}
             <p class="text-text-muted">The server is too old to count records. Update it with npm run deploy.</p>
           {:else}
@@ -292,7 +288,7 @@
   {/if}
 
   <section class="space-y-2" aria-label="This device's syncs">
-    <div class="rounded-lg border p-1.5" style="border-color: var(--color-border); background: var(--color-surface-2);">
+    <div class="rounded-lg border p-1.5 border-border bg-surface-2">
       <SyncHistory title="This device's syncs, last {HISTORY_DAYS} days" />
     </div>
   </section>

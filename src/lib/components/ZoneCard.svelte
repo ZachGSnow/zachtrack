@@ -1,6 +1,8 @@
 <script lang="ts">
   import type { BioZone } from '../data/zones';
   import { zoneInfoStore } from '../stores/zoneInfo.svelte';
+  import { readableText } from '../utils/color';
+  import { themeStore } from '../stores/theme.svelte';
 
   let { zone }: { zone: BioZone } = $props();
 </script>
@@ -12,7 +14,7 @@
 >
   <div class="flex items-start justify-between gap-3">
     <div>
-      <p class="text-xs font-medium uppercase tracking-wide" style="color: {zone.color};">
+      <p class="text-xs font-medium uppercase tracking-wide" style="color: {readableText(zone.color, themeStore.effective)};">
         Current biological zone
       </p>
       <h2 class="mt-0.5 text-lg font-semibold text-text">{zone.title}</h2>
@@ -20,5 +22,5 @@
     </div>
   </div>
 
-  <span class="mt-3 inline-block text-sm font-medium" style="color: {zone.color};">Learn more</span>
+  <span class="mt-3 inline-block text-sm font-medium" style="color: {readableText(zone.color, themeStore.effective)};">Learn more</span>
 </button>

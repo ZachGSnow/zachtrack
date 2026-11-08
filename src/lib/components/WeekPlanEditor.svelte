@@ -54,8 +54,7 @@
       <li class="flex items-center gap-2">
         <span class="w-9 shrink-0 text-text-muted">{name}</span>
         <select
-          class="min-w-0 flex-1 rounded-lg border bg-transparent p-1.5 text-text"
-          style="border-color: var(--color-border); color-scheme: dark;"
+          class="min-w-0 flex-1 rounded-lg border bg-transparent p-1.5 text-text border-border"
           aria-label="{name} method"
           value={day?.rest ? 'rest' : (day?.presetId ?? '')}
           onchange={(e) => setMethod(i, (e.target as HTMLSelectElement).value)}
@@ -68,8 +67,7 @@
         </select>
         <input
           type="time"
-          class="w-28 rounded-lg border bg-transparent p-1.5 text-text disabled:opacity-40"
-          style="border-color: var(--color-border); color-scheme: dark;"
+          class="w-28 rounded-lg border bg-transparent p-1.5 text-text disabled:opacity-40 border-border"
           aria-label="{name} start time"
           disabled={!!day?.rest}
           value={day?.time ?? ''}
@@ -79,7 +77,7 @@
       </li>
     {/each}
   </ul>
-  {#if error}<p class="mt-1 text-xs" style="color: #f87171;">{error}</p>{/if}
+  {#if error}<p class="mt-1 text-xs text-danger">{error}</p>{/if}
   <p class="mt-1 text-xs text-text-muted">
     A blank time uses the daily start time. On a rest day nothing is due; Start Fast picks the day's method.
   </p>

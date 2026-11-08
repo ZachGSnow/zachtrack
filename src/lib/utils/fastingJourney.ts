@@ -1,7 +1,7 @@
 import type { FastRecord } from '../db';
 import type { GridDay } from './habitGrid';
 import { bucketStart } from './trackableStats';
-import { formatCountdown } from './fastingSchedule';
+import { formatCountdown, planForDay, type ScheduleInput } from './fastingSchedule';
 import { addDays, formatClockTime, formatHoursShort, HOUR_MS, startOfDay } from './time';
 
 // Journey and the idle Fasting tab: whether a fast met its goal, the goal
@@ -172,4 +172,117 @@ export function fastingWeightInsight(
   if (size < 0.6) return null;
   const fmt = (v: number) => `${v > 0 ? '+' : ''}${v.toFixed(1)}${unit ? ` ${unit}` : ''}`;
   return `Weight changes ${fmt(a)} the day after a goal fast (${after.length} days), ${fmt(b)} after other days (${other.length})`;
+}
+
+// ---------------------------------------------------------------------------
+// The week strip and the restart card on the Fasting tab (3.45).
+// ---------------------------------------------------------------------------
+
+export type WeekDayState =
+  /** A fast that met its goal started that day. */
+  | 'goal'
+  /** A fast started that day and ended short of its goal. */
+  | 'short'
+  /** A fast started that day is still running. */
+  | 'running'
+  /** A rest day in the weekly plan. */
+  | 'rest'
+  /** An earlier day with no fast. */
+  | 'missed'
+  /** Today, no fast yet. */
+  | 'open'
+  /** Later this week. */
+  | 'upcoming';
+
+export interface WeekDay {
+  /** Local start-of-day. */
+  day: number;
+  state: WeekDayState;
+  isToday: boolean;
+}
+
+/**
+ * This week, Monday to Sunday: what happened against the plan, one state per
+ * day (a day with several fasts takes its best). A rest day with a fast still
+ * shows the fast.
+ */
+export function weekStrip(fasts: readonly Fast[], schedule: ScheduleInput, now: number): WeekDay[] {
+  const today = startOfDay(now);
+  const monday = bucketStart(now, 'week');
+  const byDay = new Map<number, Fast[]>();
+  for (const f of fasts) {
+    if (f.startTime > now) continue;
+    const d = startOfDay(f.startTime);
+    byDay.set(d, [...(byDay.get(d) ?? []), f]);
+  }
+  const out: WeekDay[] = [];
+  for (let i = 0; i < 7; i++) {
+    const day = addDays(monday, i);
+    const own = byDay.get(day) ?? [];
+    let state: WeekDayState;
+    if (own.some((f) => goalMet(f, now))) state = 'goal';
+    else if (own.some((f) => f.endTime == null)) state = 'running';
+    else if (own.length) state = 'short';
+    else if (planForDay(schedule, day).rest) state = 'rest';
+    else if (day < today) state = 'missed';
+    else if (day === today) state = 'open';
+    else state = 'upcoming';
+    out.push({ day, state, isToday: day === today });
+  }
+  return out;
+}
+
+/** No goal fast for this long, and the restart card shows. */
+export const RESTART_AFTER_DAYS = 14;
+/** At least this many finished fasts in the last year, or there's nothing to come back to. */
+export const MIN_RESTART_FASTS = 3;
+
+export interface RestartSuggestion {
+  /** Days since the last goal fast, or null if there's never been one. */
+  daysSince: number | null;
+  /** Finished fasts in the last year, and how many met their goal. */
+  fasts: number;
+  goalFasts: number;
+  /** Average length of those, in hours. */
+  averageHours: number;
+  /** The usual goal in hours (the median target of the year's fasts). */
+  usualHours: number;
+  /** A gentler length to come back with: the preset id, and its hours. */
+  presetId: string;
+  presetHours: number;
+}
+
+/**
+ * After a lapse: what the year looked like and a shorter method to ease back
+ * in with. Null while fasting is going (a goal fast in the last
+ * RESTART_AFTER_DAYS days, or a fast running) or with too little history.
+ * `presets` are the built-in methods with a target, shortest first.
+ */
+export function restartSuggestion(
+  fasts: readonly Fast[],
+  presets: readonly { id: string; targetHours?: number }[],
+  now: number,
+): RestartSuggestion | null {
+  if (fasts.some((f) => f.endTime == null && f.startTime <= now)) return null;
+  const year = fasts.filter((f) => f.endTime != null && f.startTime <= now && f.startTime > now - 365 * 24 * HOUR_MS);
+  if (year.length < MIN_RESTART_FASTS) return null;
+  const goalFasts = year.filter((f) => goalMet(f, now));
+  const lastGoal = goalFasts.reduce((max, f) => Math.max(max, f.startTime), 0);
+  const daysSince = lastGoal ? Math.floor((startOfDay(now) - startOfDay(lastGoal)) / (24 * HOUR_MS)) : null;
+  if (daysSince != null && daysSince < RESTART_AFTER_DAYS) return null;
+  const targets = year.map(goalHours).sort((a, b) => a - b);
+  const usualHours = targets[Math.floor(targets.length / 2)];
+  // The longest built-in method at least two hours shorter than the usual one, else the shortest there is.
+  const timed = presets.filter((p) => p.targetHours && p.targetHours > 0).sort((a, b) => a.targetHours! - b.targetHours!);
+  const gentler = [...timed].reverse().find((p) => p.targetHours! <= usualHours - 2) ?? timed[0];
+  if (!gentler) return null;
+  return {
+    daysSince,
+    fasts: year.length,
+    goalFasts: goalFasts.length,
+    averageHours: year.reduce((sum, f) => sum + fastHours(f, now), 0) / year.length,
+    usualHours,
+    presetId: gentler.id,
+    presetHours: gentler.targetHours!,
+  };
 }

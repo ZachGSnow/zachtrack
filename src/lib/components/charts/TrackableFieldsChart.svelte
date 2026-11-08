@@ -7,6 +7,9 @@
   import { BODY_FAT_COLOR } from '../../utils/metrics';
   import { settingsStore } from '../../stores/settings.svelte';
   import EChart from '../EChart.svelte';
+  import { themeStore } from '../../stores/theme.svelte';
+  import { chartColors } from '../../utils/theme';
+  import { readableText } from '../../utils/color';
 
   let {
     entries,
@@ -24,11 +27,16 @@
   } = $props();
 
 
-  const PALETTE = ['#22ff88', '#a855f7', '#38bdf8', '#f97316', '#eab308', '#ec4899', '#818cf8', '#10b981', '#60a5fa'];
+  // Chart colours follow the theme (utils/theme.ts), since ECharts draws with literal colours.
+  const ct = $derived(chartColors(themeStore.effective));
+  const PALETTE = $derived([ct.brand, '#a855f7', '#38bdf8', '#f97316', '#eab308', '#ec4899', '#818cf8', '#10b981', '#60a5fa']);
 
   // One color per field from its place among all fields, so a pill and its line
   // match whichever other fields are switched on.
-  const colorFor = (f: FieldDefinition) => PALETTE[Math.max(0, fields.indexOf(f)) % PALETTE.length];
+  // Readable on this theme, so a pill and its line stay the same colour on light and dark.
+  const colorFor = (f: FieldDefinition) => readableText(PALETTE[Math.max(0, fields.indexOf(f)) % PALETTE.length], themeStore.effective);
+  const goalColor = $derived(readableText('#f472b6', themeStore.effective));
+  const bodyFatColor = $derived(readableText(BODY_FAT_COLOR, themeStore.effective));
 
   const weightField = $derived(weightFieldId ? fields.find((f) => f.id === weightFieldId) : undefined);
   const showBmiOption = $derived(!!weightField && !!settingsStore.data.heightInches);
@@ -71,15 +79,15 @@
   const option = $derived<EChartsOption>({
     backgroundColor: 'transparent',
     grid: { left: 44, right: 16, top: 36, bottom: 30 },
-    legend: { textStyle: { color: '#8ba398' }, top: 0 },
+    legend: { textStyle: { color: ct.muted }, top: 0 },
     tooltip: { trigger: 'axis' },
     xAxis: {
       type: 'category',
       data: categories,
-      axisLine: { lineStyle: { color: '#262e2a' } },
-      axisLabel: { color: '#8ba398' },
+      axisLine: { lineStyle: { color: ct.line } },
+      axisLabel: { color: ct.muted },
     },
-    yAxis: { type: 'value', scale: true, axisLabel: { color: '#8ba398' }, splitLine: { lineStyle: { color: '#1a201d' } } },
+    yAxis: { type: 'value', scale: true, axisLabel: { color: ct.muted }, splitLine: { lineStyle: { color: ct.grid } } },
     series: [
       ...fields
         .filter((f) => visible[f.id])
@@ -97,8 +105,8 @@
             ? {
                 markLine: {
                   symbol: 'none' as const,
-                  label: { formatter: 'Goal', color: '#8ba398' },
-                  lineStyle: { color: '#8ba398', type: 'dashed' as const, width: 1.5 },
+                  label: { formatter: 'Goal', color: ct.muted },
+                  lineStyle: { color: ct.muted, type: 'dashed' as const, width: 1.5 },
                   data: [{ yAxis: settingsStore.data.goalWeightLb }],
                 },
               }
@@ -114,8 +122,8 @@
               connectNulls: true,
               showSymbol: true,
               symbolSize: 5,
-              itemStyle: { color: '#f472b6' },
-              lineStyle: { color: '#f472b6', width: 2, type: 'dashed' as const },
+              itemStyle: { color: goalColor },
+              lineStyle: { color: goalColor, width: 2, type: 'dashed' as const },
             },
           ]
         : []),
@@ -129,8 +137,8 @@
               connectNulls: true,
               showSymbol: true,
               symbolSize: 5,
-              itemStyle: { color: BODY_FAT_COLOR },
-              lineStyle: { color: BODY_FAT_COLOR, width: 2, type: 'dashed' as const },
+              itemStyle: { color: bodyFatColor },
+              lineStyle: { color: bodyFatColor, width: 2, type: 'dashed' as const },
             },
           ]
         : []),
@@ -138,7 +146,7 @@
   });
 </script>
 
-<div class="rounded-2xl border p-4" style="border-color: var(--color-border); background: var(--color-surface);">
+<div class="rounded-2xl border p-4 border-border bg-surface">
   <p class="mb-2 text-sm font-medium text-text-muted">Fields over time</p>
   <div class="mb-2 flex flex-wrap gap-1.5">
     {#each fields as field (field.id)}
@@ -154,7 +162,7 @@
       <button
         class="rounded-full border px-2.5 py-1 text-xs font-medium"
         style={visible['__bmi']
-          ? 'background: #f472b622; color: #f472b6; border-color: #f472b680;'
+          ? `background: 22; color: ; border-color: 80;`
           : 'color: var(--color-text-muted); border-color: var(--color-border);'}
         onclick={() => toggle('__bmi')}
       >BMI</button>
@@ -163,7 +171,7 @@
       <button
         class="rounded-full border px-2.5 py-1 text-xs font-medium"
         style={visible['__bodyFat']
-          ? `background: ${BODY_FAT_COLOR}22; color: ${BODY_FAT_COLOR}; border-color: ${BODY_FAT_COLOR}80;`
+          ? `background: 22; color: ; border-color: 80;`
           : 'color: var(--color-text-muted); border-color: var(--color-border);'}
         onclick={() => toggle('__bodyFat')}
       >Body fat (Navy)</button>

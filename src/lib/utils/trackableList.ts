@@ -50,3 +50,27 @@ export function moveInOrder(orderedIds: readonly string[], id: string, direction
   [ids[from], ids[to]] = [ids[to], ids[from]];
   return ids.map((tid, sortOrder) => ({ id: tid, sortOrder })).filter((c) => current.get(c.id) !== c.sortOrder);
 }
+
+/** A trackable without a goal that hasn't been logged for this long is quiet. */
+export const QUIET_DAYS = 42;
+
+/**
+ * Trackables that have gone quiet: active, not pinned, without a goal and not
+ * dates, with nothing logged for QUIET_DAYS days (or ever, after that long).
+ * The Trackables list offers to archive them (3.44), so the dormant starter
+ * trackables stop crowding the list.
+ */
+export function quietTrackables<T extends Listed & { goalType?: string; displayMode?: string; archived?: boolean; createdAt: number }>(
+  trackables: readonly T[],
+  entries: readonly { trackableId: string; timestamp: number }[],
+  now: number,
+  days: number = QUIET_DAYS,
+): T[] {
+  const lastAt = new Map<string, number>();
+  for (const e of entries) if (e.timestamp <= now) lastAt.set(e.trackableId, Math.max(lastAt.get(e.trackableId) ?? 0, e.timestamp));
+  const cutoff = now - days * 24 * 3600_000;
+  return trackables
+    .filter((t) => !t.archived && !t.pinned && !t.goalType && t.displayMode !== 'ages')
+    .filter((t) => (lastAt.get(t.id) ?? t.createdAt) < cutoff)
+    .sort((a, b) => (lastAt.get(a.id) ?? a.createdAt) - (lastAt.get(b.id) ?? b.createdAt));
+}

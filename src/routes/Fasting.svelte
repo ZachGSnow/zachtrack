@@ -13,10 +13,14 @@
   import { takeShortcut } from '../lib/utils/shortcuts';
   import { liveQuery } from 'dexie';
   import { db } from '../lib/db';
-  import { addDays, fromDatetimeLocal, startOfDay, toDatetimeLocal } from '../lib/utils/time';
+  import { addDays, formatHoursShort, fromDatetimeLocal, startOfDay, toDatetimeLocal } from '../lib/utils/time';
   import { planForDay, scheduleStatus } from '../lib/utils/fastingSchedule';
   import { endSummary, fastTimeline, longFastGuidance, refeedingNote, startedAgo } from '../lib/utils/fastProgress';
-  import { eatingWindowStatus } from '../lib/utils/fastingJourney';
+  import { eatingWindowStatus, restartSuggestion, weekStrip } from '../lib/utils/fastingJourney';
+  import { PRESETS } from '../lib/data/presets';
+  import WeekStrip from '../lib/components/WeekStrip.svelte';
+  import Card from '../lib/components/ui/Card.svelte';
+  import Button from '../lib/components/ui/Button.svelte';
 
   // The schedule countdown and the timeline lines change with the clock, also while no fast runs.
   let now = $state(Date.now());
@@ -30,6 +34,21 @@
   const lastFasts = liveQuery(() => db.fasts.where('startDay').aboveOrEqual(addDays(startOfDay(Date.now()), -3)).toArray());
   const eatingWindow = $derived(fastTimer.activeFast ? null : eatingWindowStatus($lastFasts ?? [], now));
   const timeline = $derived(fastTimer.activeFast ? fastTimeline(fastTimer.activeFast, Math.max(now, fastTimer.now)) : null);
+
+  // This week against the plan, and after a lapse, a gentler way back in (3.45).
+  const yearFasts = liveQuery(() => db.fasts.where('startDay').aboveOrEqual(addDays(startOfDay(Date.now()), -366)).toArray());
+  const strip = $derived(weekStrip($yearFasts ?? [], settingsStore.data, Math.max(now, fastTimer.now)));
+  const restart = $derived(fastTimer.ready && settingsStore.ready ? restartSuggestion($yearFasts ?? [], PRESETS, Math.max(now, fastTimer.now)) : null);
+  const restartPreset = $derived(restart ? PRESETS.find((p) => p.id === restart.presetId) : undefined);
+  // The zone reference is noise between fasts: behind a link while nothing runs.
+  let zonesOpen = $state(false);
+
+  async function startRestart() {
+    if (!restart) return;
+    selectedPresetId = restart.presetId;
+    startedChoice = 'now';
+    await handleStart();
+  }
 
   let selectedPresetId = $state(DEFAULT_PRESET_ID);
   let presetInitialized = false;
@@ -159,7 +178,7 @@
           class="flex-1 rounded-lg border py-2 text-sm"
           aria-pressed={value === n}
           style={value === n
-            ? 'background: var(--color-brand); color: #06140c; border-color: var(--color-brand);'
+            ? 'background: var(--color-brand); color: var(--color-brand-fg); border-color: var(--color-brand);'
             : 'border-color: var(--color-border); color: var(--color-text-muted);'}
           onclick={() => set(value === n ? null : n)}
         >{n}</button>
@@ -200,7 +219,7 @@
       <div class="relative z-10 -mt-2 flex flex-col items-center gap-0.5 text-center text-sm text-text-muted">
         <p>
           {fastTimer.activeFast.presetLabel ?? 'Count-up fast'}
-          <button class="ml-1 text-xs font-semibold underline" style="color: var(--color-brand);" onclick={openChangeGoal}>Change goal</button>
+          <button class="ml-1 text-xs font-semibold underline text-brand" onclick={openChangeGoal}>Change goal</button>
         </p>
         {#if timeline}
           <p>{timeline.started}</p>
@@ -211,8 +230,10 @@
 
       <ZoneCard zone={fastTimer.zone} />
 
+      <WeekStrip days={strip} />
+
       {#if guidance.length}
-        <section class="w-full rounded-2xl border p-4 text-sm" style="border-color: var(--color-border); background: var(--color-surface);" aria-labelledby="long-fast">
+        <section class="w-full rounded-2xl border p-4 text-sm border-border bg-surface" aria-labelledby="long-fast">
           <h2 id="long-fast" class="mb-1 font-semibold text-text">Long fast</h2>
           <ul class="flex list-disc flex-col gap-1 pl-5 text-text-muted">
             {#each guidance as line (line)}<li>{line}</li>{/each}
@@ -224,18 +245,18 @@
       {#if !showStopPanel}
         <button
           class="w-full rounded-xl border py-3 text-base font-semibold"
-          style="border-color: #ef444460; color: #f87171; background: #ef444414;"
+          style="border-color: var(--color-danger-line); color: var(--color-danger); background: var(--color-danger-soft);"
           onclick={() => (showStopPanel = true)}
         >
           End Fast
         </button>
       {:else}
-        <div class="w-full space-y-4 rounded-2xl border p-4" style="border-color: var(--color-border); background: var(--color-surface);">
+        <div class="w-full space-y-4 rounded-2xl border p-4 border-border bg-surface">
           {#if summary}
             <div aria-label="Fast summary">
               <p class="text-lg font-semibold text-text">{summary.duration}</p>
               {#if summary.goal}
-                <p class="text-sm font-medium" style="color: {summary.goalMet ? 'var(--color-brand)' : '#fbbf24'};">{summary.goal}</p>
+                <p class="text-sm font-medium" style="color: {summary.goalMet ? 'var(--color-brand)' : 'var(--color-warn)'};">{summary.goal}</p>
               {/if}
               <p class="text-xs text-text-muted">Reached: {summary.zone}</p>
               {#if refeeding}
@@ -245,7 +266,7 @@
           {/if}
 
           {#if !showDetails}
-            <button class="text-sm font-medium underline" style="color: var(--color-brand);" onclick={() => (showDetails = true)}
+            <button class="text-sm font-medium underline text-brand" onclick={() => (showDetails = true)}
               >Add details: how you feel, tags, note</button
             >
           {:else}
@@ -260,22 +281,19 @@
               bind:value={note}
               placeholder="Notes (optional)"
               rows="2"
-              class="w-full resize-none rounded-lg border bg-transparent p-2 text-sm text-text placeholder:text-text-muted"
-              style="border-color: var(--color-border);"
+              class="w-full resize-none rounded-lg border bg-transparent p-2 text-sm text-text placeholder:text-text-muted border-border"
             ></textarea>
           {/if}
           {#if finishError}
-            <p class="text-sm" style="color: #f87171;">{finishError}</p>
+            <p class="text-sm text-danger">{finishError}</p>
           {/if}
           <div class="flex gap-2">
             <button
-              class="flex-1 rounded-xl border py-2.5 text-sm font-medium text-text-muted"
-              style="border-color: var(--color-border);"
+              class="flex-1 rounded-xl border py-2.5 text-sm font-medium text-text-muted border-border"
               onclick={() => (showStopPanel = false)}
             >Keep fasting</button>
             <button
-              class="flex-1 rounded-xl py-2.5 text-sm font-semibold"
-              style="background: var(--color-brand); color: #06140c;"
+              class="flex-1 rounded-xl py-2.5 text-sm font-semibold bg-brand text-brand-fg"
               onclick={handleFinish}
             >Save & Finish</button>
           </div>
@@ -295,9 +313,30 @@
           </div>
         {/if}
         {#if schedule}
-          <p class="text-sm font-medium" style="color: {schedule.late ? '#fbbf24' : 'var(--color-text-muted)'};">{schedule.text}</p>
+          <p class="text-sm font-medium" style="color: {schedule.late ? 'var(--color-warn)' : 'var(--color-text-muted)'};">{schedule.text}</p>
         {/if}
       </div>
+
+      <WeekStrip days={strip} />
+
+      {#if restart && restartPreset}
+        <Card tone="brand" padding="p-4" label="Pick it back up" class="w-full">
+          <p class="font-heading text-base font-semibold text-text">Pick it back up</p>
+          <p class="mt-1 text-sm text-text-muted">
+            {restart.daysSince == null ? 'No goal fast yet this year' : `${restart.daysSince} days since your last goal fast`}. This year:
+            {restart.fasts} {restart.fasts === 1 ? 'fast' : 'fasts'}, {restart.goalFasts} to goal, averaging {formatHoursShort(restart.averageHours)}.
+            {#if restart.presetHours < restart.usualHours}
+              Ease back in with {restartPreset.label} rather than {formatHoursShort(restart.usualHours)}; step up once it's easy again.
+            {:else}
+              {restartPreset.label} is a gentle place to start again.
+            {/if}
+          </p>
+          <div class="mt-3 flex flex-wrap items-center gap-3">
+            <Button variant="primary" onclick={startRestart}>Start {restartPreset.label} now</Button>
+            <span class="text-xs text-text-muted">or pick a method below</span>
+          </div>
+        </Card>
+      {/if}
 
       <MethodPicker bind:selectedId={selectedPresetId} />
 
@@ -309,7 +348,7 @@
               class="rounded-full border px-3 py-1.5 text-sm"
               aria-pressed={startedChoice === option.id}
               style={startedChoice === option.id
-                ? 'background: var(--color-brand); color: #06140c; border-color: var(--color-brand);'
+                ? 'background: var(--color-brand); color: var(--color-brand-fg); border-color: var(--color-brand);'
                 : 'background: var(--color-surface-2); color: var(--color-text); border-color: var(--color-border);'}
               onclick={() => {
                 startedChoice = option.id;
@@ -323,19 +362,17 @@
             type="datetime-local"
             bind:value={pickedStart}
             aria-label="Fast started at"
-            class="mt-2 w-full rounded-lg border bg-transparent p-2 text-sm text-text"
-            style="border-color: var(--color-border);"
+            class="mt-2 w-full rounded-lg border bg-transparent p-2 text-sm text-text border-border"
           />
         {/if}
       </div>
 
       {#if startError}
-        <p class="text-sm" style="color: #f87171;">{startError}</p>
+        <p class="text-sm text-danger">{startError}</p>
       {/if}
 
       <button
-        class="w-full rounded-xl py-3.5 text-base font-semibold"
-        style="background: var(--color-brand); color: #06140c;"
+        class="w-full rounded-xl py-3.5 text-base font-semibold bg-brand text-brand-fg"
         onclick={handleStart}
       >
         Start Fast
@@ -343,7 +380,18 @@
     {/if}
   </div>
 
-  <ZoneReferenceList currentZoneId={fastTimer.activeFast ? fastTimer.zone.id : null} />
+  {#if fastTimer.activeFast}
+    <ZoneReferenceList currentZoneId={fastTimer.zone.id} />
+  {:else}
+    <div class="w-full">
+      <button class="text-sm font-medium text-brand" aria-expanded={zonesOpen} onclick={() => (zonesOpen = !zonesOpen)}>
+        {zonesOpen ? 'Hide the zones' : 'About the zones'}
+      </button>
+      {#if zonesOpen}
+        <div class="mt-3"><ZoneReferenceList currentZoneId={null} /></div>
+      {/if}
+    </div>
+  {/if}
 </div>
 
 <BottomSheet bind:open={editActiveOpen}>
@@ -355,8 +403,8 @@
     <h2 class="text-lg font-semibold text-text">Change goal</h2>
     <p class="text-sm text-text-muted">The fast keeps its start time; only the goal changes.</p>
     <MethodPicker bind:selectedId={goalPresetId} />
-    {#if goalError}<p class="text-sm" style="color: #f87171;">{goalError}</p>{/if}
-    <button class="w-full rounded-xl py-2.5 text-sm font-semibold" style="background: var(--color-brand); color: #06140c;" onclick={saveGoal}
+    {#if goalError}<p class="text-sm text-danger">{goalError}</p>{/if}
+    <button class="w-full rounded-xl py-2.5 text-sm font-semibold bg-brand text-brand-fg" onclick={saveGoal}
       >Save goal</button
     >
   </div>

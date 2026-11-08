@@ -1,5 +1,7 @@
 <script lang="ts">
   import { ZONES } from '../data/zones';
+  import { readableText } from '../utils/color';
+  import { themeStore } from '../stores/theme.svelte';
   import { zoneInfoStore } from '../stores/zoneInfo.svelte';
   import BottomSheet from './BottomSheet.svelte';
 
@@ -17,7 +19,7 @@
 <BottomSheet bind:open>
   {#if zone}
     <div class="space-y-3">
-      <p class="text-xs font-medium uppercase tracking-wide" style="color: {zone.color};">
+      <p class="text-xs font-medium uppercase tracking-wide" style="color: {readableText(zone.color, themeStore.effective)};">
         {zone.hourEnd === Infinity ? `${zone.hourStart}h+` : `${zone.hourStart}-${zone.hourEnd}h`}
       </p>
       <h2 class="text-lg font-semibold text-text">{zone.title}</h2>

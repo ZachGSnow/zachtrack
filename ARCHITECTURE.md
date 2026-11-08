@@ -728,6 +728,210 @@ days logged (dates trackables left out, since their entries are dates rather
 than things done), the busiest month, and the three trackables logged on
 the most days.
 
+### 3.40 Design system and themes (v1.15.0)
+
+Before v1.15.0 the app had nine flat hex tokens, dark only, Segoe UI on
+Windows and Roboto on Android, emoji for the tab icons, and status colours
+typed inline (`#f87171` for overdue in thirty places). The one-app rework
+(3.41 onward) needed a base to build on, so this came first.
+
+- **Tokens** (`src/app.css`, `@theme static`): each colour is one
+  `light-dark()` pair, light value first, and `color-scheme` picks the side.
+  Semantic names only: `bg`, `surface`, `surface-2`, `border`, `text`,
+  `text-muted`, `brand`, `brand-dim`, `brand-fg` (what's drawn on the brand
+  green), `warn`, `danger`, `info`, and `-soft` tints made with `color-mix`.
+  `static` so a token used only in an inline style is still emitted.
+- **Theme** (`stores/theme.svelte.ts`): System, Light or Dark under Settings
+  > Appearance, per device like the other view preferences. A fixed choice
+  sets `data-theme` on `<html>`; `main.ts` applies it before the first
+  paint. The meta theme-color follows, so Android's status bar matches.
+- **Charts** draw with literal colours, so `utils/theme.ts` repeats the hex
+  values and `chartColors()` hands each chart the text, line and grid
+  colours for the theme in effect. `tests/theme.test.ts` fails if a value
+  there is missing from `app.css`.
+- **Readable colours** (`utils/color.ts`, culori): a trackable's colour is
+  whatever the user picked and is drawn as text on both themes. `ensure()`
+  moves it in OKLCH lightness until it meets a WCAG target against the
+  surface (4.5:1 for text, 3:1 for rings and icons), keeping its hue.
+  Ported from the infographics studio's palette engine.
+- **Fonts**: Inter (body) and Manrope (headings), self-hosted through
+  fontsource so the CSP's `font-src 'self'` holds and the app looks the same
+  on every device. Only the latin files are precached. Digits are tabular
+  everywhere so the timer and the tables don't jitter.
+- **Icons**: lucide for the app chrome (tabs, Help, Settings); trackables
+  keep their emoji, which are the user's.
+- **Primitives** (`components/ui/`): Card, StatTile, SectionHeading,
+  Button, Pill and EmptyState, so screens stop restating the same border and
+  background rules. `SegmentedControl` gained an `onchange` for the cases
+  where a pick does something rather than just binding.
+
+### 3.41 Today, the home (v1.15.0)
+
+By v1.14.0 the app was three apps stapled together: a fasting timer at `/`,
+a habit list under Trackables and dates beside it, each with its own idea of
+"what now". The timer opened first although fasting had lapsed for months
+while weigh-ins and check-ins carried on daily. 3.39 had turned a Today tab
+down because Needs attention and the badges covered it; they covered what
+was overdue, not what the day looks like.
+
+Today (`routes/Today.svelte`) is now `/`, the first of four tabs, and the
+timer moved to `/fasting` (the Start fast shortcut and the nav's fasting
+badges follow it; `/journey` and `/history` are unchanged). It only reads;
+every row links to where the rest lives. `utils/today.ts` picks what it
+shows, so the choices are unit tested:
+
+- **Fasting** (`FastNow.svelte`): the running fast's elapsed time, goal
+  progress in the zone's colour, zone and milestone, with Open timer; or,
+  between fasts, the eating window (3.35), the schedule (3.20) or a rest
+  day, and one tap to start today's method from the weekly plan (3.36),
+  else the default. Starting earlier, ending and details stay on the timer.
+- **Habits**: every trackable with a goal other than avoid
+  (`todayHabits`), most urgent first by the goal's urgency (3.18), done
+  ones after, rest, skipped and paused days last and greyed out. Each row
+  (`HabitRow.svelte`) has the goal's text and streak and the same check
+  button as the list card.
+- **Log**: trackables without a goal logged in the last 30 days
+  (`todayLogs`), latest first, with the kind's card line (3.17) and a "+".
+  Anything quieter stays on the Trackables list, so the dormant starter
+  trackables don't crowd the day.
+- **Coming up**: the next 14 days of dates (`todayDates`), only when there
+  is a dates trackable.
+
+The check button and its state moved out of `TrackableCard.svelte` into
+`utils/quickCheck.ts` and `CheckButton.svelte`, and the one-tap logging,
+uncheck and undo out of `Trackables.svelte` into `stores/quickLog.svelte.ts`
+with `QuickLogHost.svelte` for the sheet and the toast, so Today and the
+list share one implementation.
+
+### 3.42 Reading a measurement through its noise (v1.15.0)
+
+The Body Measurements header read "up 1 since last week": one reading
+minus another, which a late meal or a glass of water swings by a pound,
+and the owner was already discounting single mornings by hand in the
+entry notes.
+
+- **`utils/measurement.ts`**: `weeklyAverages` (the 7-day mean and the 7
+  days before it), `trendPerWeek` (a least-squares slope over the last 30
+  days, in units per week, needing five readings), and `projectGoal` (at
+  that rate, when the average reaches a goal: toward with a date, away,
+  flat, or there). Days are counted whole, so a DST change doesn't tilt the
+  slope.
+- **Headline** (3.17, `summarize`): the latest reading stays the big
+  number, since it is what was logged; under it come the 7-day average
+  against the week before and the trend. The card line adds the average.
+  The stat tiles become 7-day avg, per week over 30 days, 90-day low and
+  high; the old "30-day change" (one reading minus one reading) goes.
+- **Goal weight**: the weight field's page (the one BMI follows, 3.14)
+  adds "At this rate, 176 lb around Mar 14" from the average and the
+  trend, or that it is moving away, holding, or there.
+- **Prefill**: a new entry starts from the last entry's readings (number
+  fields with `last` aggregation), with a note saying so. Totals and
+  averages start empty, since each entry is its own amount. Four tape
+  measurements no longer mean retyping four numbers.
+- **On days after** (3.28): the comparisons on a trackable's page also
+  shift the other trackable by a day, so a Late meal logged at night shows
+  in the next morning's weight. The new Late meal template is a one-tap
+  trackable for exactly that.
+
+### 3.43 Habits at a glance: the week matrix and goal tiles (v1.15.0)
+
+The habit mechanics were all there (grid, streaks, schedules, skips, one-tap
+checks) but each habit's grid lived on its own page, and a habit's stat
+tiles were the kind's figures (streaks and days logged), not how its goal
+was going.
+
+- **Last 7 days** (`HabitMatrix.svelte`, under Habits on Today): one row
+  per goal trackable, one cell per day, the way Streaks and Habitify show a
+  week, drawn with the same `HabitGrid` cells and shading as the strips
+  (3.23). A tap on a cell logs that day, or takes a logged day back off,
+  through the quick-log store: a missed check-in is filled in without
+  opening the trackable. An earlier day's entry is stamped at midday so it
+  lands on that date whatever the time zone does; a trackable with fields
+  opens the sheet for that day instead. The matrix is on Today only: the
+  list's cards already carry a strip each.
+- **Goal tiles** (`goalStats` in `utils/trackableGoals.ts`): a trackable
+  with a goal shows how the goal is going instead of the kind's figures:
+  for a daily goal, days met in the last 30 scheduled days and the rate,
+  the current run and the best run (off days neither count nor break a
+  run, as for the streak); for a weekly goal, this week, weeks met of the
+  last 12, and runs of weeks; for every N days, the next due date, on-time
+  intervals in 90 days and runs of them; for avoid, time since, the best
+  gap and slips in 30 and 90 days. Today is counted only once it's met,
+  since it is still open.
+
+### 3.44 Less clutter: field pickers, unused fields, quiet trackables, the starter picker (v1.15.0)
+
+Three months of real use had left clutter the app never cleaned up: the
+Body pickers in Settings listed every number field ever made, four times
+over (fields of deleted trackables included); four of the eight starter
+trackables had not been logged in months but still filled the list; and a
+fresh install created all eight whether wanted or not.
+
+- **Field pickers** (`bodyFieldOptions` in `utils/health.ts`): a picker
+  lists the number fields a trackable still uses that fit the role by unit
+  (lb or kg for weight; in, cm or mm for the tape roles) or by name, plus
+  whatever is chosen now even when it doesn't fit, and every number field
+  in use when nothing fits. The name fallback in `resolveBodyField` (3.14)
+  is unchanged.
+- **Unused fields** (`unusedFields`): Settings > Fields lists the fields no
+  trackable uses, with Delete. `deleteFieldDefinition` already tombstones
+  the field for sync; values logged under it stay in their entries, unseen.
+- **Quiet trackables** (`quietTrackables` in `utils/trackableList.ts`):
+  the Trackables list offers to archive active, unpinned, goal-less
+  trackables with nothing logged for 42 days (or never, once that old).
+  Archiving keeps every entry (3.21). "Not now" snoozes the offer for 30
+  days on that device. Habits are left alone: their goal says whether they
+  are being kept.
+- **Starter picker** (`StarterPicker.svelte`, `stores/starter.svelte.ts`):
+  once the first sync has settled with no trackables on the device, the
+  Trackables list offers the eight starter trackables with every box
+  ticked; Add makes the chosen ones (and only the fields they need,
+  `seedStarterTrackables` in `db.ts`), Start empty is remembered per
+  device. The browser tests take the whole set through the picker
+  (`waitForStarterSet`), so the sample data still finds its fields.
+
+### 3.45 Coming back to fasting: the week strip and the restart card (v1.15.0)
+
+The timer was the most complete part of the app and the least used: daily
+18:6 fasts through August, then one in October. Its idle page was a long
+form with the zone reference always open, it showed nothing of the week,
+and nothing eased a restart.
+
+- **This week** (`weekStrip` in `utils/fastingJourney.ts`,
+  `WeekStrip.svelte`): Monday to Sunday under the header, idle or running:
+  a dot per day, filled for a goal fast, half for one that fell short, a
+  ring for the running one, hollow for a rest day in the weekly plan
+  (3.36), faint for a day missed, outlined for today. A day with several
+  fasts takes its best.
+- **Zones** (`ZoneReferenceList`): behind "About the zones" while nothing
+  runs; open as before, with the current zone marked, during a fast.
+- **Pick it back up** (`restartSuggestion`): after RESTART_AFTER_DAYS (14)
+  days without a goal fast, with at least MIN_RESTART_FASTS (3) finished
+  fasts in the last year, a card says how long it has been and what the
+  year looked like (fasts, goal fasts, average length), and offers the
+  longest built-in method at least two hours shorter than the usual one
+  (the median target), or the shortest when the usual one is already
+  short. Its button starts that method now; the picker below is unchanged.
+  Nothing shows while a fast runs or while fasting is going.
+
+### 3.46 The polish pass (v1.15.0)
+
+With the structure settled, the last step of the one-app rework went over
+every screen with the design system from 3.40:
+
+- Inline token styles (the card border and background, the brand button,
+  brand and danger text) became classes (`border-border bg-surface`,
+  `bg-brand text-brand-fg`, `text-brand`), so a screen reads as one system
+  and the theme switch covers it. The few styles that mix a token with a
+  runtime value stay inline.
+- Every colour drawn as text that comes from data (a trackable's colour on
+  its page and the Dates list, a zone's colour on the zone cards and the
+  reference list, the field pills on the chart) goes through
+  `readableText` (3.40), so the light theme never shows pale green on
+  white.
+- Empty states use `EmptyState`, the undo toast slides in, and the README
+  screenshots are recaptured with a Today shot first.
+
 ### 3.21 Trackables list: pin, archive, order; tag filters
 - **Sort** (per device, `zachtrack:trackables-view`): Due first (goal
   urgency from 3.18: overdue, then due, then the rest, then trackables

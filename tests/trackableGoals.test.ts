@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { FieldDefinition } from '../src/lib/db';
 import type { TimestampedValues } from '../src/lib/utils/trackableStats';
-import { describeGoal, goalCardLine, goalStatus } from '../src/lib/utils/trackableGoals';
+import { describeGoal, goalCardLine, goalStats, goalStatus } from '../src/lib/utils/trackableGoals';
 
 // America/New_York (vitest config). 2026-10-19 is a Monday; DST ends 2026-11-01.
 const at = (month: number, d: number, h = 9) => new Date(2026, month, d, h).getTime();
@@ -141,5 +141,52 @@ describe('schedules, skipped days and pausing', () => {
     const paused = { goalType: 'everyDays' as const, goalValue: 2, pausedUntil: new Date(2026, 9, 25).getTime() };
     expect(goalStatus(paused, logs(oct(1)), [], oct(22))).toMatchObject({ text: 'Paused until Oct 25', state: 'ok' });
     expect(goalStatus(paused, logs(oct(1)), [], oct(26))!.state).toBe('overdue');
+  });
+});
+
+describe('goal stat tiles', () => {
+  it('daily: days met in the last 30, the rate, and the current and best runs', () => {
+    // Floss once a day since Sep 1: every day except Sep 10 and Oct 3 to 5; today (Oct 21) not yet.
+    const skip = new Set([at(8, 10), oct(3), oct(4), oct(5)].map((t) => new Date(t).setHours(0, 0, 0, 0)));
+    const times: number[] = [];
+    for (let t = at(8, 1); t < oct(21); t = new Date(t).setDate(new Date(t).getDate() + 1)) {
+      if (!skip.has(new Date(t).setHours(0, 0, 0, 0))) times.push(t);
+    }
+    const stats = goalStats({ goalType: 'perDay', goalValue: 1, createdAt: at(8, 1) }, logs(...times), [], oct(21, 10))!;
+    expect(stats.map((s) => s.label)).toEqual(['Met, last 30 days', 'Rate (30d)', 'Current streak', 'Best streak']);
+    // Sep 22 to Oct 20 are the 29 finished days in the window; 3 were missed.
+    expect(stats[0].value).toBe('26 of 29');
+    expect(stats[1].value).toBe('90%');
+    expect(stats[2].value).toBe('15 days'); // Oct 6 to 20
+    expect(stats[3].value).toBe('22 days'); // Sep 11 to Oct 2
+  });
+
+  it('weekly: this week, weeks met, and runs of weeks', () => {
+    // Gym 3 times a week for the three weeks before this one, twice the week before that, once so far this week.
+    const times = [
+      oct(19), // this week (Mon Oct 19)
+      oct(12), oct(14), oct(16),
+      oct(5), oct(7), oct(9),
+      at(8, 28), at(8, 30), oct(2),
+      at(8, 21), at(8, 23),
+    ];
+    const stats = goalStats({ goalType: 'perWeek', goalValue: 3, createdAt: at(8, 21) }, logs(...times), [], oct(21, 10))!;
+    expect(stats.map((s) => s.value)).toEqual(['1 of 3', '3 of 4', '3 weeks', '3 weeks']);
+  });
+
+  it('every N days: on-time intervals and runs', () => {
+    const times = [oct(1), oct(7), oct(13), oct(22)]; // 6, 6, then 9 days: the last one late
+    const stats = goalStats({ goalType: 'everyDays', goalValue: 7, createdAt: oct(1) }, logs(...times), [], oct(23, 10))!;
+    expect(stats.map((s) => s.label)).toEqual(['Next', 'On time (90d)', 'Current streak', 'Best streak']);
+    expect(stats[1].value).toBe('2 of 3');
+    expect(stats[2].value).toBe('0 on time');
+    expect(stats[3].value).toBe('2 on time');
+  });
+
+  it('avoid: time since, the best gap, and slips', () => {
+    const stats = goalStats({ goalType: 'avoid', createdAt: at(8, 1) }, logs(at(8, 5), oct(1), oct(15)), [], oct(21, 9))!;
+    expect(stats.map((s) => s.value)).toEqual(['6d', '26d', '2 slips', '3 slips']);
+    expect(goalStats({ goalType: 'avoid', createdAt: at(8, 1) }, [], [], oct(21))![0].value).toBe('Never');
+    expect(goalStats({ createdAt: 0 }, [], [], oct(21))).toBeNull();
   });
 });

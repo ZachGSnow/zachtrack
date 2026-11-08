@@ -39,7 +39,7 @@
   });
 </script>
 
-<div class="rounded-2xl border p-4" style="border-color: var(--color-border); background: var(--color-surface);">
+<div class="rounded-2xl border p-4 border-border bg-surface">
   <p class="mb-2 text-sm font-medium text-text-muted">Time spent in each biological zone</p>
   {#if !hasData}
     <p class="py-4 text-center text-sm text-text-muted">Complete a fast to see your zone breakdown.</p>
