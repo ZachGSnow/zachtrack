@@ -217,3 +217,59 @@ describe('tasks in the export file (v1.19.0)', () => {
     expect(result.plan.added).toBe(1);
   });
 });
+
+describe('what an import may bring (safety, v1.21.0)', () => {
+  const T = Date.UTC(2026, 9, 1);
+  // One record of each kind with every field it can have set.
+  const full = {
+    fieldDefinitions: [{ id: 'f1', name: 'Water', kind: 'number', unit: 'oz', ratingMin: 1, ratingMax: 5, aggregation: 'sum', createdAt: T, updatedAt: T }],
+    trackableDefinitions: [
+      {
+        id: 't1', name: 'Water', icon: 'W', color: '#38bdf8', fieldIds: ['f1'], displayMode: 'daily', goalType: 'dailyTotal', goalValue: 64, pinned: true,
+        archived: false, sortOrder: 2, scheduleDays: [0, 2], skipDays: ['2026-10-02'], pausedUntil: T, dateKind: 'birthday', dateLeadDays: 3,
+        insightsHidden: true, scheduleHistory: [{ until: T, scheduleDays: [1] }], createdAt: T, updatedAt: T,
+      },
+    ],
+    trackableEntries: [{ id: 'e1', trackableId: 't1', timestamp: T, note: 'n', tags: ['a'], values: { f1: 8 }, dateRepeat: { type: 'yearly' }, details: 'd', createdAt: T, updatedAt: T }],
+    fasts: [{ uuid: 'u1', startTime: T, startDay: T, endTime: T + 1, method: 'preset', presetId: '16:8', presetLabel: '16:8', targetHours: 16, moodRating: 3, energyRating: 3, hungerRating: 3, tags: ['x'], note: 'n', createdAt: T, updatedAt: T }],
+    taskProjects: [{ id: 'p1', name: 'Home', color: '#a855f7', icon: 'H', notes: 'n', sections: [{ id: 's1', name: 'Now' }], archived: false, sortOrder: 1, createdAt: T, updatedAt: T }],
+    tasks: [{ id: 'k1', name: 'Oil', projectId: 'p1', sectionId: 's1', notes: 'n', dueOn: '2026-12-01', dueTime: '09:00', repeat: { type: 'days', every: 2 }, completedAt: T, sortOrder: 1, createdAt: T, updatedAt: T }, { id: 'k2', name: 'Sub', parentId: 'k1', sortOrder: 0, createdAt: T, updatedAt: T }],
+    taskCompletions: [{ id: 'c1', taskId: 'k1', completedAt: T, dueOn: '2026-11-01', nextDueOn: '2026-11-03', subtaskIds: ['k2'], createdAt: T, updatedAt: T }],
+    settings: {
+      id: 'app-settings', defaultPresetId: '16:8', notificationsEnabled: false, heightInches: 70, goalWeightLb: 180, weightFieldId: 'f1', waistFieldId: 'f1', neckFieldId: 'f1',
+      hipFieldId: 'f1', bodyFatSex: 'male', fastScheduleTime: '20:00', customFastPresets: [{ id: 'c', label: '20:4', targetHours: 20 }], fastWeekPlan: [null, null, null, null, null, null, null],
+      mutedInsights: ['a|b|0'], updatedAt: T,
+    },
+  };
+  const file = (data: object) => JSON.stringify({ format: 'zachtrack-export', version: 1, exportedAt: new Date(T).toISOString(), data });
+
+  it('keeps every field of every kind of record', () => {
+    const result = planImport(file(full), snapshot());
+    if (!result.ok) throw new Error(result.error);
+    expect(result.plan.skipped).toEqual([]);
+    const c = result.plan.changes;
+    expect(c.fieldDefinitions).toEqual(full.fieldDefinitions);
+    expect(c.trackableDefinitions).toEqual(full.trackableDefinitions);
+    expect(c.trackableEntries).toEqual(full.trackableEntries);
+    expect(c.fasts).toEqual(full.fasts);
+    expect(c.taskProjects).toEqual(full.taskProjects);
+    expect(c.tasks).toEqual(full.tasks);
+    expect(c.taskCompletions).toEqual(full.taskCompletions);
+    expect(c.settings).toEqual(full.settings);
+  });
+
+  it('drops a deletedAt and anything else that is not data, so an import can never delete', () => {
+    const sneaky = { ...full.trackableDefinitions[0], deletedAt: T, updatedBy: 'dev', huge: 'x'.repeat(100) };
+    const result = planImport(file({ trackableDefinitions: [sneaky] }), snapshot());
+    if (!result.ok) throw new Error(result.error);
+    expect(result.plan.changes.trackableDefinitions[0]).toEqual(full.trackableDefinitions[0]);
+  });
+
+  it('skips a record changed in the future, which would win every later edit', () => {
+    const later = Date.now() + 3 * 24 * 3600_000;
+    const result = planImport(file({ fieldDefinitions: [{ ...full.fieldDefinitions[0], updatedAt: later }] }), snapshot());
+    if (!result.ok) throw new Error(result.error);
+    expect(result.plan.changes.fieldDefinitions).toEqual([]);
+    expect(result.plan.skipped).toEqual([expect.objectContaining({ recordType: 'fieldDefinitions', reason: expect.stringContaining('no later than tomorrow') })]);
+  });
+});

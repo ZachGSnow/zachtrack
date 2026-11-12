@@ -38,6 +38,7 @@ const env = (): Env => ({ DB: db, OWNER_EMAIL: OWNER, ACCESS_TEAM_DOMAIN: TEAM_D
 const deps = (now = NOW) => ({ now: () => now, fetchKeys: async () => signer.jwks });
 const headers = (jwt: string | null = token): Record<string, string> => ({
   'Content-Type': 'application/json',
+  'X-Requested-With': 'XMLHttpRequest',
   ...(jwt ? { 'Cf-Access-Jwt-Assertion': jwt } : {}),
 });
 

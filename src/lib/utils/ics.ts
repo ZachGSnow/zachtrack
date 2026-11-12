@@ -20,9 +20,9 @@ const icsDate = (ms: number) => {
 };
 const icsStamp = (ms: number) => new Date(ms).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
 
-/** Text values escape backslashes, semicolons, commas and newlines. */
+/** Text values escape backslashes, semicolons, commas and line breaks (a lone CR too, which would end the line). */
 export function escapeText(text: string): string {
-  return text.replace(/[\\;,]/g, (c) => `\\${c}`).replace(/\r?\n/g, '\\n');
+  return text.replace(/[\\;,]/g, (c) => `\\${c}`).replace(/\r\n|\r|\n/g, '\\n');
 }
 
 /** Lines longer than 75 octets continue on the next line after a space. */

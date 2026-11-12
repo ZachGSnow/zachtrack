@@ -1938,6 +1938,45 @@ for the day it started; totals, averages and the longest fast still count
 completed fasts only. Spotted in the README screenshots of sample data, then
 covered by tests in `tests/time.test.ts` that fail on the old code.
 
+### 4.17 A second security review (2026-11-12, v1.21.0)
+
+A read-only review of the whole project, with the new task tables in mind,
+found no way past Access and no script injection, and these, all fixed:
+
+- **Cross-site writes.** The Access cookie goes with any request to the
+  domain, so a page on another site could post a form to `/api/sync` while
+  you're logged in and write records it can't read back (how far depends on
+  the cookie's SameSite setting). Every request that isn't a read must now
+  carry the app's `X-Requested-With` header, which a form can't set and a
+  cross-site script can't send without a CORS preflight the server never
+  answers, and `Sec-Fetch-Site`, when the browser sends it, must be
+  same-origin (`crossSiteReason` in `server/endpoint.ts`). The Access
+  cookie's SameSite is set to Lax as well (README, step 5).
+- **Change times from the future.** Last write wins on `updatedAt`, so a
+  record stamped years ahead (a clock set wrong, a hand-made file) beat
+  every later edit forever, and a delete stamped ahead beat them too.
+  `validate.ts` now refuses an `updatedAt` or `deletedAt` more than a day
+  ahead of the clock, on the server and in an import.
+- **An import could delete.** The import passed records through whole, and
+  applying them treats a `deletedAt` as a delete from another device: no
+  tombstone, so the server kept what this device had just lost. An import
+  now keeps only each record type's own fields (`KNOWN_KEYS`, `pickKnown`),
+  so it can never delete and can't store anything that isn't data;
+  `tests/dataFile.test.ts` checks a record with every field survives whole.
+- **`ACCESS_AUD` is required,** like the owner and team domain: without it a
+  token Access issued for another app in the same team would have passed on
+  `pages.dev`.
+- **Smaller ones:** colours must be hex colours and icons short, since both
+  go into `style` attributes; the CSV export puts an apostrophe before text
+  a spreadsheet would run as a formula (`=`, `+`, `-`, `@`); the calendar
+  export escapes a lone carriage return; `npm run deploy` keeps only the
+  newest three database backups in the temp folder; and deleting a task
+  labels the delete in this device's sync history with its project, not its
+  own name.
+
+Left for later: the request size of a full send and the age of soft-deleted
+rows, both in the plan that follows (3.67, 3.68).
+
 ### 4.16 The timer didn't follow fasts from other devices
 Like the settings store (4.14), the fasting timer store read the running fast
 once at startup and again only when the edit sheet asked it to. A fast started
@@ -1977,7 +2016,7 @@ are kept out of the repo, in the git-ignored `wrangler.toml` and a local
   external IdP), 30-day session duration.
 - **`wrangler.toml`** (copy of `wrangler.toml.example`): D1 binding `DB` ->
   `zachtrack-db`; plain (non-secret) vars `OWNER_EMAIL`,
-  `ACCESS_TEAM_DOMAIN` and optionally `ACCESS_AUD`, read by
+  `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD` (all three required since v1.21.0), read by
   `functions/api/sync.ts`.
 - **Backups:** D1's built-in Time Travel is always-on with no setup -
   point-in-time restore to any minute within the last **7 days** on the

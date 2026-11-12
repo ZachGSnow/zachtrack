@@ -31,6 +31,8 @@ test('search finds tasks by name and notes, and / jumps to it', async ({ page })
   await page.getByRole('dialog').getByRole('textbox', { name: 'Notes' }).fill('Heavy duty, for the ladder');
   await page.getByRole('dialog').getByRole('textbox', { name: 'Notes' }).blur();
   await page.keyboard.press('Escape');
+  // Shortcuts wait while a sheet is on screen, including while it fades out.
+  await expect(page.getByRole('dialog')).toHaveCount(0);
 
   await page.goto('/#/');
   await page.keyboard.press('/');
