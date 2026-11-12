@@ -30,6 +30,8 @@
   import EmptyState from '../lib/components/ui/EmptyState.svelte';
   import TaskHost from '../lib/components/TaskHost.svelte';
   import TaskRow from '../lib/components/TaskRow.svelte';
+  import { quickAdd } from '../lib/stores/quickAdd.svelte';
+  import { taskUi } from '../lib/stores/taskUi.svelte';
   import { dayKey, dueTasks, taskContext } from '../lib/utils/tasks';
 
   // Today: what to do now, gathered from every part of the app (ARCHITECTURE.md
@@ -50,9 +52,11 @@
 
   const habits = $derived(todayHabits($trackables ?? [], $allFields ?? [], $allEntries ?? [], now));
   const todayKey = $derived(dayKey(now));
+  const hasOpenTasks = $derived(($allTasks ?? []).some((t) => !t.completedAt));
   const tasksDue = $derived(
     dueTasks($allTasks ?? [], todayKey, new Set(($taskProjects ?? []).filter((p) => p.archived).map((p) => p.id))),
   );
+  const overdueCount = $derived(tasksDue.filter((t) => t.dueOn! < todayKey).length);
   const logs = $derived(todayLogs($trackables ?? [], $allFields ?? [], $allEntries ?? [], now, undefined, measurementView.view));
   const dates = $derived(todayDates($trackables ?? [], $allEntries ?? [], now));
   const hasDates = $derived(($trackables ?? []).some((t) => !t.archived && t.displayMode === 'ages'));
@@ -247,20 +251,32 @@
       {/if}
     </section>
 
-    {#if tasksDue.length > 0}
+    {#if tasksDue.length > 0 || hasOpenTasks}
       <!-- Tasks overdue or due today, from every project (3.62); the rest are on Tasks > Upcoming. -->
       <section class="flex flex-col gap-2" aria-labelledby="today-tasks">
         <SectionHeading id="today-tasks" title="Tasks">
           {#snippet action()}
-            <a href="/tasks/upcoming" use:link class="text-xs font-semibold text-brand">Upcoming</a>
+            <span class="flex items-center gap-3">
+              <button type="button" class="text-xs font-semibold text-brand" onclick={() => quickAdd.show()}>+ Add</button>
+              <a href="/tasks/upcoming" use:link class="text-xs font-semibold text-brand">Upcoming</a>
+            </span>
           {/snippet}
         </SectionHeading>
         <Card padding="px-1 py-1">
-          <ul class="flex flex-col">
-            {#each tasksDue as t (t.id)}
-              <TaskRow task={t} tasks={$allTasks ?? []} today={todayKey} context={taskContext(t, $allTasks ?? [], $taskProjects ?? [])} />
-            {/each}
-          </ul>
+          {#if tasksDue.length === 0}
+            <p class="px-2 py-1.5 text-sm text-text-muted">Nothing due today.</p>
+          {:else}
+            <ul class="flex flex-col">
+              {#each tasksDue as t (t.id)}
+                <TaskRow task={t} tasks={$allTasks ?? []} today={todayKey} context={taskContext(t, $allTasks ?? [], $taskProjects ?? [])} />
+              {/each}
+            </ul>
+            {#if overdueCount > 0}
+              <button type="button" class="px-2 py-1.5 text-xs font-semibold text-brand" onclick={() => taskUi.moveOverdue(tasksDue, todayKey)}>
+                Move {overdueCount === 1 ? 'the overdue task' : `all ${overdueCount} overdue`} to today
+              </button>
+            {/if}
+          {/if}
         </Card>
       </section>
     {/if}

@@ -1,9 +1,18 @@
 <script lang="ts">
   import ChevronLeft from '@lucide/svelte/icons/chevron-left';
   import SkipForward from '@lucide/svelte/icons/skip-forward';
-  import { createTask, deleteTask, updateTask, type Task, type TaskCompletion, type TaskProject } from '../db';
+  import { createTask, deleteTask, duplicateTask, setTaskParent, updateTask, type Task, type TaskCompletion, type TaskProject } from '../db';
+  import GripVertical from '@lucide/svelte/icons/grip-vertical';
+  import Copy from '@lucide/svelte/icons/copy';
+  import { sortable, type DropEvent } from '../actions/sortable';
+  import { moveTo as placeAt, renumber } from '../utils/reorder';
+  import { rootOf } from '../utils/tasks';
   import { dayKey, daysFrom } from '../utils/tasks';
   import RepeatPicker from './RepeatPicker.svelte';
+  import DateChoices from './DateChoices.svelte';
+  import ExternalLink from '@lucide/svelte/icons/external-link';
+  import { parseQuickAdd } from '../utils/quickAdd';
+  import { linksIn } from '../utils/tasks';
   import { followDueDate } from '../utils/taskRepeat';
   import { INBOX_ID, nextSortOrder, parentChain, subtaskProgress, subtasksOf } from '../utils/tasks';
   import { taskUi } from '../stores/taskUi.svelte';
@@ -29,6 +38,57 @@
   const progress = $derived(task ? subtaskProgress(tasks, task.id) : null);
   const project = $derived(task?.projectId ? projects.find((p) => p.id === task.projectId) : undefined);
   const activeProjects = $derived(projects.filter((p) => !p.archived || p.id === task?.projectId));
+  const links = $derived(task?.notes ? linksIn(task.notes) : []);
+
+  // Where it can go (3.65): another open task in the same project (or the
+  // inbox), but not itself or one of its own subtasks.
+  const below = $derived.by(() => {
+    if (!task) return new Set<string>();
+    const ids = new Set([task.id]);
+    let grew = true;
+    while (grew) {
+      grew = false;
+      for (const t of tasks) if (t.parentId && ids.has(t.parentId) && !ids.has(t.id)) (ids.add(t.id), (grew = true));
+    }
+    return ids;
+  });
+  const parentChoices = $derived.by(() => {
+    if (!task) return [];
+    const home = rootOf(tasks, task).projectId;
+    return tasks
+      .filter((t) => !t.completedAt && !below.has(t.id) && rootOf(tasks, t).projectId === home)
+      .map((t) => {
+        const chain = parentChain(tasks, t);
+        return { id: t.id, label: [...chain.map((c) => c.name), t.name].join(' / '), depth: chain.length };
+      })
+      .filter((c) => c.depth <= 2)
+      .sort((a, b) => a.label.localeCompare(b.label));
+  });
+
+  async function setParent(value: string) {
+    if (!task) return;
+    const ok = await setTaskParent(task.id, value || null);
+    if (!ok) error = "A task can't go under itself or one of its own subtasks.";
+  }
+
+  async function duplicate() {
+    if (!task) return;
+    const copy = await duplicateTask(task.id);
+    if (copy) taskUi.show(copy.id);
+  }
+
+  /** A subtask dragged to a new place among the open ones. */
+  async function dropSubtask(e: DropEvent) {
+    const open = subtasks.filter((s) => !s.completedAt);
+    const order = placeAt(open.map((s) => s.id), e.id, e.index);
+    for (const c of renumber(order, new Map(open.map((s) => [s.id, s.sortOrder])))) await updateTask(c.id, { sortOrder: c.sortOrder });
+  }
+  function keyMoveSubtask(id: string, direction: -1 | 1) {
+    const open = subtasks.filter((s) => !s.completedAt);
+    const at = open.findIndex((s) => s.id === id);
+    if (at < 0 || at + direction < 0 || at + direction >= open.length) return;
+    void dropSubtask({ id, from: '', to: '', index: at + direction });
+  }
   const history = $derived(task ? completions.filter((c) => c.taskId === task.id).sort((a, b) => b.completedAt - a.completedAt) : []);
   /** "on time", "3 days late", "1 day early": when it was done against its due date. */
   function timing(dueOn: string, completedAt: number): string {
@@ -81,7 +141,16 @@
     if (!task || !name) return;
     // Cleared first, so typing the next one straight away starts empty.
     newSubtask = '';
-    await createTask({ name, parentId: task.id, sortOrder: nextSortOrder(subtasks) });
+    // A date typed at the end works here too ("Buy filters fri").
+    const q = parseQuickAdd(name, dayKey(Date.now()));
+    await createTask({
+      name: q.name,
+      parentId: task.id,
+      ...(q.dueOn ? { dueOn: q.dueOn } : {}),
+      ...(q.dueTime ? { dueTime: q.dueTime } : {}),
+      ...(q.repeat ? { repeat: q.repeat } : {}),
+      sortOrder: nextSortOrder(subtasks),
+    });
   }
 
   async function remove() {
@@ -171,7 +240,7 @@
       {/if}
     </div>
     {#if task.dueOn}
-      <button type="button" class="-mt-2 text-xs text-text-muted" onclick={() => setDue('')}>Clear due date</button>
+      <DateChoices dueOn={task.dueOn} onpick={(d) => setDue(d ?? '')} />
       {#if !task.completedAt}
         <RepeatPicker repeat={task.repeat} dueOn={task.dueOn} onchange={(repeat) => save({ repeat })} />
       {/if}
@@ -181,7 +250,8 @@
         </button>
       {/if}
     {:else}
-      <p class="-mt-2 text-xs text-text-muted">Set a due date to make it repeat.</p>
+      <DateChoices dueOn={undefined} onpick={(d) => setDue(d ?? '')} />
+      <p class="text-xs text-text-muted">Set a due date to make it repeat.</p>
     {/if}
     {#if history.length > 0}
       <details class="text-sm">
@@ -206,16 +276,38 @@
         ></textarea>
       {/key}
     </label>
+    {#if links.length > 0}
+      <ul class="-mt-2 flex flex-col gap-1 text-sm" aria-label="Links in the notes">
+        {#each links as url (url)}
+          <li>
+            <a href={url} target="_blank" rel="noopener noreferrer" class="inline-flex max-w-full items-center gap-1.5 text-brand hover:underline">
+              <ExternalLink size={14} class="shrink-0" aria-hidden="true" /><span class="truncate">{url.replace(/^https?:\/\/(www\.)?/, '')}</span>
+            </a>
+          </li>
+        {/each}
+      </ul>
+    {/if}
 
     <section aria-label="Subtasks" class="space-y-1">
       <p class="text-sm text-text-muted">
         Subtasks{#if progress}<span> &middot; {progress.done} of {progress.total} done</span>{/if}
       </p>
       {#if subtasks.length > 0}
-        <ul class="flex flex-col">
+        <ul class="flex flex-col" use:sortable={{ group: `subtasks:${task.id}`, zone: task.id, onDrop: dropSubtask, onKeyMove: keyMoveSubtask }}>
           {#each subtasks as s (s.id)}
             {@const sp = subtaskProgress(tasks, s.id)}
-            <li class="flex items-center gap-2 rounded-lg px-1 py-1.5 hover:bg-surface-2">
+            <li class="flex items-center gap-2 rounded-lg px-1 py-1.5 hover:bg-surface-2" data-sort-id={s.completedAt ? undefined : s.id}>
+              {#if !s.completedAt}
+                <button
+                  type="button"
+                  data-drag-handle
+                  class="-mx-1 flex h-7 w-5 shrink-0 cursor-grab items-center justify-center rounded text-text-muted/60 hover:text-text-muted"
+                  style="touch-action: none;"
+                  aria-label="Drag {s.name} to move it, or use the arrow keys"
+                ><GripVertical size={14} aria-hidden="true" /></button>
+              {:else}
+                <span class="w-4 shrink-0"></span>
+              {/if}
               <TaskCheck size="sm" done={!!s.completedAt} name={s.name} onclick={() => taskUi.toggle(s)} />
               <button type="button" class="min-w-0 flex-1 truncate text-left text-sm {s.completedAt ? 'text-text-muted line-through' : 'text-text'}" onclick={() => taskUi.show(s.id)}>
                 {s.name}
@@ -242,6 +334,19 @@
     {#if error}
       <p class="text-sm text-danger">{error}</p>
     {/if}
+
+    <div class="space-y-2 border-t border-border pt-3">
+      <label class="block text-sm">
+        <span class="mb-1 block text-text-muted">Subtask of</span>
+        <select class={inputClass} value={task.parentId ?? ''} onchange={(e) => setParent(e.currentTarget.value)}>
+          <option value="">(none: a task of its own)</option>
+          {#each parentChoices as c (c.id)}
+            <option value={c.id}>{c.label}</option>
+          {/each}
+        </select>
+      </label>
+      <Button size="sm" onclick={duplicate}><Copy size={14} aria-hidden="true" /> Duplicate</Button>
+    </div>
 
     <div class="border-t border-border pt-3">
       {#if confirmDelete}

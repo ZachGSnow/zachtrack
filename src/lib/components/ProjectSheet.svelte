@@ -1,6 +1,7 @@
 <script lang="ts">
-  import ArrowUp from '@lucide/svelte/icons/arrow-up';
-  import ArrowDown from '@lucide/svelte/icons/arrow-down';
+  import GripVertical from '@lucide/svelte/icons/grip-vertical';
+  import { sortable, type DropEvent } from '../actions/sortable';
+  import { moveTo } from '../utils/reorder';
   import X from '@lucide/svelte/icons/x';
   import { createTaskProject, deleteTaskProject, deleteTaskSection, updateTaskProject, type Task, type TaskProject, type TaskSection } from '../db';
   import { PROJECT_COLORS, SECTION_TEMPLATES } from '../utils/tasks';
@@ -49,6 +50,12 @@
 
   const taskCount = $derived(project ? tasks.filter((t) => t.projectId === project.id && !t.parentId).length : 0);
   const countIn = (sectionId: string) => (project ? tasks.filter((t) => t.projectId === project.id && t.sectionId === sectionId && !t.parentId).length : 0);
+
+  /** A section dragged to a new place (3.65); written with Save, like the rest of the form. */
+  function dropSection(e: DropEvent) {
+    const order = moveTo(sections.map((s) => s.id), e.id, e.index);
+    sections = order.map((id) => sections.find((s) => s.id === id)!);
+  }
 
   function moveSection(i: number, direction: -1 | 1) {
     const j = i + direction;
@@ -144,12 +151,25 @@
       {#if sections.length === 0}
         <p class="text-xs text-text-muted">No sections: tasks are one list.</p>
       {/if}
-      <ul class="flex flex-col gap-1.5">
-        {#each sections as s, i (s.id)}
-          <li class="flex items-center gap-1.5">
+      <ul
+        class="flex flex-col gap-1.5"
+        use:sortable={{
+          group: 'project-sections',
+          zone: 'sections',
+          onDrop: dropSection,
+          onKeyMove: (id, d) => moveSection(sections.findIndex((x) => x.id === id), d),
+        }}
+      >
+        {#each sections as s (s.id)}
+          <li class="flex items-center gap-1.5" data-sort-id={s.id}>
+            <button
+              type="button"
+              data-drag-handle
+              class="flex h-9 w-6 shrink-0 cursor-grab items-center justify-center rounded text-text-muted/60 hover:text-text-muted"
+              style="touch-action: none;"
+              aria-label="Drag {s.name} to move it, or use the arrow keys"
+            ><GripVertical size={16} aria-hidden="true" /></button>
             <input type="text" bind:value={s.name} class="{inputClass} text-sm" aria-label="Section name" />
-            <button type="button" class="rounded-lg p-1.5 text-text-muted hover:bg-surface-2 disabled:opacity-30" disabled={i === 0} onclick={() => moveSection(i, -1)} aria-label="Move {s.name} up"><ArrowUp size={16} aria-hidden="true" /></button>
-            <button type="button" class="rounded-lg p-1.5 text-text-muted hover:bg-surface-2 disabled:opacity-30" disabled={i === sections.length - 1} onclick={() => moveSection(i, 1)} aria-label="Move {s.name} down"><ArrowDown size={16} aria-hidden="true" /></button>
             <button type="button" class="rounded-lg p-1.5 text-text-muted hover:bg-surface-2" onclick={() => (sections = sections.filter((x) => x.id !== s.id))} aria-label="Remove {s.name}"><X size={16} aria-hidden="true" /></button>
           </li>
         {/each}

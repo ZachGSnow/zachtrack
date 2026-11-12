@@ -10,6 +10,8 @@ import {
   deleteTask,
   deleteTaskProject,
   deleteTaskSection,
+  duplicateTask,
+  setTaskParent,
   getChangedSyncableRecords,
   getPendingTombstones,
   getSyncMeta,
@@ -225,5 +227,54 @@ describe('completing, undoing and skipping (3.61)', () => {
     expect(await db.taskCompletions.count()).toBe(0);
     const plain = await createTask({ name: 'One-off', dueOn: '2026-11-09', sortOrder: 2 });
     expect(await skipTask(plain.id)).toBeNull();
+  });
+});
+
+describe('duplicating and moving between task and subtask (3.65)', () => {
+  beforeEach(async () => {
+    await Promise.all(db.tables.map((t) => t.clear()));
+  });
+
+  it('duplicates a task with its subtasks, open again, just below it, without its history', async () => {
+    const top = await createTask({ name: 'Weekend', projectId: 'p', sectionId: 's', dueOn: '2026-11-14', repeat: { type: 'weeks', every: 1, weekdays: [5] }, completedAt: 9, sortOrder: 3 });
+    const sub = await createTask({ name: 'Trash', parentId: top.id, completedAt: 5, sortOrder: 0 });
+    await createTask({ name: 'Recycling', parentId: sub.id, sortOrder: 0 });
+    await db.taskCompletions.put({ id: 'c1', taskId: top.id, completedAt: 1, createdAt: 1, updatedAt: 1 });
+
+    const copy = (await duplicateTask(top.id))!;
+    expect(copy).toMatchObject({ name: 'Weekend', projectId: 'p', sectionId: 's', dueOn: '2026-11-14', sortOrder: 3.5 });
+    expect(copy).not.toHaveProperty('completedAt');
+    expect(copy.id).not.toBe(top.id);
+    const copySubs = await db.tasks.where('parentId').equals(copy.id).toArray();
+    expect(copySubs.map((t) => t.name)).toEqual(['Trash']);
+    expect(copySubs[0]).not.toHaveProperty('completedAt');
+    expect((await db.tasks.where('parentId').equals(copySubs[0].id).toArray()).map((t) => t.name)).toEqual(['Recycling']);
+    expect(await db.tasks.count()).toBe(6);
+    expect(await db.taskCompletions.count()).toBe(1);
+  });
+
+  it('makes a task a subtask, and a subtask a task of its own in its parent project and section', async () => {
+    const a = await createTask({ name: 'Garage', projectId: 'p', sectionId: 's', sortOrder: 2 });
+    const b = await createTask({ name: 'Buy hooks', projectId: 'p', sectionId: 's2', sortOrder: 5 });
+    const deep = await createTask({ name: 'Measure', parentId: a.id, sortOrder: 0 });
+    const deeper = await createTask({ name: 'Find the tape', parentId: deep.id, sortOrder: 0 });
+
+    expect(await setTaskParent(b.id, a.id)).toBe(true);
+    const moved = (await db.tasks.get(b.id))!;
+    expect(moved).toMatchObject({ parentId: a.id, sortOrder: 1 });
+    expect(moved).not.toHaveProperty('projectId');
+    expect(moved).not.toHaveProperty('sectionId');
+
+    expect(await setTaskParent(deeper.id, null)).toBe(true);
+    expect(await db.tasks.get(deeper.id)).toMatchObject({ projectId: 'p', sectionId: 's', sortOrder: 2.5 });
+    expect(await db.tasks.get(deeper.id)).not.toHaveProperty('parentId');
+  });
+
+  it("won't put a task under itself or one of its own subtasks", async () => {
+    const a = await createTask({ name: 'A', sortOrder: 0 });
+    const b = await createTask({ name: 'B', parentId: a.id, sortOrder: 0 });
+    expect(await setTaskParent(a.id, b.id)).toBe(false);
+    expect(await setTaskParent(a.id, a.id)).toBe(false);
+    expect(await db.tasks.get(a.id)).not.toHaveProperty('parentId');
   });
 });

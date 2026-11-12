@@ -799,6 +799,65 @@ export async function updateTask(id: string, patch: Partial<Omit<Task, 'id' | 'c
   notifyMutation();
 }
 
+/**
+ * Copies a task with its subtasks, at any depth, just below it: open again,
+ * with its repeat rule and notes but without its completion history (3.65).
+ */
+export async function duplicateTask(id: string): Promise<Task | null> {
+  const original = await db.tasks.get(id);
+  if (!original) return null;
+  const now = Date.now();
+  const ids = await withDescendants([id]);
+  const all = (await db.tasks.bulkGet(ids)).filter((t): t is Task => !!t);
+  const newId = new Map(all.map((t) => [t.id, uuid()] as const));
+  const copies = all.map((t) => {
+    const { completedAt: _done, ...rest } = t;
+    return {
+      ...rest,
+      id: newId.get(t.id)!,
+      ...(t.parentId && newId.has(t.parentId) ? { parentId: newId.get(t.parentId)! } : {}),
+      ...(t.id === id ? { sortOrder: t.sortOrder + 0.5 } : {}),
+      createdAt: now,
+      updatedAt: now,
+    };
+  });
+  await db.tasks.bulkAdd(copies);
+  notifyMutation();
+  return copies.find((c) => c.id === newId.get(id)) ?? null;
+}
+
+/**
+ * Makes a task a subtask of `parentId`, or with null a task of its own in the
+ * project and section its top-level task is in, just below that task (3.65).
+ * Refuses to put a task under itself or one of its own subtasks.
+ */
+export async function setTaskParent(id: string, parentId: string | null): Promise<boolean> {
+  const task = await db.tasks.get(id);
+  if (!task) return false;
+  const now = Date.now();
+  if (parentId) {
+    if ((await withDescendants([id])).includes(parentId)) return false;
+    const siblings = await db.tasks.where('parentId').equals(parentId).toArray();
+    const { projectId: _p, sectionId: _s, ...rest } = task;
+    await db.tasks.put({ ...rest, parentId, sortOrder: siblings.reduce((m, s) => Math.max(m, s.sortOrder), -1) + 1, updatedAt: now });
+  } else {
+    if (!task.parentId) return true;
+    // The top-level task it was under, at whatever depth.
+    let root = await db.tasks.get(task.parentId);
+    for (let i = 0; root?.parentId && i < 100; i++) root = await db.tasks.get(root.parentId);
+    const { parentId: _parent, ...rest } = task;
+    await db.tasks.put({
+      ...rest,
+      ...(root?.projectId ? { projectId: root.projectId } : {}),
+      ...(root?.sectionId ? { sectionId: root.sectionId } : {}),
+      sortOrder: (root?.sortOrder ?? 0) + 0.5,
+      updatedAt: now,
+    });
+  }
+  notifyMutation();
+  return true;
+}
+
 /** What completing a task did, so Undo can take it back. */
 export type TaskCompleteResult =
   | { kind: 'closed'; taskId: string }
