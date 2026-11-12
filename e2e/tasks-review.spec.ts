@@ -77,3 +77,28 @@ test('Done lists what was completed by day, repeats included, and Insights and t
   await expect(page.getByRole('region', { name: 'Year in review' })).toContainText('Tasks done');
   expect(problems).toEqual([]);
 });
+
+test('one undo message at a time: logging a trackable and then completing a task shows only the latest', async ({ page }) => {
+  await quickAdd(page, 'Post the parcel today');
+  // A trackable without fields logs in one tap, with Undo.
+  await page.goto('/#/trackables');
+  await page.getByRole('button', { name: '+ New' }).click();
+  const sheet = page.getByRole('dialog');
+  await sheet.getByPlaceholder('e.g. Watered Plants').fill('Stretch');
+  await sheet.getByRole('button', { name: 'Save', exact: true }).click();
+  // Saving opens the new trackable's page; go back to the list from there.
+  await expect(page.getByRole('heading', { name: 'Stretch', level: 1 })).toBeVisible();
+  await page.goto('/#/trackables');
+  await expect(page.getByRole('heading', { name: 'Trackables', level: 1 })).toBeVisible();
+  await page.getByRole('button', { name: 'Log Stretch' }).click();
+  const undo = page.getByRole('status').filter({ hasText: 'Undo' });
+  await expect(undo).toContainText('Logged Stretch');
+
+  // Within its six seconds, a task completed on Today replaces it: one message, the latest.
+  await page.goto('/#/');
+  await page.getByRole('region', { name: 'Tasks' }).getByRole('checkbox', { name: 'Complete Post the parcel' }).click();
+  await expect(undo).toHaveCount(1);
+  await expect(undo).toContainText('Completed Post the parcel');
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.getByRole('region', { name: 'Tasks' }).getByRole('checkbox', { name: 'Complete Post the parcel' })).toBeVisible();
+});

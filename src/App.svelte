@@ -22,6 +22,7 @@
   import { visitStore } from './lib/stores/visit.svelte';
   import ZoneInfoSheet from './lib/components/ZoneInfoSheet.svelte';
   import QuickAddSheet from './lib/components/QuickAddSheet.svelte';
+  import UndoToast from './lib/components/UndoToast.svelte';
   import { quickAdd } from './lib/stores/quickAdd.svelte';
   import { taskSearch } from './lib/stores/taskSearch.svelte';
   import SyncStatus from './lib/components/SyncStatus.svelte';
@@ -133,6 +134,7 @@
 
 <ZoneInfoSheet />
 <QuickAddSheet />
+<UndoToast />
 
 <BottomSheet bind:open={shortcutsOpen}>
   <div class="space-y-3">
