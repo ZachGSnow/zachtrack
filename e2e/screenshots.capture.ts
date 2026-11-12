@@ -82,6 +82,44 @@ test('capture README screenshots', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Dates', level: 1 })).toBeVisible();
   await shot(page, 'dates');
 
+  // Tasks: a project with sections, dates typed in plain words, a repeating task, subtasks, and a few done.
+  await page.goto('/#/tasks');
+  await page.getByRole('button', { name: '+ Project' }).click();
+  const projectSheet = page.getByRole('dialog');
+  await projectSheet.getByRole('textbox', { name: 'Name' }).fill('Garden');
+  await projectSheet.getByRole('combobox', { name: 'Sections' }).selectOption({ label: 'Now / Next / Later' });
+  await projectSheet.getByRole('button', { name: 'Save', exact: true }).click();
+  const add = async (section: string, ...names: string[]) => {
+    const box = page.getByRole('textbox', { name: `Add a task to ${section}` });
+    for (const name of names) {
+      await box.fill(name);
+      await box.press('Enter');
+      await expect(box).toHaveValue('');
+    }
+  };
+  await add('Now', 'Water the tomatoes every 2 days', 'Buy compost tomorrow', 'Fix the fence post fri', 'Plant the bulbs');
+  await add('Next', 'Clean the gutters next week', 'Rake leaves this weekend');
+  await add('Later', 'Build a raised bed', 'Prune the apple tree in 3 months');
+  await page.getByRole('button', { name: /^Fix the fence post/ }).click();
+  const taskSheet = page.getByRole('dialog');
+  for (const sub of ['Buy a post', 'Dig out the old one', 'Set it in concrete']) {
+    await taskSheet.getByRole('textbox', { name: 'New subtask' }).fill(sub);
+    await taskSheet.getByRole('textbox', { name: 'New subtask' }).press('Enter');
+    await expect(taskSheet.getByRole('textbox', { name: 'New subtask' })).toHaveValue('');
+  }
+  await taskSheet.getByRole('checkbox', { name: 'Complete Buy a post' }).click();
+  await page.keyboard.press('Escape');
+  await page.getByRole('checkbox', { name: 'Complete Plant the bulbs' }).click();
+  await page.getByRole('checkbox', { name: 'Complete Water the tomatoes' }).click();
+  await expect(page.getByRole('checkbox', { name: 'Complete Plant the bulbs' })).toHaveCount(0);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(6500); // Let the Undo message go.
+  await shot(page, 'tasks');
+
+  await page.goto('/#/tasks/done');
+  await expect(page.getByRole('heading', { name: 'Done', level: 1 })).toBeVisible();
+  await shot(page, 'tasks-done');
+
   // Today: a habit to check (Male Health once a day), the running fast, what's been logged, and the dates just added.
   await page.goto('/#/trackables');
   await page.getByRole('link', { name: /Male Health/ }).click();

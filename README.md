@@ -6,12 +6,14 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 <p>
-  <img src="docs/screenshots/today.png" alt="Today with the running fast, a habit to check, the last seven days and what has been logged" width="200">
+  <img src="docs/screenshots/today.png" alt="Today with the running fast, suggested habits, a habit to check, the last seven days and the Tasks block" width="200">
   <img src="docs/screenshots/fasting.png" alt="Fasting timer with a 16:8 fast past its goal, its start, goal and next zone, and the current zone" width="200">
   <img src="docs/screenshots/journey.png" alt="Journey with goal streaks, this week against last, and the fasting days grid" width="200">
   <img src="docs/screenshots/trackables.png" alt="Trackables list showing each one's latest value or when it was last logged" width="200">
   <img src="docs/screenshots/trackable-trends.png" alt="Body Measurements trends table with weekly weight, BMI and body fat" width="200">
   <img src="docs/screenshots/dates.png" alt="Dates list with upcoming birthdays and US holidays and their countdowns" width="200">
+  <img src="docs/screenshots/tasks.png" alt="A Garden project with Now, Next and Later sections, tasks with due dates, a repeating task and a task with subtasks" width="200">
+  <img src="docs/screenshots/tasks-done.png" alt="The Done page listing the tasks completed today, with a repeating task marked on time" width="200">
   <img src="docs/screenshots/insights.png" alt="Insights overview of fasting and each trackable over the last 30 days" width="200">
 </p>
 

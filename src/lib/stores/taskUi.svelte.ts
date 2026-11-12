@@ -1,6 +1,7 @@
 import { completeTask, db, skipTask, undoComplete, updateTask, type Task } from '../db';
 import { describeDue, dayKey } from '../utils/tasks';
 import { followDueDate } from '../utils/taskRepeat';
+import { undoToast } from './undo.svelte';
 
 /**
  * The task sheet and the "Completed ... Undo" toast, shared by every page that
@@ -14,10 +15,8 @@ class TaskUi {
   /** The task the sheet shows; the sheet follows it as it changes or syncs. */
   taskId = $state<string | null>(null);
   open = $state(false);
-  undo = $state<{ message: string; revert: () => Promise<unknown> } | null>(null);
   error = $state<string | null>(null);
 
-  private undoTimer: ReturnType<typeof setTimeout> | undefined;
 
   show(id: string) {
     this.taskId = id;
@@ -25,9 +24,7 @@ class TaskUi {
   }
 
   private offerUndo(message: string, revert: () => Promise<unknown>) {
-    clearTimeout(this.undoTimer);
-    this.undo = { message, revert };
-    this.undoTimer = setTimeout(() => (this.undo = null), 6000);
+    undoToast.offer(message, revert);
   }
 
   private async attempt(work: () => Promise<void>) {
@@ -107,14 +104,6 @@ class TaskUi {
         for (const b of before) await updateTask(b.id, b.patch);
       });
     });
-  }
-
-  async undoNow() {
-    if (!this.undo) return;
-    const { revert } = this.undo;
-    this.undo = null;
-    clearTimeout(this.undoTimer);
-    await revert();
   }
 }
 

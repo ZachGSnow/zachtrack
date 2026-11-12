@@ -1,28 +1,24 @@
 import { addTrackableEntry, deleteTrackableEntry, type TrackableDefinition, type TrackableEntry } from '../db';
 import { formatShortDate, startOfDay } from '../utils/time';
+import { undoToast } from './undo.svelte';
 
 /**
  * Logging from a list: the "+" and check buttons on Trackables and Today, and
  * the day cells of Today's habit matrix. A trackable with fields (or dates)
  * opens the Log entry sheet; one without logs right away, the "I just did it"
  * of a days-since app, and checking it again takes the entry back off. Either
- * way there are a few seconds to undo. QuickLogHost.svelte renders the sheet,
- * the undo toast and errors.
+ * way there are a few seconds to undo (stores/undo.svelte.ts). QuickLogHost.svelte
+ * renders the sheet and errors.
  */
 class QuickLogStore {
   sheetOpen = $state(false);
   sheetTrackable = $state<TrackableDefinition | null>(null);
   /** When the sheet's new entry starts out: a day picked in the matrix; undefined = now. */
   sheetTimestamp = $state<number | undefined>(undefined);
-  undo = $state<{ message: string; revert: () => Promise<unknown> } | null>(null);
   error = $state('');
 
-  private undoTimer: ReturnType<typeof setTimeout> | undefined;
-
   private offerUndo(message: string, revert: () => Promise<unknown>) {
-    clearTimeout(this.undoTimer);
-    this.undo = { message, revert };
-    this.undoTimer = setTimeout(() => (this.undo = null), 6000);
+    undoToast.offer(message, revert);
   }
 
   /** Opens the sheet, or logs a trackable without fields right away. */
@@ -99,14 +95,6 @@ class QuickLogStore {
     const logged = entries.some((e) => startOfDay(e.timestamp) === target);
     if (logged) await this.uncheckOn(t, entries, target);
     else await this.logOn(t, at);
-  }
-
-  async undoNow() {
-    if (!this.undo) return;
-    const { revert } = this.undo;
-    this.undo = null;
-    clearTimeout(this.undoTimer);
-    await revert();
   }
 }
 

@@ -1453,6 +1453,19 @@ the Tasks page heading and from Repeat in a task's sheet.
   a "Tasks done" tile; the weekly review on Today a Tasks tile with that
   week's count (`tallyTasks`).
 
+### 3.67 One undo message (v1.21.0)
+
+Logging from a list (3.18) and completing, skipping or moving tasks (3.64)
+each had their own "... Undo" message and timer, drawn by their own host
+component, both at the bottom of the screen. Today mounts both hosts, so
+logging a habit and then completing a task within six seconds put two
+messages in the same place, one over the other. Now `stores/undo.svelte.ts`
+holds the one message and `UndoToast.svelte` (mounted once in `App.svelte`)
+draws it; the stores only call `undoToast.offer(message, revert)`. A newer
+offer replaces the older, whose change simply stays, and the message
+survives moving between pages for its six seconds. The README screenshots
+gained Tasks (a project) and Done.
+
 ### 3.21 Trackables list: pin, archive, order; tag filters
 - **Sort** (per device, `zachtrack:trackables-view`): Due first (goal
   urgency from 3.18: overdue, then due, then the rest, then trackables
