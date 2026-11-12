@@ -29,6 +29,7 @@ import {
 import { formatClockTime, formatDateTime } from '../utils/time';
 import { describeRejected, REJECTED_DETAILS_LIMIT, type RejectedRecord } from '../utils/rejected';
 import { canMerge, mergeInto, summarizeSync, type AppliedCounts, type SyncHistoryEntry } from '../utils/syncHistory';
+import { splitForSending } from '../utils/syncChunks';
 
 export type { SyncHistoryEntry } from '../utils/syncHistory';
 
@@ -82,6 +83,23 @@ interface AppliedRecord {
   deleted?: boolean;
 }
 
+/** A sync stops after this many requests, sending or pulling; the next sync carries on from where it got to. */
+const MAX_REQUESTS_PER_SYNC = 200;
+
+const emptyLists = () => ({ fasts: [], fieldDefinitions: [], trackableDefinitions: [], trackableEntries: [], taskProjects: [], tasks: [], taskCompletions: [] });
+
+/** Adds one response's changes to what the sync has received so far (for the history). */
+function mergeChanges(into: RemoteSyncChanges, more: RemoteSyncChanges) {
+  into.fasts.push(...more.fasts);
+  into.fieldDefinitions.push(...more.fieldDefinitions);
+  into.trackableDefinitions.push(...more.trackableDefinitions);
+  into.trackableEntries.push(...more.trackableEntries);
+  into.taskProjects!.push(...(more.taskProjects ?? []));
+  into.tasks!.push(...(more.tasks ?? []));
+  into.taskCompletions!.push(...(more.taskCompletions ?? []));
+  if (more.settings) into.settings = more.settings;
+}
+
 /** A device in the server's list (functions/api/sync.ts). */
 export interface DeviceInfo {
   id: string;
@@ -103,6 +121,8 @@ export interface ActivityEvent {
 
 interface SyncResponseBody {
   cursor: number;
+  /** More changes wait after `cursor` (3.69): pull again. */
+  more?: boolean;
   changes: RemoteSyncChanges;
   rejected: Array<{ recordType: string; uuid: string; reason: string }>;
   /** Absent from servers before v1.10.0. */
@@ -697,6 +717,36 @@ class SyncStore {
     return this.inFlight;
   }
 
+  /**
+   * One request to the sync endpoint. An expired Access session comes back as
+   * a 401 (thanks to X-Requested-With) or, as a fallback, an opaque redirect
+   * with `redirect: 'manual'`, instead of the browser trying (and failing,
+   * cross-origin) to follow it; our own Function never returns 401 (it uses
+   * 403). 404/405: no sync endpoint at all (the Vite dev server).
+   */
+  private async post(body: object): Promise<SyncResponseBody> {
+    const response = await fetch(SYNC_ENDPOINT, {
+      method: 'POST',
+      credentials: 'include',
+      redirect: 'manual',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      body: JSON.stringify(body),
+    });
+    if (response.type === 'opaqueredirect' || response.status === 401) throw new UnauthenticatedError();
+    if (response.status === 404 || response.status === 405) throw new NoBackendError();
+    if (!response.ok) {
+      let detail = '';
+      try {
+        const errBody = (await response.json()) as { error?: string };
+        detail = errBody?.error ? `: ${errBody.error}` : '';
+      } catch {
+        // Response body wasn't JSON -- ignore.
+      }
+      throw new Error(`Sync request failed (${response.status})${detail}`);
+    }
+    return (await response.json()) as SyncResponseBody;
+  }
+
   private async doSync(): Promise<void> {
     const wasLocalOnly = this.status === 'local';
     const startedAt = Date.now();
@@ -721,68 +771,48 @@ class SyncStore {
         getDevice(),
       ]);
 
-      const response = await fetch(SYNC_ENDPOINT, {
-        method: 'POST',
-        credentials: 'include',
-        redirect: 'manual',
-        headers: {
-          'Content-Type': 'application/json',
-          // Tells Cloudflare Access this is an AJAX call, so an expired session
-          // comes back as a plain 401 instead of a 302 to the login page.
-          'X-Requested-With': 'XMLHttpRequest',
-        },
-        body: JSON.stringify({
-          cursor: meta.cursor,
-          changes: records,
-          tombstones: tombstones.map(({ recordType, uuid, deletedAt }) => ({ recordType, uuid, deletedAt })),
+      // In parts of at most CHUNK_RECORDS records, and pulling until the server
+      // has no more, so no single request grows with the data (3.69).
+      const parts = splitForSending(records);
+      const from = (id: string | null | undefined) => this.deviceLabel(id);
+      const received: RemoteSyncChanges = { fasts: [], fieldDefinitions: [], trackableDefinitions: [], trackableEntries: [], taskProjects: [], tasks: [], taskCompletions: [], settings: null };
+      const rejected: SyncResponseBody['rejected'] = [];
+      const applied: AppliedRecord[] = [];
+      const appliedCounts: AppliedCounts = {};
+      const overwritten: string[] = [];
+      let counts: SyncResponseBody['counts'];
+      let cursor = meta.cursor;
+      for (let i = 0; i < MAX_REQUESTS_PER_SYNC; i++) {
+        const part = parts[i];
+        const body = await this.post({
+          cursor,
+          changes: part ?? splitForSending({ ...records, ...emptyLists(), settings: null })[0],
+          tombstones: i === 0 ? tombstones.map(({ recordType, uuid, deletedAt }) => ({ recordType, uuid, deletedAt })) : [],
           device: { id: device.id, name: device.name, appVersion: __APP_VERSION__ },
           ...(check ? { check: true } : {}),
-        }),
-      });
-
-      // Access answers an expired session with a 401 (thanks to the
-      // X-Requested-With header above). The opaque-redirect check is kept as a
-      // fallback: with `redirect: 'manual'`, a re-challenge that still comes as
-      // a 302 shows up as status 0 / type 'opaqueredirect' instead of the browser
-      // trying (and failing, cross-origin) to follow it -- that's the CORS error
-      // this used to surface as. Our own Function never returns 401 (it uses 403).
-      if (response.type === 'opaqueredirect' || response.status === 401) {
-        throw new UnauthenticatedError();
+        });
+        if (body.devices) this.devices = body.devices;
+        overwritten.push(...(await findOverwritten(records, meta.sentThrough, body.changes, from).catch(() => [] as string[])));
+        await applyRemoteChanges(body.changes);
+        if (i === 0) await prunePendingTombstones(tombstones.map((t) => t.id).filter((id): id is number => id != null));
+        mergeChanges(received, body.changes);
+        rejected.push(...(body.rejected ?? []));
+        applied.push(...(body.applied ?? []));
+        for (const [k, v] of Object.entries(body.appliedCounts ?? {})) appliedCounts[k as keyof AppliedCounts] = (appliedCounts[k as keyof AppliedCounts] ?? 0) + (v ?? 0);
+        counts = body.counts ?? counts;
+        // What's applied here stays applied: a failure later in the sync starts from this point.
+        cursor = body.cursor;
+        await setSyncMeta({ cursor });
+        if (i >= parts.length - 1 && !body.more) break;
       }
-
-      // No sync endpoint deployed at all (e.g. the Vite dev server).
-      if (response.status === 404 || response.status === 405) {
-        throw new NoBackendError();
-      }
-
-      if (!response.ok) {
-        let detail = '';
-        try {
-          const errBody = (await response.json()) as { error?: string };
-          detail = errBody?.error ? `: ${errBody.error}` : '';
-        } catch {
-          // Response body wasn't JSON -- ignore.
-        }
-        throw new Error(`Sync request failed (${response.status})${detail}`);
-      }
-
-      const body: SyncResponseBody = await response.json();
-      if (body.devices) this.devices = body.devices;
-      const from = (id: string | null | undefined) => this.deviceLabel(id);
-
-      const overwritten = await findOverwritten(records, meta.sentThrough, body.changes, from).catch(() => [] as string[]);
-      await applyRemoteChanges(body.changes);
-
-      const tombstoneIds = tombstones.map((t) => t.id).filter((id): id is number => id != null);
-      await prunePendingTombstones(tombstoneIds);
 
       // Refused records go again next time, so they keep showing as not synced
       // until they're fixed or deleted.
-      const retry: SyncRetryKey[] = (body.rejected ?? [])
+      const retry: SyncRetryKey[] = rejected
         .filter((r) => RETRY_TYPES.has(r.recordType) && r.uuid)
         .map((r) => ({ recordType: r.recordType as SyncRetryKey['recordType'], uuid: r.uuid }));
       await setSyncMeta({
-        cursor: body.cursor,
+        cursor,
         lastSyncedAt: Date.now(),
         sentThrough: startedAt,
         retry,
@@ -792,7 +822,7 @@ class SyncStore {
       this.signedOut = false;
 
       this.lastSyncedAt = Date.now();
-      this.rejected = body.rejected ?? [];
+      this.rejected = rejected;
       this.rejectedDetails = this.rejected.length
         ? await describeRejectedLocally(this.rejected).catch(() =>
             this.rejected.map((r) => `${r.recordType} ${r.uuid}: ${r.reason}`),
@@ -802,7 +832,7 @@ class SyncStore {
 
       if (check) {
         const here = await countLocalRecords();
-        const server = body.counts;
+        const server = counts;
         const rows = (Object.keys(CHECK_LABELS) as SyncRecordType[]).map((k) => ({
           label: CHECK_LABELS[k],
           here: here[k],
@@ -817,27 +847,27 @@ class SyncStore {
         };
       }
 
-      const received = await describeReceived(body.changes, from).catch(() => [] as string[]);
-      const sent = await describeSent(body.applied ?? [], records, tombstones).catch(() => [] as string[]);
-      const sentTotal = Object.values(body.appliedCounts ?? {}).reduce((a, b) => a + (b ?? 0), 0);
+      const receivedLines = await describeReceived(received, from).catch(() => [] as string[]);
+      const sent = await describeSent(applied.slice(0, HISTORY_DETAILS_LIMIT), records, tombstones).catch(() => [] as string[]);
+      const sentTotal = Object.values(appliedCounts).reduce((a, b) => a + (b ?? 0), 0);
 
       await this.pushHistory({
         completedAt: this.lastSyncedAt,
         outcome: 'success',
-        summary: summarizeSync(body.appliedCounts, {
-          fasts: body.changes.fasts.length,
-          fieldDefinitions: body.changes.fieldDefinitions.length,
-          trackableDefinitions: body.changes.trackableDefinitions.length,
-          trackableEntries: body.changes.trackableEntries.length,
-          taskProjects: body.changes.taskProjects?.length ?? 0,
-          tasks: body.changes.tasks?.length ?? 0,
-          taskCompletions: body.changes.taskCompletions?.length ?? 0,
-          settings: !!body.changes.settings,
+        summary: summarizeSync(appliedCounts, {
+          fasts: received.fasts.length,
+          fieldDefinitions: received.fieldDefinitions.length,
+          trackableDefinitions: received.trackableDefinitions.length,
+          trackableEntries: received.trackableEntries.length,
+          taskProjects: received.taskProjects?.length ?? 0,
+          tasks: received.tasks?.length ?? 0,
+          taskCompletions: received.taskCompletions?.length ?? 0,
+          settings: !!received.settings,
         }),
         rejectedCount: this.rejected.length,
         rejectedDetails: this.rejectedDetails.length ? this.rejectedDetails.slice(0, REJECTED_DETAILS_LIMIT) : undefined,
-        details: received.slice(0, HISTORY_DETAILS_LIMIT),
-        moreDetailsCount: Math.max(0, received.length - HISTORY_DETAILS_LIMIT),
+        details: receivedLines.slice(0, HISTORY_DETAILS_LIMIT),
+        moreDetailsCount: Math.max(0, receivedLines.length - HISTORY_DETAILS_LIMIT),
         sentDetails: sent.slice(0, HISTORY_DETAILS_LIMIT),
         moreSentCount: Math.max(0, sentTotal - Math.min(sent.length, HISTORY_DETAILS_LIMIT)),
         durationMs: Date.now() - startedAt,

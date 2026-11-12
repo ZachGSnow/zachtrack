@@ -564,3 +564,33 @@ describe('change times and display fields (v1.21.0)', () => {
     expect(soon.body.rejected).toEqual([]);
   });
 });
+
+describe('sync in parts (v1.21.0)', () => {
+  it('refuses a request with more records than one request may carry, and writes nothing', async () => {
+    const res = await sync(syncBody(0, { trackableEntries: Array.from({ length: 2001 }, (_, i) => entry(`e-${i}`, 5, i)) }));
+    expect(res.status).toBe(413);
+    expect(await db.prepare('SELECT COUNT(*) AS n FROM trackableEntries').first('n')).toBe(0);
+  });
+
+  it('hands out a large pull a page at a time, oldest first across tables, until nothing is left', async () => {
+    await sync(syncBody(0, { fieldDefinitions: [field], trackableEntries: Array.from({ length: 1300 }, (_, i) => entry(`e-${i}`, 5, i)) }));
+    await sync(syncBody(0, { fasts: [fast('late', day(20), 10)] }));
+
+    const first = await pull(0);
+    const firstIds = [...first.changes.fieldDefinitions, ...first.changes.trackableEntries, ...first.changes.fasts];
+    expect(firstIds).toHaveLength(1000);
+    expect(first.more).toBe(true);
+    // The field went in first (lowest serverSeq), the fast last: it waits for a later page.
+    expect(first.changes.fieldDefinitions).toHaveLength(1);
+    expect(first.changes.fasts).toHaveLength(0);
+    expect(first.cursor).toBe(1000);
+
+    const second = await pull(first.cursor);
+    expect(second.changes.trackableEntries).toHaveLength(301);
+    expect(second.changes.fasts.map((f: { uuid: string }) => f.uuid)).toEqual(['late']);
+    expect(second.more).toBeUndefined();
+    expect(second.cursor).toBe(1302);
+    const all = new Set([...first.changes.trackableEntries, ...second.changes.trackableEntries].map((e: { id: string }) => e.id));
+    expect(all.size).toBe(1300);
+  });
+});

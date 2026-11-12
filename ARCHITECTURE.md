@@ -1508,6 +1508,39 @@ re-derives its own view. With today's data that costs a few milliseconds;
 merging them means a shared store per table, worth it when it shows up in
 a measurement.
 
+### 3.69 Syncing in parts (v1.21.0)
+
+A full send (the first sync, an import, Full resync, the daily one) was one
+request carrying every record, and a pull from cursor 0 one response
+carrying the whole database. Subrequests stay fixed (3.8), but the work a
+request does grows with the data, and the free plan gives a Function 10 ms
+of CPU. Once a full send outgrew that, it would fail every time, and since
+`lastFullSendAt` only moves on success, every sync after it would be a full
+send and fail too.
+
+- **The server** refuses a request carrying more than 2,000 records and
+  deletes (`MAX_RECORDS_PER_REQUEST`, 413), and pulls at most 1,000 rows
+  (`PULL_PAGE`): a page from each table in `serverSeq` order, then the
+  oldest 1,000 across them (any older row must be in its own table's first
+  1,000, so none is skipped). When rows are left over, the response says
+  `more` and its cursor is the page's last row; otherwise the cursor is the
+  current sequence, as before.
+- **The app** splits what it sends into parts of 500
+  (`utils/syncChunks.ts`, fields before trackables, projects before tasks,
+  settings and deletes in the first) and sends them in turn, each with the
+  cursor the last one returned, then keeps asking while the server says
+  `more` (at most 200 requests a sync; the next sync carries on). The
+  cursor is saved after every response, since what it brought is already
+  applied: a failure part way doesn't start the pull over. The history
+  shows one entry for the whole sync.
+- A device on an older app sends a full send in one request: past 2,000
+  records it gets a 413 and has to update. It ignores `more`, so it pulls a
+  page per sync and catches up over a few.
+- When a pull runs to several pages in the same sync that sent records, the
+  later pages can bring this device's own writes back (they're past the
+  first page's cursor). They apply as no change; only the history's
+  received count is larger.
+
 ### 3.21 Trackables list: pin, archive, order; tag filters
 - **Sort** (per device, `zachtrack:trackables-view`): Due first (goal
   urgency from 3.18: overdue, then due, then the rest, then trackables
@@ -2029,8 +2062,8 @@ found no way past Access and no script injection, and these, all fixed:
   labels the delete in this device's sync history with its project, not its
   own name.
 
-Left for later: the request size of a full send and the age of soft-deleted
-rows, both in the plan that follows (3.67, 3.68).
+Two more came with the same review and have their own sections: the size of
+a full send (3.69) and how long deleted rows are kept (3.70).
 
 ### 4.16 The timer didn't follow fasts from other devices
 Like the settings store (4.14), the fasting timer store read the running fast

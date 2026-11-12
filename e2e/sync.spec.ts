@@ -25,6 +25,8 @@ interface FakeServer {
   counts?: Record<string, number>;
   /** Answer every sync with this status instead (401: logged out). */
   status?: number;
+  /** Say there are more changes to pull this many more times (3.69). */
+  morePulls?: number;
 }
 
 /** Answers like the real server: counts what was sent as applied, names it, and sends back only `incoming`. */
@@ -35,6 +37,7 @@ async function fakeServer(page: Page): Promise<FakeServer> {
     if (server.status) return route.fulfill({ status: server.status, body: '' });
     const body = route.request().postDataJSON() as SentBody;
     server.sent.push(body);
+    if (server.morePulls) server.morePulls--;
     const base = okSync().body as { changes: Record<string, unknown> };
     const incoming = server.incoming;
     server.incoming = [];
@@ -49,6 +52,7 @@ async function fakeServer(page: Page): Promise<FakeServer> {
         applied: body.changes.trackableEntries.map((e) => ({ recordType: 'trackableEntries', uuid: e.id })),
         devices: [{ ...body.device, firstSeenAt: 1, lastSeenAt: Date.now() }, ...server.others],
         ...(body.check ? { counts: server.counts } : {}),
+        ...(server.morePulls ? { more: true } : {}),
       }),
     });
   });
@@ -284,4 +288,47 @@ test('erasing asks first, says what would be lost, and only then deletes everyth
   await expect(page.getByText('Signed out')).toBeVisible();
   const names = await page.evaluate(async () => (await indexedDB.databases()).map((d) => d.name));
   expect(names).not.toContain('snowfast');
+});
+
+test('a big sync goes in parts of at most 500 records, and pulls again while the server has more', async ({ page }) => {
+  const server = await fakeServer(page);
+  await waitForStarterSet(page);
+  const starter = await readStarterDefinitions(page);
+  const male = starter.trackables.find((t) => t.name === 'Male Health')!;
+  // 1,200 fictional entries through the real import.
+  const at = Date.now() - 400 * 86_400_000;
+  const file = {
+    format: 'zachtrack-export',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    data: {
+      fasts: [],
+      fieldDefinitions: [],
+      trackableDefinitions: [],
+      trackableEntries: Array.from({ length: 1200 }, (_, i) => ({ id: `bulk-${i}`, trackableId: male.id, timestamp: at + i * 3_600_000, createdAt: at, updatedAt: at })),
+      settings: null,
+    },
+  };
+  await openSettings(page);
+  await page.locator('input[type=file][accept*=json]').setInputFiles({ name: 'bulk.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(file)) });
+  await page.getByRole('button', { name: 'Import', exact: true }).click();
+  await expect(page.getByText(/^Imported: 1200 added/)).toBeVisible();
+
+  // Full resync: everything again, in parts; then two more pages to pull.
+  await page.goto('/#/sync');
+  server.sent = [];
+  server.morePulls = 4;
+  server.counts = { fasts: 0, fieldDefinitions: starter.fields.length, trackableDefinitions: starter.trackables.length, trackableEntries: 1200 };
+  await page.getByRole('button', { name: 'Full resync' }).click();
+  await expect(page.getByRole('region', { name: 'Check and repair' })).toContainText('In sync', { timeout: 15_000 });
+  const sizes = server.sent.map((b) => b.changes.trackableEntries.length + b.changes.fieldDefinitions.length + b.changes.trackableDefinitions.length + (b.changes.settings ? 1 : 0));
+  expect(Math.max(...sizes)).toBeLessThanOrEqual(500);
+  expect(server.sent.flatMap((b) => b.changes.trackableEntries.map((e) => e.id)).filter((id) => id.startsWith('bulk-'))).toHaveLength(1200);
+  // Three parts to send (1,200 entries plus the starter fields and trackables); the server
+  // said "more" to four requests, so one more request, sending nothing, pulls the rest.
+  expect(server.sent.length).toBe(4);
+  expect(server.sent[3].changes.trackableEntries).toHaveLength(0);
+  expect(server.sent[0].cursor).toBe(0);
+  // Each request carries on from the cursor the one before returned.
+  expect(server.sent.slice(1).every((b, i) => b.cursor > server.sent[i].cursor || server.sent[i].cursor === 0)).toBe(true);
 });
