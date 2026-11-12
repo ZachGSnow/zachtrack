@@ -3,6 +3,7 @@ import Dexie from 'dexie';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   applyRemoteChanges,
+  completeTask,
   createTask,
   createTaskProject,
   db,
@@ -12,6 +13,8 @@ import {
   getChangedSyncableRecords,
   getPendingTombstones,
   getSyncMeta,
+  skipTask,
+  undoComplete,
   updateTask,
   type TaskCompletion,
 } from '../src/lib/db';
@@ -154,5 +157,73 @@ describe('tasks on the device', () => {
     await createTask({ name: 'Kept', sortOrder: 1 });
     await applyRemoteChanges({ fasts: [], fieldDefinitions: [], trackableDefinitions: [], trackableEntries: [], settings: null });
     expect(await db.tasks.count()).toBe(1);
+  });
+});
+
+describe('completing, undoing and skipping (3.61)', () => {
+  beforeEach(async () => {
+    await Promise.all(db.tables.map((t) => t.clear()));
+  });
+
+  const at = (y: number, m: number, d: number, h = 12) => new Date(y, m - 1, d, h).getTime();
+
+  it('closes a task without a repeat rule, and Undo opens it again', async () => {
+    const task = await createTask({ name: 'Return the library book', dueOn: '2026-11-11', sortOrder: 1 });
+    const result = await completeTask(task.id, at(2026, 11, 11));
+    expect(result).toEqual({ kind: 'closed', taskId: task.id });
+    expect((await db.tasks.get(task.id))!.completedAt).toBe(at(2026, 11, 11));
+    expect(await db.taskCompletions.count()).toBe(0);
+    await undoComplete(result!);
+    expect(await db.tasks.get(task.id)).not.toHaveProperty('completedAt');
+  });
+
+  it('moves a repeating task to its next date, logs the completion and reopens its done subtasks', async () => {
+    const task = await createTask({ name: 'Change the furnace filter', dueOn: '2026-11-01', repeat: { type: 'months', every: 3, day: 1 }, sortOrder: 1 });
+    const done = await createTask({ name: 'Buy filters', parentId: task.id, completedAt: 5, sortOrder: 1 });
+    const deep = await createTask({ name: 'Check the size', parentId: done.id, completedAt: 5, sortOrder: 1 });
+    const open = await createTask({ name: 'Write the date on it', parentId: task.id, sortOrder: 2 });
+
+    const result = await completeTask(task.id, at(2026, 11, 3));
+    expect(result).toMatchObject({ kind: 'moved', nextDueOn: '2027-02-01' });
+    const moved = (await db.tasks.get(task.id))!;
+    expect(moved.dueOn).toBe('2027-02-01');
+    expect(moved).not.toHaveProperty('completedAt');
+    expect(await db.tasks.get(done.id)).not.toHaveProperty('completedAt');
+    expect(await db.tasks.get(deep.id)).not.toHaveProperty('completedAt');
+    expect(await db.tasks.get(open.id)).not.toHaveProperty('completedAt');
+    const [completion] = await db.taskCompletions.toArray();
+    expect(completion).toMatchObject({ taskId: task.id, dueOn: '2026-11-01', nextDueOn: '2027-02-01', completedAt: at(2026, 11, 3) });
+    expect(completion.subtaskIds!.sort()).toEqual([done.id, deep.id].sort());
+
+    // Undo: the date and the subtasks go back, and the completion row is deleted (and synced as a delete).
+    await undoComplete(result!);
+    expect((await db.tasks.get(task.id))!.dueOn).toBe('2026-11-01');
+    expect((await db.tasks.get(done.id))!.completedAt).toBe(at(2026, 11, 3));
+    expect((await db.tasks.get(deep.id))!.completedAt).toBe(at(2026, 11, 3));
+    expect(await db.tasks.get(open.id)).not.toHaveProperty('completedAt');
+    expect(await db.taskCompletions.count()).toBe(0);
+    expect((await getPendingTombstones()).map((t) => t.recordType)).toEqual(['taskCompletions']);
+  });
+
+  it("doesn't move the date back on Undo when it was changed since", async () => {
+    const task = await createTask({ name: 'Water the plants', dueOn: '2026-11-11', repeat: { type: 'days', every: 7 }, sortOrder: 1 });
+    const result = await completeTask(task.id, at(2026, 11, 11));
+    await updateTask(task.id, { dueOn: '2026-11-30' });
+    await undoComplete(result!);
+    expect((await db.tasks.get(task.id))!.dueOn).toBe('2026-11-30');
+  });
+
+  it('counts "after it is done" from the day it was done', async () => {
+    const task = await createTask({ name: 'Rotate the tires', dueOn: '2026-11-01', repeat: { type: 'afterDone', every: 180, unit: 'days' }, sortOrder: 1 });
+    expect(await completeTask(task.id, at(2026, 11, 11))).toMatchObject({ nextDueOn: '2027-05-10' });
+  });
+
+  it('skips a repeating task to its next date without logging a completion', async () => {
+    const task = await createTask({ name: 'Take out recycling', dueOn: '2026-11-09', repeat: { type: 'weeks', every: 1, weekdays: [0] }, sortOrder: 1 });
+    expect(await skipTask(task.id, at(2026, 11, 11))).toBe('2026-11-09');
+    expect((await db.tasks.get(task.id))!.dueOn).toBe('2026-11-16');
+    expect(await db.taskCompletions.count()).toBe(0);
+    const plain = await createTask({ name: 'One-off', dueOn: '2026-11-09', sortOrder: 2 });
+    expect(await skipTask(plain.id)).toBeNull();
   });
 });

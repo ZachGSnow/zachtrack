@@ -177,3 +177,73 @@ export const SECTION_TEMPLATES: ReadonlyArray<{ label: string; sections: string[
 ];
 
 export const PROJECT_COLORS = ['#38bdf8', '#a855f7', '#22ff88', '#f97316', '#eab308', '#ec4899', '#ef4444', '#22d3ee', '#818cf8', '#10b981'];
+
+/** Earliest due first; on the same day a timed task before the untimed ones, then by name. */
+const byDue = (a: Task, b: Task) =>
+  (a.dueOn ?? '').localeCompare(b.dueOn ?? '') || (a.dueTime ?? '99:99').localeCompare(b.dueTime ?? '99:99') || a.name.localeCompare(b.name);
+
+/**
+ * Open tasks and subtasks due today or earlier, oldest first, leaving out
+ * archived projects: what Today lists and the tab badge counts (3.62).
+ */
+export function dueTasks(tasks: readonly Task[], today: string, archivedProjectIds: ReadonlySet<string> = new Set()): Task[] {
+  return tasks
+    .filter((t) => {
+      if (t.completedAt || !t.dueOn || t.dueOn > today) return false;
+      const root = rootOf(tasks, t);
+      return !root.projectId || !archivedProjectIds.has(root.projectId);
+    })
+    .sort(byDue);
+}
+
+export interface UpcomingGroup {
+  key: string;
+  label: string;
+  state: DueState;
+  tasks: Task[];
+}
+
+/**
+ * Every open task and subtask with a due date, for the Upcoming page:
+ * Overdue, Today, Tomorrow, each of the next five days by name, then by
+ * month. Tasks in archived projects (and their subtasks) are left out.
+ */
+export function upcomingGroups(tasks: readonly Task[], today: string, archivedProjectIds: ReadonlySet<string> = new Set()): UpcomingGroup[] {
+  const groups = new Map<string, UpcomingGroup>();
+  const add = (key: string, label: string, state: DueState, t: Task) => {
+    const g = groups.get(key) ?? { key, label, state, tasks: [] };
+    g.tasks.push(t);
+    groups.set(key, g);
+  };
+  const archived = (t: Task) => {
+    const root = rootOf(tasks, t);
+    return !!root.projectId && archivedProjectIds.has(root.projectId);
+  };
+  for (const t of [...tasks].sort(byDue)) {
+    if (t.completedAt || !t.dueOn || archived(t)) continue;
+    const days = daysFrom(today, t.dueOn);
+    const date = new Date(dayStart(t.dueOn));
+    if (days < 0) add('overdue', 'Overdue', 'overdue', t);
+    else if (days === 0) add('today', 'Today', 'today', t);
+    else if (days === 1) add('tomorrow', 'Tomorrow', 'soon', t);
+    else if (days < 7) add(t.dueOn, date.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' }), 'soon', t);
+    else {
+      const sameYear = date.getFullYear() === new Date(dayStart(today)).getFullYear();
+      add(t.dueOn.slice(0, 7), date.toLocaleDateString(undefined, sameYear ? { month: 'long' } : { month: 'long', year: 'numeric' }), 'later', t);
+    }
+  }
+  return [...groups.values()];
+}
+
+/** Where a task lives, for a list that mixes projects: "Home / Now", "Inbox", or "Subtask of Garage". */
+export function taskContext(task: Task, tasks: readonly Task[], projects: readonly TaskProject[]): string {
+  if (task.parentId) {
+    const parent = tasks.find((t) => t.id === task.parentId);
+    return parent ? `Subtask of ${parent.name}` : 'Subtask';
+  }
+  if (!task.projectId) return 'Inbox';
+  const project = projects.find((p) => p.id === task.projectId);
+  if (!project) return '';
+  const section = project.sections.find((s) => s.id === task.sectionId);
+  return section ? `${project.name} / ${section.name}` : project.name;
+}

@@ -91,13 +91,18 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
   to calendar downloads them as an .ics file, with optional reminders.
 - **Tasks:** a to-do list with projects, sections (Now / Next / Later, or
   your own), tasks with subtasks at any depth, notes and due dates with an
-  optional time. Tap to complete, with Undo; completed tasks hide until you
-  ask for them. Tasks without a project go to an Inbox. Each project card
-  shows what's open, overdue and due next.
+  optional time. Due dates can repeat: every few days, weekly on chosen
+  days, monthly on a date or on the first/last weekday, yearly, or a set
+  time after it's done. Completing a repeating task moves it to its next
+  date and reopens its subtasks, with Undo, Skip and a history of when it
+  was done. Tap to complete, with Undo; completed tasks hide until you ask
+  for them. Tasks without a project go to an Inbox. Upcoming lists what's
+  due across projects, overdue first; Today shows what's due today, and
+  the Tasks tab counts it.
 - **Five tabs:** Today (what to do now: the fast, habits due, what to log
   and dates coming up, what happened since you were last here, and whether
   your data is safe: last sync, the server's last backup, your last export), Fasting (Timer, Journey, History), Trackables (List,
-  Dates), Tasks and Insights, with each tab's pages switched at the top of the page
+  Dates), Tasks (Projects, Upcoming) and Insights, with each tab's pages switched at the top of the page
   on a phone and listed in the sidebar on a laptop. Insights opens with an
   overview of fasting and every trackable, the clearest patterns and a year
   in review, then a table to compare any of them.

@@ -1,6 +1,7 @@
 <script lang="ts">
   import ArrowUp from '@lucide/svelte/icons/arrow-up';
   import ArrowDown from '@lucide/svelte/icons/arrow-down';
+  import Repeat from '@lucide/svelte/icons/repeat';
   import type { Task } from '../db';
   import { describeDue, subtaskProgress, type DueState } from '../utils/tasks';
   import { taskUi } from '../stores/taskUi.svelte';
@@ -12,12 +13,15 @@
     task,
     tasks,
     today,
+    context,
     onMove,
   }: {
     task: Task;
     /** Every task, for the subtask count. */
     tasks: readonly Task[];
     today: string;
+    /** Where it lives, on a list that mixes projects (Upcoming, Today). */
+    context?: string;
     /** Reorder mode: up and down buttons instead of opening the sheet. */
     onMove?: (direction: -1 | 1) => void;
   } = $props();
@@ -36,10 +40,15 @@
   <TaskCheck done={!!task.completedAt} name={task.name} onclick={() => taskUi.toggle(task)} />
   <button type="button" class="min-w-0 flex-1 text-left" onclick={() => taskUi.show(task.id)} disabled={!!onMove}>
     <span class="block truncate text-sm {task.completedAt ? 'text-text-muted line-through' : 'text-text'}">{task.name || 'Untitled task'}</span>
-    {#if (due && !task.completedAt) || progress || task.notes}
+    {#if (due && !task.completedAt) || progress || task.notes || context}
       <span class="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-text-muted">
         {#if due && !task.completedAt}
-          <span style="color: {DUE_COLORS[due.state]};">{due.text}</span>
+          <span class="inline-flex items-center gap-1" style="color: {DUE_COLORS[due.state]};">
+            {due.text}{#if task.repeat}<Repeat size={11} aria-label="repeats" />{/if}
+          </span>
+        {/if}
+        {#if context}
+          <span class="truncate">{context}</span>
         {/if}
         {#if progress}
           <span aria-label="{progress.done} of {progress.total} subtasks done">{progress.done}/{progress.total} subtasks</span>

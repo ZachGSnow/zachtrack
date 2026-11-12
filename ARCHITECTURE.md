@@ -1276,9 +1276,8 @@ Trackables and Insights; five still fit a phone's tab bar.
   the subtasks that go with it. A subtask opens in the same sheet with
   "Subtask of ..." to go back up.
 - **Completing** is the round checkbox on a row or in the sheet, with
-  Undo for six seconds, like one-tap logging (3.18). Repeat rules can't be
-  set from the screens yet; completing a repeating task (moving it to its
-  next date) comes with the repeat engine.
+  Undo for six seconds, like one-tap logging (3.18). A repeating task moves
+  to its next date instead (3.61).
 - **Order:** a new task's `sortOrder` is at least the clock
   (`nextSortOrder`), so tasks typed one after another, or added on two
   devices, keep the order they were added in even before the list has
@@ -1290,6 +1289,61 @@ Trackables and Insights; five still fit a phone's tab bar.
 "Fri", "Nov 30", "Jan 5, 2027", with the time when set), subtask counts and
 project summaries, tested in `tests/tasksView.test.ts`; `e2e/tasks.spec.ts`
 walks the screens.
+
+### 3.61 Repeating tasks (v1.19.0)
+
+`utils/taskRepeat.ts` works out the next date; `completeTask`,
+`undoComplete` and `skipTask` in `db.ts` apply it.
+
+- **The next date.** A fixed schedule (every N days; every N weeks on
+  chosen weekdays; every N months on a day or on the nth or last weekday;
+  every N years) keeps its rhythm: the next date is the first on the
+  schedule after both the due date and the day it was done. Done early, no
+  turn is skipped; done late, the task doesn't stay overdue for turns
+  already missed (Asana keeps stepping from the old date). "After it's
+  done" counts from the day it was done, in days, weeks, months or years,
+  with no 30-day cap. Month steps clamp to the month's end (Jan 31 + 1
+  month = Feb 28), a month without a 5th weekday is passed over, and Feb 29
+  yearly falls on Feb 28. The math runs on calendar days through UTC dates,
+  so no DST change moves a date (tests across 2026-03-08 and 2026-11-01).
+- **Completing** writes a completion row (the due date it was done for, the
+  date it moved to, and the subtasks it reopened, at any depth), moves
+  `dueOn` and reopens the done subtasks for the next round, in one
+  transaction. The task never closes. **Undo** puts the date and subtasks
+  back and deletes the row (a synced delete), but leaves the date alone if
+  it was changed since. **Skip** moves to the next date without a row.
+- **The rule follows the date.** Moving the due date carries the parts of
+  the rule that came from the old date: weekly on Thursday becomes weekly
+  on Wednesday when the date moves to a Wednesday; a day of the month or an
+  nth weekday likewise. Parts chosen apart from the date (Mon and Thu) stay
+  (`followDueDate`). Clearing the due date clears the rule.
+- **The sheet** (`RepeatPicker.svelte`): Doesn't repeat, Daily, Weekly,
+  Monthly on a date, Monthly on a weekday, Yearly, After it's done; a new
+  choice starts from the due date (`repeatFor`), then the interval,
+  weekdays, day or nth weekday, and the rule in words ("Every 3 months on
+  the first Wednesday"). Below it Skip this one, and the history: "Done 4
+  times, last on Nov 3", each "on time", "2 days late" or "1 day early".
+  Rows show a repeat mark next to the date.
+
+### 3.62 Upcoming, Today and the Tasks badge (v1.19.0)
+
+- **Upcoming** (`routes/TasksUpcoming.svelte`, `/tasks/upcoming`, the
+  second page of the Tasks tab): every open task and subtask with a due
+  date, from every project but archived ones, under Overdue, Today,
+  Tomorrow, each of the next five days, then by month (`upcomingGroups`).
+  Each row says where the task lives ("House / Now", "Inbox", "Subtask of
+  Garage", `taskContext`). Asana's My Tasks, without the assignee.
+- **Today** gains a Tasks block when anything is overdue or due today
+  (`dueTasks`), oldest first, checkable in place, with a link to Upcoming.
+  Nothing shows when nothing is due, so Today stays as it was for anyone
+  not using tasks.
+- **The Tasks tab's badge** counts the same tasks (`attentionStore.tasksDue`,
+  rechecked every minute), like the Trackables badge counts goals due. No
+  notifications, as before (3.27).
+- **Escape in a sheet.** `BottomSheet.svelte` stopped key presses inside a
+  sheet from reaching the page, so its window-level Escape never fired
+  while a field in the sheet had focus. The sheet now handles Escape
+  itself, and blurs the focused field first so an edit in progress saves.
 
 ### 3.21 Trackables list: pin, archive, order; tag filters
 - **Sort** (per device, `zachtrack:trackables-view`): Due first (goal

@@ -127,3 +127,72 @@ test('the inbox holds tasks without a project, and K opens Tasks', async ({ page
   await page.getByRole('link', { name: 'Projects' }).click();
   await expect(page.getByRole('link', { name: /Inbox/ })).toContainText('1 open');
 });
+
+/** A YYYY-MM-DD date `days` from today in the page's time zone. */
+const dayFromToday = (page: Page, days: number) =>
+  page.evaluate((d) => {
+    const t = new Date();
+    t.setDate(t.getDate() + d);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}`;
+  }, days);
+
+test('a repeating task moves to its next date when done, with Undo, Skip and its history, and shows on Today and Upcoming', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await newProject(page, 'House', 'Now / Next / Later');
+  await addTask(page, 'Now', 'Water the ferns');
+  await addTask(page, 'Now', 'Book the plumber');
+
+  // Every 3 days from yesterday, so it's overdue now; one subtask, done.
+  await page.getByRole('button', { name: /Water the ferns/ }).click();
+  const sheet = page.getByRole('dialog');
+  await sheet.getByLabel('Due date').fill(await dayFromToday(page, -1));
+  await sheet.getByRole('combobox', { name: 'Repeat' }).selectOption({ label: 'Daily' });
+  await sheet.getByRole('spinbutton', { name: 'Every how many' }).fill('3');
+  await sheet.getByRole('spinbutton', { name: 'Every how many' }).press('Tab');
+  await expect(sheet.getByText(/^Every 3 days\./)).toBeVisible();
+  const sub = sheet.getByRole('textbox', { name: 'New subtask' });
+  await sub.fill('Check the soil');
+  await sub.press('Enter');
+  await sheet.getByRole('checkbox', { name: 'Complete Check the soil' }).click();
+  await page.keyboard.press('Escape');
+
+  // The other task is due today. Both show on Today, oldest first, and on the tab badge.
+  await page.getByRole('button', { name: /Book the plumber/ }).click();
+  await sheet.getByLabel('Due date').fill(await dayFromToday(page, 0));
+  await page.keyboard.press('Escape');
+  const tabs = page.getByRole('navigation', { name: 'Main' });
+  await expect(tabs.getByRole('link', { name: /Tasks/ })).toContainText('2');
+  await page.goto('/#/');
+  const todayTasks = page.getByRole('region', { name: 'Tasks' });
+  await expect(todayTasks.getByRole('listitem')).toHaveText([/Water the ferns.*Yesterday.*House \/ Now/, /Book the plumber.*Today/]);
+
+  // Done a day late: the next date on the schedule after today (yesterday + 3 days), and the subtask reopens.
+  await todayTasks.getByRole('checkbox', { name: 'Complete Water the ferns' }).click();
+  await expect(page.getByRole('status')).toContainText(/Water the ferns done\. Next: /);
+  await expect(todayTasks.getByRole('listitem')).toHaveText([/Book the plumber/]);
+  await expect(tabs.getByRole('link', { name: /Tasks/ })).toContainText('1');
+  // Undo puts the date and the subtask back.
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(todayTasks.getByRole('listitem')).toHaveCount(2);
+  await todayTasks.getByRole('checkbox', { name: 'Complete Water the ferns' }).click();
+  await expect(todayTasks.getByRole('listitem')).toHaveCount(1);
+
+  await page.goto('/#/tasks/upcoming');
+  const row = page.getByRole('listitem').filter({ hasText: 'Water the ferns' });
+  await expect(row).toContainText('0/1 subtasks');
+  await row.getByRole('button', { name: /Water the ferns/ }).click();
+  await expect(sheet.getByText(/Done 1 time, last on/)).toBeVisible();
+  const due = await sheet.getByLabel('Due date').inputValue();
+  expect(due).toBe(await dayFromToday(page, 2));
+
+  // Skip moves it on again without counting as done.
+  await sheet.getByRole('button', { name: 'Skip this one' }).click();
+  await expect(sheet.getByLabel('Due date')).toHaveValue(await dayFromToday(page, 5));
+  await expect(sheet.getByText(/Done 1 time/)).toBeVisible();
+
+  // Clearing the due date clears the repeat too.
+  await sheet.getByRole('button', { name: 'Clear due date' }).click();
+  await expect(sheet.getByText('Set a due date to make it repeat.')).toBeVisible();
+  expect(problems).toEqual([]);
+});

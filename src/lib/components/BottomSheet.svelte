@@ -11,6 +11,8 @@
   } = $props();
 
   function close() {
+    // Blur first: a field being edited commits its change on blur, before the sheet goes.
+    (document.activeElement as HTMLElement | null)?.blur?.();
     open = false;
   }
 </script>
@@ -30,7 +32,11 @@
       style="border-color: var(--color-border); background: var(--color-surface); padding-bottom: calc(1rem + env(safe-area-inset-bottom));"
       transition:fly={{ y: 300, duration: 200 }}
       onclick={(e) => e.stopPropagation()}
-      onkeydown={(e) => e.stopPropagation()}
+      onkeydown={(e) => {
+        // Keys inside the sheet stay out of the page's shortcuts, except Escape, which closes it.
+        e.stopPropagation();
+        if (e.key === 'Escape') close();
+      }}
       role="dialog"
       aria-modal="true"
       tabindex="-1"

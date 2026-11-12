@@ -4,6 +4,7 @@ import {
   dayKey,
   daysFrom,
   describeDue,
+  dueTasks,
   groupBySection,
   INBOX_ID,
   nextSortOrder,
@@ -13,7 +14,9 @@ import {
   rootOf,
   subtaskProgress,
   subtasksOf,
+  taskContext,
   topLevelTasks,
+  upcomingGroups,
 } from '../src/lib/utils/tasks';
 
 // What the Tasks screens show (ARCHITECTURE.md 3.60). Runs in America/New_York
@@ -137,5 +140,52 @@ describe('a project card', () => {
     const s = projectSummary(tasks, 'p', today);
     expect(s).toMatchObject({ open: 5, overdue: 1, dueToday: 2 });
     expect(s.next?.text).toMatch(/^Today, 8:00/);
+  });
+});
+
+describe('Upcoming and Today (3.62)', () => {
+  const today = '2026-11-11';
+
+  it('counts open tasks and subtasks due today or earlier, oldest first', () => {
+    const later = task({ dueOn: '2026-11-12' });
+    const late = task({ dueOn: '2026-11-02' });
+    const now = task({ dueOn: today, dueTime: '07:00' });
+    const sub = task({ parentId: 'x', dueOn: today });
+    const done = task({ dueOn: '2026-11-01', completedAt: 1 });
+    expect(dueTasks([later, sub, late, now, done], today).map((t) => t.id)).toEqual([late.id, now.id, sub.id]);
+  });
+
+  it('groups by Overdue, Today, Tomorrow, the days of the coming week and then months, leaving out archived projects', () => {
+    const tasks = [
+      task({ dueOn: '2026-11-01' }),
+      task({ dueOn: today }),
+      task({ dueOn: '2026-11-12' }),
+      task({ dueOn: '2026-11-13' }),
+      task({ dueOn: '2026-11-25' }),
+      task({ dueOn: '2027-01-04' }),
+      task(),
+      task({ dueOn: today, projectId: 'old' }),
+    ];
+    const groups = upcomingGroups(tasks, today, new Set(['old']));
+    expect(groups.map((g) => [g.key, g.tasks.length])).toEqual([
+      ['overdue', 1],
+      ['today', 1],
+      ['tomorrow', 1],
+      ['2026-11-13', 1],
+      ['2026-11', 1],
+      ['2027-01', 1],
+    ]);
+    expect(groups[3].label).toMatch(/Friday/);
+    expect(groups[5].label).toMatch(/2027/);
+  });
+
+  it('says where a task lives', () => {
+    const projects: TaskProject[] = [{ id: 'p', name: 'Home', color: '#000', sections: [{ id: 's', name: 'Now' }], createdAt: 1, updatedAt: 1 }];
+    const top = task({ name: 'Garage', projectId: 'p', sectionId: 's' });
+    const all = [top, task({ name: 'Hooks', parentId: top.id })];
+    expect(taskContext(top, all, projects)).toBe('Home / Now');
+    expect(taskContext(all[1], all, projects)).toBe('Subtask of Garage');
+    expect(taskContext(task(), all, projects)).toBe('Inbox');
+    expect(taskContext(task({ projectId: 'p' }), all, projects)).toBe('Home');
   });
 });
