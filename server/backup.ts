@@ -12,7 +12,16 @@
 // and last-write-wins keeps whichever version of a record is newer.
 
 /** Tables in restore order. `syncSeq` is handled separately. */
-export const BACKUP_TABLES = ['fasts', 'fieldDefinitions', 'trackableDefinitions', 'trackableEntries', 'settings'] as const;
+export const BACKUP_TABLES = [
+  'fasts',
+  'fieldDefinitions',
+  'trackableDefinitions',
+  'trackableEntries',
+  'taskProjects',
+  'tasks',
+  'taskCompletions',
+  'settings',
+] as const;
 
 export interface BackupResult {
   sql: string;

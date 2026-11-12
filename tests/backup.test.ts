@@ -122,7 +122,7 @@ describe('backup worker', () => {
     await seed(env.DB);
     const summary = await runBackup({ DB: env.DB, BACKUPS: env.BACKUPS }, new Date(NOW));
     expect(summary.key).toBe('zachtrack-db/2026-10-22.sql');
-    expect(summary.rows).toEqual({ fasts: 1, fieldDefinitions: 2, trackableDefinitions: 1, trackableEntries: 3, settings: 1 });
+    expect(summary.rows).toEqual({ fasts: 1, fieldDefinitions: 2, trackableDefinitions: 1, trackableEntries: 3, taskProjects: 0, tasks: 0, taskCompletions: 0, settings: 1 });
 
     const object = await env.BACKUPS.get(summary.key);
     expect(object).not.toBeNull();

@@ -5,6 +5,9 @@ import type {
   TrackableEntry,
   SettingsRecord,
   SyncRecordType,
+  Task,
+  TaskCompletion,
+  TaskProject,
 } from '../../src/lib/db';
 import type { AccessDeps } from '../../server/access';
 import { jsonResponse, listDevices, refuseUnlessOwner, type DeviceInfo, type Env } from '../../server/endpoint';
@@ -38,6 +41,10 @@ interface SyncRequestBody {
     fieldDefinitions: FieldDefinition[];
     trackableDefinitions: TrackableDefinition[];
     trackableEntries: TrackableEntry[];
+    /** Absent from apps older than tasks. */
+    taskProjects?: TaskProject[];
+    tasks?: Task[];
+    taskCompletions?: TaskCompletion[];
     settings: SettingsRecord | null;
   };
   tombstones: Tombstone[];
@@ -47,12 +54,7 @@ interface SyncRequestBody {
 }
 
 /** Live (not deleted) records per type on the server, for Check sync. */
-export interface ServerCounts {
-  fasts: number;
-  fieldDefinitions: number;
-  trackableDefinitions: number;
-  trackableEntries: number;
-}
+export type ServerCounts = Record<SyncRecordType, number>;
 
 interface RejectedRecord {
   recordType: RecordKind;
@@ -81,6 +83,9 @@ interface SyncResponseBody {
     fieldDefinitions: WireRow<FieldDefinition>[];
     trackableDefinitions: WireRow<TrackableDefinition>[];
     trackableEntries: WireRow<TrackableEntry>[];
+    taskProjects: WireRow<TaskProject>[];
+    tasks: WireRow<Task>[];
+    taskCompletions: WireRow<TaskCompletion>[];
     settings: WireRow<SettingsRecord> | null;
   };
   rejected: RejectedRecord[];
@@ -109,6 +114,10 @@ const TOMBSTONE_TABLES: Record<SyncRecordType, { table: string; keyColumn: strin
   fieldDefinitions: { table: 'fieldDefinitions', keyColumn: 'id' },
   trackableDefinitions: { table: 'trackableDefinitions', keyColumn: 'id' },
   trackableEntries: { table: 'trackableEntries', keyColumn: 'id', scrub: 'note = NULL, tags = NULL, fieldValues = NULL, details = NULL' },
+  // Projects keep their names like trackables; a task's name is its content.
+  taskProjects: { table: 'taskProjects', keyColumn: 'id', scrub: 'notes = NULL' },
+  tasks: { table: 'tasks', keyColumn: 'id', scrub: "name = '', notes = NULL" },
+  taskCompletions: { table: 'taskCompletions', keyColumn: 'id' },
 };
 
 export const onRequestPost: PagesFunction<Env> = (context) => handleSync(context.request, context.env);
@@ -143,6 +152,9 @@ export async function handleSync(request: Request, env: Env, deps: AccessDeps = 
       fieldDefinitions: 0,
       trackableDefinitions: 0,
       trackableEntries: 0,
+      taskProjects: 0,
+      tasks: 0,
+      taskCompletions: 0,
       settings: 0,
       deletes: 0,
     };
@@ -224,10 +236,17 @@ const KIND_LABEL: Record<AppliedRecord['recordType'], string> = {
   fieldDefinitions: 'Field',
   trackableDefinitions: 'Trackable',
   trackableEntries: 'Entry',
+  taskProjects: 'Project',
+  tasks: 'Task',
+  taskCompletions: 'Task done',
   settings: 'Settings',
 };
 
-/** "Entry -- Water", "Trackable deleted -- Reading", "Fast": the kind and a name, never a value. */
+/**
+ * "Entry -- Water", "Trackable deleted -- Reading", "Fast": the kind and a
+ * name, never a value. A task is named by its project, not by its own name,
+ * which is its content.
+ */
 async function nameApplied(db: D1Database, applied: AppliedRecord[]): Promise<string[]> {
   const idsOf = (type: AppliedRecord['recordType']) => applied.filter((a) => a.recordType === type).map((a) => a.uuid);
   const marks = (n: number) => Array(n).fill('?').join(', ');
@@ -243,7 +262,16 @@ async function nameApplied(db: D1Database, applied: AppliedRecord[]): Promise<st
         .bind(...entryIds),
     });
   }
-  for (const type of ['fieldDefinitions', 'trackableDefinitions'] as const) {
+  const taskIds = idsOf('tasks');
+  if (taskIds.length) {
+    lookups.push({
+      type: 'tasks',
+      statement: db
+        .prepare(`SELECT k.id AS id, p.name AS name FROM tasks k LEFT JOIN taskProjects p ON p.id = k.projectId WHERE k.id IN (${marks(taskIds.length)})`)
+        .bind(...taskIds),
+    });
+  }
+  for (const type of ['fieldDefinitions', 'trackableDefinitions', 'taskProjects'] as const) {
     const ids = idsOf(type);
     if (ids.length) lookups.push({ type, statement: db.prepare(`SELECT id, name FROM ${type} WHERE id IN (${marks(ids.length)})`).bind(...ids) });
   }
@@ -262,7 +290,7 @@ async function nameApplied(db: D1Database, applied: AppliedRecord[]): Promise<st
 }
 
 async function countLive(db: D1Database): Promise<ServerCounts> {
-  const tables = ['fasts', 'fieldDefinitions', 'trackableDefinitions', 'trackableEntries'] as const;
+  const tables = ['fasts', 'fieldDefinitions', 'trackableDefinitions', 'trackableEntries', 'taskProjects', 'tasks', 'taskCompletions'] as const;
   const results = await db.batch<{ n: number }>(tables.map((t) => db.prepare(`SELECT COUNT(*) AS n FROM ${t} WHERE deletedAt IS NULL`)));
   const counts = {} as ServerCounts;
   tables.forEach((t, i) => (counts[t] = results[i].results?.[0]?.n ?? 0));
@@ -282,7 +310,7 @@ async function currentSeq(db: D1Database): Promise<number> {
 //   1. reserve a contiguous block of `serverSeq` values (1 query)
 //   2. fasts-only: fetch current (startDay -> uuid) claims for conflict
 //      detection (1 query)
-//   3. up to 5 batched upserts (one batch call per table)
+//   3. up to 8 batched upserts (one batch call per table)
 //   4. up to 1 batched tombstone application (all deletes together)
 // ---------------------------------------------------------------------------
 
@@ -326,10 +354,22 @@ async function applyIncomingChanges(db: D1Database, body: SyncRequestBody, updat
   const fields = valid<FieldDefinition>('fieldDefinitions', body.changes.fieldDefinitions);
   const trackables = valid<TrackableDefinition>('trackableDefinitions', body.changes.trackableDefinitions);
   const entries = valid<TrackableEntry>('trackableEntries', body.changes.trackableEntries);
+  const projects = valid<TaskProject>('taskProjects', body.changes.taskProjects);
+  const tasks = valid<Task>('tasks', body.changes.tasks);
+  const completions = valid<TaskCompletion>('taskCompletions', body.changes.taskCompletions);
   const settings = body.changes.settings == null ? null : (valid<SettingsRecord>('settings', [body.changes.settings])[0] ?? null);
   const tombstones = valid<Tombstone>('tombstones', body.tombstones);
 
-  const totalSeqNeeded = fasts.length + fields.length + trackables.length + entries.length + (settings ? 1 : 0) + tombstones.length;
+  const totalSeqNeeded =
+    fasts.length +
+    fields.length +
+    trackables.length +
+    entries.length +
+    projects.length +
+    tasks.length +
+    completions.length +
+    (settings ? 1 : 0) +
+    tombstones.length;
   let nextSeqValue = 0;
   let ownSeq: ApplyResult['ownSeq'] = null;
   if (totalSeqNeeded > 0) {
@@ -386,6 +426,24 @@ async function applyIncomingChanges(db: D1Database, body: SyncRequestBody, updat
   await runBatch(
     db,
     entries.map((e) => ({ statement: buildEntryUpsert(db, e, takeSeq(), updatedBy), record: { recordType: 'trackableEntries' as const, uuid: e.id } })),
+    applied,
+  );
+  await runBatch(
+    db,
+    projects.map((p) => ({ statement: buildTaskProjectUpsert(db, p, takeSeq(), updatedBy), record: { recordType: 'taskProjects' as const, uuid: p.id } })),
+    applied,
+  );
+  await runBatch(
+    db,
+    tasks.map((t) => ({ statement: buildTaskUpsert(db, t, takeSeq(), updatedBy), record: { recordType: 'tasks' as const, uuid: t.id } })),
+    applied,
+  );
+  await runBatch(
+    db,
+    completions.map((c) => ({
+      statement: buildTaskCompletionUpsert(db, c, takeSeq(), updatedBy),
+      record: { recordType: 'taskCompletions' as const, uuid: c.id },
+    })),
     applied,
   );
   if (settings) {
@@ -537,6 +595,89 @@ function buildEntryUpsert(db: D1Database, entry: TrackableEntry, serverSeq: numb
     );
 }
 
+function buildTaskProjectUpsert(db: D1Database, project: TaskProject, serverSeq: number, updatedBy: string | null): D1PreparedStatement {
+  return db
+    .prepare(
+      `INSERT INTO taskProjects (id, name, color, icon, notes, sections, archived, sortOrder, createdAt, updatedAt, deletedAt, serverSeq, updatedBy)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         name=excluded.name, color=excluded.color, icon=excluded.icon, notes=excluded.notes, sections=excluded.sections,
+         archived=excluded.archived, sortOrder=excluded.sortOrder, createdAt=excluded.createdAt, updatedAt=excluded.updatedAt,
+         deletedAt=NULL, serverSeq=excluded.serverSeq, updatedBy=excluded.updatedBy
+       WHERE excluded.updatedAt > taskProjects.updatedAt`,
+    )
+    .bind(
+      project.id,
+      project.name,
+      project.color,
+      project.icon ?? null,
+      project.notes ?? null,
+      JSON.stringify(project.sections),
+      project.archived == null ? null : project.archived ? 1 : 0,
+      project.sortOrder ?? null,
+      project.createdAt,
+      project.updatedAt,
+      serverSeq,
+      updatedBy,
+    );
+}
+
+function buildTaskUpsert(db: D1Database, task: Task, serverSeq: number, updatedBy: string | null): D1PreparedStatement {
+  return db
+    .prepare(
+      `INSERT INTO tasks (id, name, projectId, sectionId, parentId, notes, dueOn, dueTime, repeat, completedAt, sortOrder, createdAt, updatedAt, deletedAt, serverSeq, updatedBy)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         name=excluded.name, projectId=excluded.projectId, sectionId=excluded.sectionId, parentId=excluded.parentId,
+         notes=excluded.notes, dueOn=excluded.dueOn, dueTime=excluded.dueTime, repeat=excluded.repeat,
+         completedAt=excluded.completedAt, sortOrder=excluded.sortOrder, createdAt=excluded.createdAt, updatedAt=excluded.updatedAt,
+         deletedAt=NULL, serverSeq=excluded.serverSeq, updatedBy=excluded.updatedBy
+       WHERE excluded.updatedAt > tasks.updatedAt`,
+    )
+    .bind(
+      task.id,
+      task.name,
+      task.projectId ?? null,
+      task.sectionId ?? null,
+      task.parentId ?? null,
+      task.notes ?? null,
+      task.dueOn ?? null,
+      task.dueTime ?? null,
+      task.repeat ? JSON.stringify(task.repeat) : null,
+      task.completedAt ?? null,
+      task.sortOrder,
+      task.createdAt,
+      task.updatedAt,
+      serverSeq,
+      updatedBy,
+    );
+}
+
+function buildTaskCompletionUpsert(db: D1Database, completion: TaskCompletion, serverSeq: number, updatedBy: string | null): D1PreparedStatement {
+  return db
+    .prepare(
+      `INSERT INTO taskCompletions (id, taskId, completedAt, dueOn, nextDueOn, subtaskIds, createdAt, updatedAt, deletedAt, serverSeq, updatedBy)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         taskId=excluded.taskId, completedAt=excluded.completedAt, dueOn=excluded.dueOn, nextDueOn=excluded.nextDueOn,
+         subtaskIds=excluded.subtaskIds, createdAt=excluded.createdAt, updatedAt=excluded.updatedAt,
+         deletedAt=NULL, serverSeq=excluded.serverSeq, updatedBy=excluded.updatedBy
+       WHERE excluded.updatedAt > taskCompletions.updatedAt`,
+    )
+    .bind(
+      completion.id,
+      completion.taskId,
+      completion.completedAt,
+      completion.dueOn ?? null,
+      completion.nextDueOn ?? null,
+      completion.subtaskIds?.length ? JSON.stringify(completion.subtaskIds) : null,
+      completion.createdAt,
+      completion.updatedAt,
+      serverSeq,
+      updatedBy,
+    );
+}
+
 function buildSettingsUpsert(db: D1Database, settings: SettingsRecord, serverSeq: number, updatedBy: string | null): D1PreparedStatement {
   return db
     .prepare(
@@ -598,11 +739,14 @@ async function pullChangesSince(db: D1Database, cursor: number, ownSeq: [number,
   const [first, last] = ownSeq ?? [0, -1]; // an empty range leaves nothing out
   const since = (table: string) =>
     db.prepare(`SELECT * FROM ${table} WHERE serverSeq > ? AND serverSeq NOT BETWEEN ? AND ?`).bind(cursor, first, last).all();
-  const [fastsRes, fieldsRes, trackablesRes, entriesRes, settingsRes] = await Promise.all([
+  const [fastsRes, fieldsRes, trackablesRes, entriesRes, projectsRes, tasksRes, completionsRes, settingsRes] = await Promise.all([
     since('fasts'),
     since('fieldDefinitions'),
     since('trackableDefinitions'),
     since('trackableEntries'),
+    since('taskProjects'),
+    since('tasks'),
+    since('taskCompletions'),
     since('settings'),
   ]);
 
@@ -611,6 +755,9 @@ async function pullChangesSince(db: D1Database, cursor: number, ownSeq: [number,
     fieldDefinitions: fieldsRes.results.map((row) => mapFieldRow(row as Record<string, unknown>)),
     trackableDefinitions: trackablesRes.results.map((row) => mapTrackableRow(row as Record<string, unknown>)),
     trackableEntries: entriesRes.results.map((row) => mapEntryRow(row as Record<string, unknown>)),
+    taskProjects: projectsRes.results.map((row) => mapTaskProjectRow(row as Record<string, unknown>)),
+    tasks: tasksRes.results.map((row) => mapTaskRow(row as Record<string, unknown>)),
+    taskCompletions: completionsRes.results.map((row) => mapTaskCompletionRow(row as Record<string, unknown>)),
     settings: settingsRes.results[0] ? mapSettingsRow(settingsRes.results[0] as Record<string, unknown>) : null,
   };
 }
@@ -690,6 +837,58 @@ function mapEntryRow(row: Record<string, unknown>): WireRow<TrackableEntry> {
     values: row.fieldValues ? JSON.parse(row.fieldValues as string) : undefined,
     dateRepeat: row.dateRepeat ? JSON.parse(row.dateRepeat as string) : undefined,
     details: (row.details as string) ?? undefined,
+    createdAt: row.createdAt as number,
+    updatedAt: row.updatedAt as number,
+    deletedAt: (row.deletedAt as number) ?? undefined,
+    updatedBy: (row.updatedBy as string) ?? undefined,
+  };
+}
+
+function mapTaskProjectRow(row: Record<string, unknown>): WireRow<TaskProject> {
+  return {
+    id: row.id as string,
+    name: row.name as string,
+    color: row.color as string,
+    icon: (row.icon as string) ?? undefined,
+    notes: (row.notes as string) ?? undefined,
+    sections: row.sections ? JSON.parse(row.sections as string) : [],
+    archived: row.archived == null ? undefined : Boolean(row.archived),
+    sortOrder: (row.sortOrder as number) ?? undefined,
+    createdAt: row.createdAt as number,
+    updatedAt: row.updatedAt as number,
+    deletedAt: (row.deletedAt as number) ?? undefined,
+    updatedBy: (row.updatedBy as string) ?? undefined,
+  };
+}
+
+function mapTaskRow(row: Record<string, unknown>): WireRow<Task> {
+  return {
+    id: row.id as string,
+    name: row.name as string,
+    projectId: (row.projectId as string) ?? undefined,
+    sectionId: (row.sectionId as string) ?? undefined,
+    parentId: (row.parentId as string) ?? undefined,
+    notes: (row.notes as string) ?? undefined,
+    dueOn: (row.dueOn as string) ?? undefined,
+    dueTime: (row.dueTime as string) ?? undefined,
+    repeat: row.repeat ? JSON.parse(row.repeat as string) : undefined,
+    completedAt: (row.completedAt as number) ?? undefined,
+    sortOrder: row.sortOrder as number,
+    createdAt: row.createdAt as number,
+    updatedAt: row.updatedAt as number,
+    deletedAt: (row.deletedAt as number) ?? undefined,
+    updatedBy: (row.updatedBy as string) ?? undefined,
+  };
+}
+
+function mapTaskCompletionRow(row: Record<string, unknown>): WireRow<TaskCompletion> {
+  return {
+    id: row.id as string,
+    taskId: row.taskId as string,
+    completedAt: row.completedAt as number,
+    dueOn: (row.dueOn as string) ?? undefined,
+    nextDueOn: (row.nextDueOn as string) ?? undefined,
+    subtaskIds: row.subtaskIds ? JSON.parse(row.subtaskIds as string) : undefined,
     createdAt: row.createdAt as number,
     updatedAt: row.updatedAt as number,
     deletedAt: (row.deletedAt as number) ?? undefined,

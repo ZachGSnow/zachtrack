@@ -141,6 +141,95 @@ export interface TrackableEntry {
   updatedAt: number;
 }
 
+// ---------------------------------------------------------------------------
+// Tasks (ARCHITECTURE.md 3.59): projects with sections, tasks with subtasks,
+// and due dates that can repeat.
+// ---------------------------------------------------------------------------
+
+/** One heading inside a project; tasks point at it by `id`. */
+export interface TaskSection {
+  id: string; // uuid
+  name: string;
+}
+
+/** A to-do project. Its sections live inside it, in display order. */
+export interface TaskProject {
+  id: string; // uuid
+  name: string;
+  color: string; // hex
+  icon?: string; // emoji
+  notes?: string;
+  sections: TaskSection[];
+  /** Hidden from the project list but kept with all its tasks. */
+  archived?: boolean;
+  /** Position in the project list; unset sorts by name after the ordered ones. */
+  sortOrder?: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/**
+ * How a task's due date comes round again. Weekdays are 0 = Monday ... 6 =
+ * Sunday, as for habit schedules. `every` is the interval (every 2 weeks).
+ * - days: every N days after the due date
+ * - weeks: every N weeks, on the chosen weekdays
+ * - months: every N months on day `day` (1 to 31, clamped to the month's
+ *   end; -1 = the last day)
+ * - monthsNth: every N months on the `nth` (1 to 5, or -1 for last) `weekday`
+ * - years: every N years on the due date's month and day
+ * - afterDone: N units after the day it was completed, whatever its due date
+ */
+export type TaskRepeat =
+  | { type: 'days'; every: number }
+  | { type: 'weeks'; every: number; weekdays: number[] }
+  | { type: 'months'; every: number; day: number }
+  | { type: 'monthsNth'; every: number; nth: number; weekday: number }
+  | { type: 'years'; every: number }
+  | { type: 'afterDone'; every: number; unit: 'days' | 'weeks' | 'months' | 'years' };
+
+/**
+ * A to-do. A top-level task belongs to a project (or none: the inbox); a
+ * subtask has `parentId` instead and goes wherever its parent goes.
+ */
+export interface Task {
+  id: string; // uuid
+  name: string;
+  /** Top-level tasks only; unset = no project. */
+  projectId?: string;
+  /** A section of its project; unset or unknown = above the first section. */
+  sectionId?: string;
+  /** Set on a subtask: the task it belongs to. */
+  parentId?: string;
+  notes?: string;
+  /** Local calendar day, "YYYY-MM-DD"; unset = no due date. */
+  dueOn?: string;
+  /** "HH:MM" local time on `dueOn`; unset = any time that day. */
+  dueTime?: string;
+  /** Needs `dueOn`. Completing a repeating task moves it to its next date instead of closing it. */
+  repeat?: TaskRepeat;
+  /** When it was completed; unset = open. A repeating task never keeps this. */
+  completedAt?: number;
+  /** Position among its siblings (same section, or same parent); lower first. */
+  sortOrder: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** One completion of a repeating task: its history, and what Undo puts back. */
+export interface TaskCompletion {
+  id: string; // uuid
+  taskId: string;
+  completedAt: number;
+  /** The due date it was completed for. */
+  dueOn?: string;
+  /** The date it moved on to. */
+  nextDueOn?: string;
+  /** Subtasks that were done and were reset by the move, so Undo can mark them done again. */
+  subtaskIds?: string[];
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface SettingsRecord {
   id: 'app-settings';
   defaultPresetId: string;
@@ -186,7 +275,14 @@ export const DEFAULT_SETTINGS: Omit<SettingsRecord, 'updatedAt'> = {
 };
 
 /** Record types that participate in Cloudflare sync (fasts keyed by `uuid`, others already uuid-keyed). */
-export type SyncRecordType = 'fasts' | 'fieldDefinitions' | 'trackableDefinitions' | 'trackableEntries';
+export type SyncRecordType =
+  | 'fasts'
+  | 'fieldDefinitions'
+  | 'trackableDefinitions'
+  | 'trackableEntries'
+  | 'taskProjects'
+  | 'tasks'
+  | 'taskCompletions';
 
 /** A local record of a hard delete, kept only until acknowledged by the sync server, so the delete can propagate to other devices. */
 export interface SyncTombstone {
@@ -254,6 +350,9 @@ export class ZachTrackDB extends Dexie {
   syncTombstones!: EntityTable<SyncTombstone, 'id'>;
   syncMeta!: EntityTable<SyncMeta, 'id'>;
   syncLog!: EntityTable<SyncLogRow, 'id'>;
+  taskProjects!: EntityTable<TaskProject, 'id'>;
+  tasks!: EntityTable<Task, 'id'>;
+  taskCompletions!: EntityTable<TaskCompletion, 'id'>;
 
   constructor() {
     super('snowfast');
@@ -369,6 +468,27 @@ export class ZachTrackDB extends Dexie {
       syncMeta: 'id',
       syncLog: '++id, completedAt',
     });
+    // v7: tasks (ARCHITECTURE.md 3.59). The pull cursor goes back to 0 once:
+    // a device on an older version moved its cursor past any task rows another
+    // device had already synced, without storing them, so the first sync on
+    // this version receives everything again. Nothing local is deleted.
+    this.version(7)
+      .stores({
+        fasts: '++id, startTime, endTime, startDay, uuid',
+        settings: 'id',
+        fieldDefinitions: 'id, name',
+        trackableDefinitions: 'id, name',
+        trackableEntries: 'id, trackableId, timestamp',
+        syncTombstones: '++id, recordType, uuid, deletedAt',
+        syncMeta: 'id',
+        syncLog: '++id, completedAt',
+        taskProjects: 'id',
+        tasks: 'id, projectId, parentId',
+        taskCompletions: 'id, taskId',
+      })
+      .upgrade(async (tx) => {
+        await tx.table<SyncMeta>('syncMeta').update('sync', { cursor: 0 });
+      });
   }
 }
 
@@ -585,6 +705,107 @@ export async function deleteTrackableEntry(id: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Task projects, tasks and completions (ARCHITECTURE.md 3.59)
+// ---------------------------------------------------------------------------
+
+export async function createTaskProject(input: Omit<TaskProject, 'id' | 'createdAt' | 'updatedAt'>): Promise<TaskProject> {
+  const now = Date.now();
+  const project: TaskProject = { ...input, id: uuid(), createdAt: now, updatedAt: now };
+  await db.taskProjects.add(project);
+  notifyMutation();
+  return project;
+}
+
+export async function updateTaskProject(id: string, patch: Partial<Omit<TaskProject, 'id' | 'createdAt'>>): Promise<void> {
+  await db.taskProjects.update(id, { ...patch, updatedAt: Date.now() });
+  notifyMutation();
+}
+
+/** A task and every subtask under it, at any depth, as ids. */
+async function withDescendants(rootIds: string[]): Promise<string[]> {
+  const all = [...rootIds];
+  let level = rootIds;
+  while (level.length > 0) {
+    const children = await db.tasks.where('parentId').anyOf(level).primaryKeys();
+    const fresh = children.filter((id) => !all.includes(id));
+    all.push(...fresh);
+    level = fresh;
+  }
+  return all;
+}
+
+/**
+ * Deletes tasks with their subtasks and completion history. `tombstone`:
+ * false when applying a delete that came from the server (nothing to send).
+ */
+async function removeTasks(rootIds: string[], tombstone: boolean, label?: string): Promise<void> {
+  const ids = await withDescendants(rootIds);
+  const completionIds = await db.taskCompletions.where('taskId').anyOf(ids).primaryKeys();
+  await db.taskCompletions.bulkDelete(completionIds);
+  await db.tasks.bulkDelete(ids);
+  if (!tombstone) return;
+  for (const id of completionIds) await addTombstone('taskCompletions', id, label);
+  for (const id of ids) await addTombstone('tasks', id, label);
+}
+
+/** Deletes a project with all of its tasks. */
+export async function deleteTaskProject(id: string): Promise<void> {
+  const project = await db.taskProjects.get(id);
+  const taskIds = await db.tasks.where('projectId').equals(id).primaryKeys();
+  await removeTasks(taskIds, true, project?.name);
+  await db.taskProjects.delete(id);
+  await addTombstone('taskProjects', id, project?.name);
+  notifyMutation();
+}
+
+/**
+ * Removes a section from a project. Its tasks move to `moveTo` (another
+ * section of the same project), or to the top of the project when unset.
+ */
+export async function deleteTaskSection(projectId: string, sectionId: string, moveTo?: string): Promise<void> {
+  const project = await db.taskProjects.get(projectId);
+  if (!project) return;
+  const now = Date.now();
+  await db.transaction('rw', db.taskProjects, db.tasks, async () => {
+    await db.taskProjects.update(projectId, { sections: project.sections.filter((s) => s.id !== sectionId), updatedAt: now });
+    const moved = await db.tasks.where('projectId').equals(projectId).filter((t) => t.sectionId === sectionId).toArray();
+    for (const t of moved) {
+      const { sectionId: _old, ...rest } = t;
+      await db.tasks.put({ ...rest, ...(moveTo ? { sectionId: moveTo } : {}), updatedAt: now });
+    }
+  });
+  notifyMutation();
+}
+
+export async function createTask(input: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>): Promise<Task> {
+  const now = Date.now();
+  const task: Task = { ...input, id: uuid(), createdAt: now, updatedAt: now };
+  await db.tasks.add(task);
+  notifyMutation();
+  return task;
+}
+
+/**
+ * Changes a task. A key set to `undefined` in `patch` is removed (clearing a
+ * due date, say), since Dexie's `update` would keep the old value.
+ */
+export async function updateTask(id: string, patch: Partial<Omit<Task, 'id' | 'createdAt'>>): Promise<void> {
+  const current = await db.tasks.get(id);
+  if (!current) return;
+  const next: Record<string, unknown> = { ...current, ...patch, updatedAt: Date.now() };
+  for (const key of Object.keys(next)) if (next[key] === undefined) delete next[key];
+  await db.tasks.put(next as unknown as Task);
+  notifyMutation();
+}
+
+/** Deletes a task with its subtasks and completion history. */
+export async function deleteTask(id: string): Promise<void> {
+  const task = await db.tasks.get(id);
+  await removeTasks([id], true, task?.name);
+  notifyMutation();
+}
+
+// ---------------------------------------------------------------------------
 // Sync support helpers
 // ---------------------------------------------------------------------------
 
@@ -597,19 +818,25 @@ export interface SyncableRecords {
   fieldDefinitions: FieldDefinition[];
   trackableDefinitions: TrackableDefinition[];
   trackableEntries: TrackableEntry[];
+  taskProjects: TaskProject[];
+  tasks: Task[];
+  taskCompletions: TaskCompletion[];
   settings: SettingsRecord;
 }
 
 /** Full local snapshot of every syncable table: exports, imports, and a sync's full send. */
 export async function getAllSyncableRecords(): Promise<SyncableRecords> {
-  const [fasts, fieldDefinitions, trackableDefinitions, trackableEntries, settings] = await Promise.all([
+  const [fasts, fieldDefinitions, trackableDefinitions, trackableEntries, taskProjects, tasks, taskCompletions, settings] = await Promise.all([
     db.fasts.toArray(),
     db.fieldDefinitions.toArray(),
     db.trackableDefinitions.toArray(),
     db.trackableEntries.toArray(),
+    db.taskProjects.toArray(),
+    db.tasks.toArray(),
+    db.taskCompletions.toArray(),
     getSettings(),
   ]);
-  return { fasts, fieldDefinitions, trackableDefinitions, trackableEntries, settings };
+  return { fasts, fieldDefinitions, trackableDefinitions, trackableEntries, taskProjects, tasks, taskCompletions, settings };
 }
 
 /**
@@ -623,15 +850,27 @@ export async function getChangedSyncableRecords(
 ): Promise<Omit<SyncableRecords, 'settings'> & { settings: SettingsRecord | null }> {
   const again = new Set(retry.map((r) => `${r.recordType}:${r.uuid}`));
   const changed = (type: SyncRecordType, key: string, updatedAt: number) => updatedAt >= since || again.has(`${type}:${key}`);
-  const [fasts, fieldDefinitions, trackableDefinitions, trackableEntries, settings] = await Promise.all([
+  const [fasts, fieldDefinitions, trackableDefinitions, trackableEntries, taskProjects, tasks, taskCompletions, settings] = await Promise.all([
     db.fasts.filter((f) => changed('fasts', f.uuid, f.updatedAt)).toArray(),
     db.fieldDefinitions.filter((f) => changed('fieldDefinitions', f.id, f.updatedAt)).toArray(),
     db.trackableDefinitions.filter((t) => changed('trackableDefinitions', t.id, t.updatedAt)).toArray(),
     db.trackableEntries.filter((e) => changed('trackableEntries', e.id, e.updatedAt)).toArray(),
+    db.taskProjects.filter((p) => changed('taskProjects', p.id, p.updatedAt)).toArray(),
+    db.tasks.filter((t) => changed('tasks', t.id, t.updatedAt)).toArray(),
+    db.taskCompletions.filter((c) => changed('taskCompletions', c.id, c.updatedAt)).toArray(),
     getSettings(),
   ]);
   const settingsChanged = settings.updatedAt >= since || again.has(`settings:${settings.id}`);
-  return { fasts, fieldDefinitions, trackableDefinitions, trackableEntries, settings: settingsChanged ? settings : null };
+  return {
+    fasts,
+    fieldDefinitions,
+    trackableDefinitions,
+    trackableEntries,
+    taskProjects,
+    tasks,
+    taskCompletions,
+    settings: settingsChanged ? settings : null,
+  };
 }
 
 /** How many local changes the server hasn't got yet: what the next sync would send, deletes included. */
@@ -646,19 +885,25 @@ export async function countWaitingChanges(): Promise<number> {
     changes.fieldDefinitions.length +
     changes.trackableDefinitions.length +
     changes.trackableEntries.length +
+    changes.taskProjects.length +
+    changes.tasks.length +
+    changes.taskCompletions.length +
     (changes.settings ? 1 : 0)
   );
 }
 
 /** Live records per type on this device, for Check sync and the erase confirmation. */
-export async function countLocalRecords(): Promise<{ fasts: number; fieldDefinitions: number; trackableDefinitions: number; trackableEntries: number }> {
-  const [fasts, fieldDefinitions, trackableDefinitions, trackableEntries] = await Promise.all([
+export async function countLocalRecords(): Promise<Record<SyncRecordType, number>> {
+  const [fasts, fieldDefinitions, trackableDefinitions, trackableEntries, taskProjects, tasks, taskCompletions] = await Promise.all([
     db.fasts.count(),
     db.fieldDefinitions.count(),
     db.trackableDefinitions.count(),
     db.trackableEntries.count(),
+    db.taskProjects.count(),
+    db.tasks.count(),
+    db.taskCompletions.count(),
   ]);
-  return { fasts, fieldDefinitions, trackableDefinitions, trackableEntries };
+  return { fasts, fieldDefinitions, trackableDefinitions, trackableEntries, taskProjects, tasks, taskCompletions };
 }
 
 /**
@@ -735,6 +980,10 @@ export interface RemoteSyncChanges {
   fieldDefinitions: Synced<FieldDefinition>[];
   trackableDefinitions: Synced<TrackableDefinition>[];
   trackableEntries: Synced<TrackableEntry>[];
+  /** Missing from a server (or an export file) older than tasks. */
+  taskProjects?: Synced<TaskProject>[];
+  tasks?: Synced<Task>[];
+  taskCompletions?: Synced<TaskCompletion>[];
   settings: Synced<SettingsRecord> | null;
 }
 
@@ -750,7 +999,7 @@ export interface RemoteSyncChanges {
 export async function applyRemoteChanges(changes: RemoteSyncChanges): Promise<void> {
   await db.transaction(
     'rw',
-    [db.fasts, db.fieldDefinitions, db.trackableDefinitions, db.trackableEntries, db.settings],
+    [db.fasts, db.fieldDefinitions, db.trackableDefinitions, db.trackableEntries, db.settings, db.taskProjects, db.tasks, db.taskCompletions],
     async () => {
       for (const remote of changes.fasts) {
         const { deletedAt, updatedBy: _by, ...rest } = remote;
@@ -789,6 +1038,33 @@ export async function applyRemoteChanges(changes: RemoteSyncChanges): Promise<vo
           continue;
         }
         await db.trackableEntries.put(rest);
+      }
+      // Tasks: a delete from another device takes what hangs off it here too
+      // (that device sent deletes for those as well; this covers any order).
+      for (const remote of changes.taskProjects ?? []) {
+        const { deletedAt, updatedBy: _by, ...rest } = remote;
+        if (deletedAt) {
+          await removeTasks(await db.tasks.where('projectId').equals(remote.id).primaryKeys(), false);
+          await db.taskProjects.delete(remote.id);
+          continue;
+        }
+        await db.taskProjects.put(rest);
+      }
+      for (const remote of changes.tasks ?? []) {
+        const { deletedAt, updatedBy: _by, ...rest } = remote;
+        if (deletedAt) {
+          await removeTasks([remote.id], false);
+          continue;
+        }
+        await db.tasks.put(rest);
+      }
+      for (const remote of changes.taskCompletions ?? []) {
+        const { deletedAt, updatedBy: _by, ...rest } = remote;
+        if (deletedAt) {
+          await db.taskCompletions.delete(remote.id);
+          continue;
+        }
+        await db.taskCompletions.put(rest);
       }
       if (changes.settings) {
         const { deletedAt, updatedBy: _by, ...rest } = changes.settings;

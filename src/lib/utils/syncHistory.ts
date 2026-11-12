@@ -31,7 +31,10 @@ export interface SyncHistoryEntry {
 }
 
 export type AppliedCounts = Partial<
-  Record<'fasts' | 'fieldDefinitions' | 'trackableDefinitions' | 'trackableEntries' | 'settings' | 'deletes', number>
+  Record<
+    'fasts' | 'fieldDefinitions' | 'trackableDefinitions' | 'trackableEntries' | 'taskProjects' | 'tasks' | 'taskCompletions' | 'settings' | 'deletes',
+    number
+  >
 >;
 
 export interface ReceivedCounts {
@@ -39,6 +42,10 @@ export interface ReceivedCounts {
   fieldDefinitions: number;
   trackableDefinitions: number;
   trackableEntries: number;
+  /** Absent from history entries written before tasks. */
+  taskProjects?: number;
+  tasks?: number;
+  taskCompletions?: number;
   settings: boolean;
 }
 
@@ -52,6 +59,9 @@ function countParts(c: AppliedCounts): string[] {
   if (c.fieldDefinitions) parts.push(pluralize(c.fieldDefinitions, 'field'));
   if (c.trackableDefinitions) parts.push(pluralize(c.trackableDefinitions, 'trackable'));
   if (c.trackableEntries) parts.push(pluralize(c.trackableEntries, 'entry', 'entries'));
+  if (c.taskProjects) parts.push(pluralize(c.taskProjects, 'project'));
+  if (c.tasks) parts.push(pluralize(c.tasks, 'task'));
+  if (c.taskCompletions) parts.push(pluralize(c.taskCompletions, 'completion'));
   if (c.settings) parts.push('settings');
   if (c.deletes) parts.push(pluralize(c.deletes, 'delete'));
   return parts;

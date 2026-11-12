@@ -80,7 +80,7 @@ describe('erase', () => {
   it('counts what is here, then deletes the whole local database', async () => {
     const trackable = await createTrackable({ name: 'Water', icon: 'x', color: '#000000', fieldIds: [] });
     await addTrackableEntry({ trackableId: trackable.id, timestamp: 1 });
-    expect(await countLocalRecords()).toEqual({ fasts: 0, fieldDefinitions: 0, trackableDefinitions: 1, trackableEntries: 1 });
+    expect(await countLocalRecords()).toEqual({ fasts: 0, fieldDefinitions: 0, trackableDefinitions: 1, trackableEntries: 1, taskProjects: 0, tasks: 0, taskCompletions: 0 });
     await eraseLocalData();
     expect(await Dexie.exists('snowfast')).toBe(false);
   });
