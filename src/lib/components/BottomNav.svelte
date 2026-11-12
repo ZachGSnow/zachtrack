@@ -34,7 +34,7 @@
   // A page link that also stays marked on the pages under it: one trackable, one project.
   const SUB_PATHS: Record<string, RegExp> = {
     '/trackables': /^\/trackables(\/.*)?$/,
-    '/tasks': /^\/tasks(\/(?!upcoming$).*)?$/,
+    '/tasks': /^\/tasks(\/(?!upcoming$|done$).*)?$/,
   };
 
   // The sections (data/sections.ts); a section's tab is lit on any of its pages.

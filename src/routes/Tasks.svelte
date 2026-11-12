@@ -17,6 +17,14 @@
   import { onMount } from 'svelte';
   import { takeShortcut } from '../lib/utils/shortcuts';
   import { quickAdd } from '../lib/stores/quickAdd.svelte';
+  import { taskSearch } from '../lib/stores/taskSearch.svelte';
+  import { taskUi } from '../lib/stores/taskUi.svelte';
+  import { searchTasks } from '../lib/utils/taskStats';
+  import { describeDue } from '../lib/utils/tasks';
+  import TaskHost from '../lib/components/TaskHost.svelte';
+  import Search from '@lucide/svelte/icons/search';
+  import Circle from '@lucide/svelte/icons/circle';
+  import CircleCheck from '@lucide/svelte/icons/circle-check';
 
   // The Tasks tab (ARCHITECTURE.md 3.60): every project with its open tasks
   // and what's due, the inbox of tasks without a project, + Project and + Task.
@@ -30,6 +38,16 @@
   let reordering = $state(false);
 
   let sheetOpen = $state(false);
+
+  // Search (3.66). / asks for the focus (stores/taskSearch.svelte.ts).
+  let searchBox = $state<HTMLInputElement | null>(null);
+  const hits = $derived(searchTasks($tasks ?? [], $projects ?? [], taskSearch.query));
+  $effect(() => {
+    if (taskSearch.focusRequest > taskSearch.handled && searchBox) {
+      taskSearch.handled = taskSearch.focusRequest;
+      searchBox.focus();
+    }
+  });
 
   // The home-screen shortcut "Add a task" opens here with the sheet up.
   onMount(() => {
@@ -71,8 +89,43 @@
     </div>
   </div>
 
+  <label class="relative block">
+    <Search size={16} class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-text-muted" aria-hidden="true" />
+    <input
+      bind:this={searchBox}
+      type="search"
+      bind:value={taskSearch.query}
+      placeholder="Search tasks and notes"
+      aria-label="Search tasks"
+      class="w-full rounded-full border border-border bg-surface py-2 pr-3 pl-9 text-sm text-text placeholder:text-text-muted"
+    />
+  </label>
+
   {#if $projects === undefined || $tasks === undefined}
     <p class="text-sm text-text-muted">Loading&hellip;</p>
+  {:else if taskSearch.query.trim()}
+    <!-- Search (3.66): every word, in the name or the notes, across every project. -->
+    {#if hits.length === 0}
+      <p class="text-sm text-text-muted">No tasks match "{taskSearch.query.trim()}".</p>
+    {:else}
+      <ul class="flex flex-col" aria-label="Search results">
+        {#each hits as h (h.task.id)}
+          <li>
+            <button type="button" class="flex w-full items-start gap-3 rounded-xl px-2 py-2 text-left hover:bg-surface-2" onclick={() => taskUi.show(h.task.id)}>
+              <span class="mt-0.5 text-text-muted">{#if h.task.completedAt}<CircleCheck size={18} class="text-brand" aria-label="done" />{:else}<Circle size={18} aria-hidden="true" />{/if}</span>
+              <span class="min-w-0 flex-1">
+                <span class="block truncate text-sm {h.task.completedAt ? 'text-text-muted line-through' : 'text-text'}">{h.task.name}</span>
+                <span class="flex flex-wrap gap-x-2 text-xs text-text-muted">
+                  {#if h.context}<span>{h.context}</span>{/if}
+                  {#if h.task.dueOn && !h.task.completedAt}<span>{describeDue(h.task.dueOn, h.task.dueTime, today).text}</span>{/if}
+                </span>
+                {#if h.snippet}<span class="mt-0.5 block text-xs text-text-muted">{h.snippet}</span>{/if}
+              </span>
+            </button>
+          </li>
+        {/each}
+      </ul>
+    {/if}
   {:else}
     {#if ordered.active.length === 0 && inbox.open === 0}
       <EmptyState icon="&#x2705;" title="No projects yet" text="A project holds tasks, in sections if you like, and each task can have subtasks and a due date.">
@@ -143,6 +196,8 @@
     {/if}
   {/if}
 </div>
+
+<TaskHost tasks={$tasks ?? []} projects={$projects ?? []} />
 
 <BottomSheet bind:open={sheetOpen}>
   <ProjectSheet bind:open={sheetOpen} project={null} tasks={$tasks ?? []} onSaved={(id) => push(`/tasks/${id}`)} />
