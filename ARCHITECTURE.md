@@ -37,7 +37,7 @@ username/password/session system in application code at all.
 
 ## 2. Data model (current, exact)
 
-From `src/lib/db.ts`. Every syncable record now carries a stable id and an
+From `src/lib/db/types.ts`. Every syncable record now carries a stable id and an
 `updatedAt` used for last-write-wins conflict resolution.
 
 ```ts
@@ -177,7 +177,7 @@ everything.
 
 Now `SyncMeta.sentThrough` holds the local time the last successful sync
 started, and a sync sends only records with `updatedAt` at or after it
-(`getChangedSyncableRecords` in `db.ts`). Both sides of that comparison are
+(`getChangedSyncableRecords` in `db/sync.ts`). Both sides of that comparison are
 this device's own clock, so another device's clock doesn't matter. Edits made
 while a sync is in flight have an `updatedAt` after its start, so the next
 sync picks them up. Three things keep it honest:
@@ -214,7 +214,7 @@ part is unaffected.
 ### 3.6 Soft-delete on the server, hard-delete + short-lived tombstone on the client
 This was a deliberate hybrid, not the tombstones-vs-soft-delete either/or
 originally framed:
-- **Locally**, every delete function in `db.ts` still does a real, immediate
+- **Locally**, every delete function in `db/` still does a real, immediate
   hard delete - exactly as before sync existed. This means **zero changes**
   were needed to any existing query/read path anywhere in the app (routes,
   components, charts) - a huge reduction in risk surface compared to making
@@ -293,7 +293,7 @@ Received - e.g. `Water: 12 oz -- Jul 30, 3:15 PM` for a trackable entry, or
 `describeReceived()` in `sync.svelte.ts`, capped at 20
 lines per sync with a "+N more" fallback. This is a *what changed to*
 listing, not a before/after diff: computing an actual old-value -> new-value
-diff would require `applyRemoteChanges()` in `db.ts` to capture each local
+diff would require `applyRemoteChanges()` in `db/sync.ts` to capture each local
 record immediately before it's overwritten, which is meaningfully more
 invasive (touches the core sync-apply path for all five record types) and
 was deliberately scoped out for now.
@@ -887,7 +887,7 @@ fresh install created all eight whether wanted or not.
   once the first sync has settled with no trackables on the device, the
   Trackables list offers the eight starter trackables with every box
   ticked; Add makes the chosen ones (and only the fields they need,
-  `seedStarterTrackables` in `db.ts`), Start empty is remembered per
+  `seedStarterTrackables` in `db/starter.ts`), Start empty is remembered per
   device. The browser tests take the whole set through the picker
   (`waitForStarterSet`), so the sample data still finds its fields.
 
@@ -1231,7 +1231,7 @@ engine that works out the next date comes with the screens.
 
 **Deletes take what hangs off them.** Deleting a task deletes its subtasks
 and completions, and deleting a project deletes its tasks, each with its own
-tombstone (`removeTasks` in `db.ts`). A delete pulled from another device
+tombstone (`removeTasks` in `db/tasks.ts`). A delete pulled from another device
 does the same locally without writing tombstones. On the server, a deleted
 task loses its name and notes (its name is its content), and a deleted
 project its notes; the project keeps its name, like a trackable. The shared
@@ -1293,7 +1293,7 @@ walks the screens.
 ### 3.61 Repeating tasks (v1.19.0)
 
 `utils/taskRepeat.ts` works out the next date; `completeTask`,
-`undoComplete` and `skipTask` in `db.ts` apply it.
+`undoComplete` and `skipTask` in `db/tasks.ts` apply it.
 
 - **The next date.** A fixed schedule (every N days; every N weeks on
   chosen weekdays; every N months on a day or on the nth or last weekday;
@@ -1567,6 +1567,36 @@ every nightly backup. Now they go 180 days after the delete:
 - A cursor of 0 (a new device, Full resync) passes: such a device either
   has nothing yet or asked to start over, and Full resync is the repair for
   a device that already synced recently.
+
+### 3.71 Housekeeping: one copy of the helpers, tests that run every day (v1.21.0)
+
+- **Day keys** ("YYYY-MM-DD") have one home, `utils/dayKey.ts`: tasks,
+  repeats, quick add, the database and the date inputs used to carry their
+  own copies of the same few lines. `utils/tasks.ts` and
+  `utils/taskRepeat.ts` re-export what their callers already import.
+- **The database code** is a folder, `src/lib/db/`, instead of one
+  1,400-line file: `types.ts`, `schema.ts` (Dexie versions, the shared
+  `db`, mutation notices), `records.ts` (settings, fasts, fields,
+  trackables, entries), `tasks.ts`, `sync.ts` and `starter.ts`, behind
+  `index.ts`, so every `from '../db'` import is unchanged. The helpers the
+  parts share (`uuid`, `notifyMutation`, `addTombstone`, `removeTasks`) are
+  not exported from the folder.
+- **The trackable edit sheet** hands its goal and its fields to
+  `GoalEditor.svelte` and `FieldsEditor.svelte`; the sheet keeps the drafts
+  and the checks on Save.
+- **Sync history wording** (3.10) moved out of the sync store into
+  `utils/syncDescribe.ts`, pure functions that take the names on this
+  device as an argument, so tests can check the lines without a database.
+- **A trackable's page** is keyed on its id (`TrackableDetailRoute.svelte`):
+  the router keeps the same page when only the id changes, and the page
+  went on showing the previous trackable's data.
+- **Tests**: the weekly review is tested under a pinned clock (a fixed
+  Sunday, Monday and Wednesday) instead of only on the days the suite
+  happens to run; Vitest compiles the stores' runes, so the undo flows of
+  one-tap logging and completing a task have unit tests; fixed sleeps and a
+  forced click that hid failures are gone.
+- Removed unused code: `ui/Pill.svelte`, `ui/StatTile.svelte` and
+  `seedDefaultTrackablesIfEmpty`.
 
 ### 3.21 Trackables list: pin, archive, order; tag filters
 - **Sort** (per device, `zachtrack:trackables-view`): Due first (goal
@@ -1860,7 +1890,7 @@ therefore only hit this bug, once a tag was actually added). Neither save
 handler had `try/catch`, so the failure was a totally silent no-op from the
 user's perspective - no console was open, nothing appeared to happen at all.
 Fixed by spread-copying (`[...tags]`, `[...fieldIds]`) immediately before
-handing values to any `db.ts` function - a shallow copy is enough since the
+handing values to any `db/` function - a shallow copy is enough since the
 arrays only ever contain primitive strings - and by adding `try/catch` +
 visible on-screen error messages to every save handler that was missing it.
 
@@ -1868,7 +1898,7 @@ visible on-screen error messages to every save handler that was missing it.
 The original plan assumed this event existed and could be the sync trigger
 hook. It doesn't, without the separate `dexie-observable` addon (which
 carries real Dexie-4-compatibility risk and wasn't installed). Replaced with
-a small custom mechanism in `db.ts`: `onLocalMutation(listener)` /
+a small custom mechanism in `db/schema.ts`: `onLocalMutation(listener)` /
 `notifyMutation()`, called explicitly at the end of every exported mutating
 function (`addFast`, `updateTrackable`, etc.) - since every local write
 already funnels through this file's exported functions anyway, this is a
@@ -1896,7 +1926,7 @@ four times in a day left only whichever entry was processed last visible in
 graphs/derived stats -- even though every entry was still correctly stored
 and listed on the trackable's detail page. Fixed by adding an explicit
 `aggregation: 'sum' | 'average' | 'last'` to `FieldDefinition` (per-field,
-user-editable via a new `updateFieldDefinition()` in `db.ts` and a selector
+user-editable via a new `updateFieldDefinition()` in `db/records.ts` and a selector
 in `EditTrackableSheet.svelte`; defaults to `'last'` so behavior is
 unchanged unless set) and a single shared `computeFieldValuesByDay` helper
 that both call sites now use to combine same-day entries per that mode
@@ -2030,7 +2060,7 @@ the server keeps the newer `updatedAt`, a fresh install's first sync made
 those defaults win and replaced the height, goal weight, default method and
 notification setting every other device had synced. Defaults are now created
 with `updatedAt: 0`, so any real edit beats them, locally and on the server.
-`tests/settings.test.ts` (real `db.ts` on `fake-indexeddb`, real sync endpoint
+`tests/settings.test.ts` (real `db/` on `fake-indexeddb`, real sync endpoint
 on a local D1) fails on the old code. General rule: a record the app creates
 on its own, rather than from a user edit, must not carry a current
 `updatedAt`.
@@ -2209,7 +2239,7 @@ this," not a promise.
   cross-component shared state uses plain classes with `$state` fields as a
   singleton, in `.svelte.ts` files (required for runes outside `.svelte`
   files) - see `src/lib/stores/*.svelte.ts`, including `sync.svelte.ts`.
-  **Never pass a `$state` array/object directly into a `db.ts` call** -
+  **Never pass a `$state` array/object directly into a `db/` call** -
   spread-copy it first (Section 4.4).
 - Cloudflare changes: prefer `wrangler` CLI over dashboard clicks wherever
   possible for reproducibility, but some things (custom domain attachment,

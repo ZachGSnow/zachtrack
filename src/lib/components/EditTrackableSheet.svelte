@@ -5,7 +5,6 @@
     addTrackableEntry,
     addTrackableEntries,
     createFieldDefinition,
-    updateFieldDefinition,
     createTrackable,
     updateTrackable,
     deleteTrackable,
@@ -13,8 +12,6 @@
     type TrackableGoalType,
     type DateKind,
     type FieldDefinition,
-    type FieldKind,
-    type FieldAggregation,
   } from '../db';
   import {
     autoKind,
@@ -24,22 +21,16 @@
     type TrackableKind,
   } from '../utils/trackableKinds';
 
-  import { DAILY_GOALS, GOAL_LABELS, GOAL_TYPES, goalField, WEEKDAY_NAMES, withScheduleChange } from '../utils/trackableGoals';
+  import { DAILY_GOALS, goalField, withScheduleChange } from '../utils/trackableGoals';
   import { fromDateInputValue, toDateInputValue } from '../utils/time';
   import { TEMPLATES, type TrackableTemplate } from '../data/templates';
   import { holidayEntry, US_HOLIDAYS } from '../data/holidays';
   import { DATE_KINDS, DATE_KIND_LABELS, DEFAULT_LEAD_DAYS } from '../utils/dates';
+  import FieldsEditor from './FieldsEditor.svelte';
+  import GoalEditor from './GoalEditor.svelte';
   import HelpLink from './HelpLink.svelte';
 
   const KINDS: TrackableKind[] = ['event', 'measurement', 'daily', 'checkin', 'ages'];
-
-  const GOAL_HINTS: Record<TrackableGoalType, string> = {
-    dailyTotal: 'Adds up the first number field each day, like Calories or Water.',
-    perDay: 'Counts each entry today; without fields, each tap of the check button is one.',
-    perWeek: 'Counts the days you log it, Monday to Sunday.',
-    everyDays: 'Due again that many days after the last entry; shows when it is due or overdue.',
-    avoid: 'For things you want to do less: the time since it last happened is the streak.',
-  };
 
   let {
     open = $bindable(false),
@@ -59,13 +50,6 @@
     '#22ff88', '#a855f7', '#38bdf8', '#f97316', '#eab308',
     '#ec4899', '#ef4444', '#22d3ee', '#818cf8', '#10b981',
   ];
-
-  const KIND_LABELS: Record<FieldKind, string> = { number: 'Number', rating: 'Rating', boolean: 'Yes/No' };
-  const AGGREGATION_LABELS: Record<FieldAggregation, string> = {
-    sum: 'Sum same-day entries',
-    average: 'Average same-day entries',
-    last: 'Last entry wins',
-  };
 
   let name = $state('');
   let icon = $state('');
@@ -87,13 +71,6 @@
   let withHolidayPack = $state(false);
   let error = $state('');
 
-  let showNewField = $state(false);
-  let newFieldName = $state('');
-  let newFieldKind = $state<FieldKind>('number');
-  let newFieldUnit = $state('');
-  let newFieldRatingMax = $state('5');
-  let newFieldAggregation = $state<FieldAggregation>('last');
-
   $effect(() => {
     if (!open) return;
     name = trackable?.name ?? '';
@@ -111,39 +88,13 @@
     leadDaysDraft = trackable?.dateLeadDays?.toString() ?? '';
     withHolidayPack = false;
     error = '';
-    editingFieldId = null;
-    showNewField = false;
-    newFieldName = '';
-    newFieldKind = 'number';
-    newFieldUnit = '';
-    newFieldRatingMax = '5';
-    newFieldAggregation = 'last';
   });
 
   const attachedFields = $derived(
     fieldIds.map((id) => ($allFields ?? []).find((f) => f.id === id)).filter((f): f is FieldDefinition => f != null),
   );
-  const goalValueLabel = $derived.by(() => {
-    if (goalType === 'perWeek') return 'Times per week';
-    if (goalType === 'perDay') return 'Times per day';
-    if (goalType === 'everyDays') return 'Every how many days';
-    const f = goalField(attachedFields);
-    return f ? `${f.name} per day${f.unit ? ` (${f.unit})` : ''}` : 'Amount per day';
-  });
-
   /** What Auto would pick for the fields as they are now in this sheet. */
   const auto = $derived(autoKind(attachedFields));
-  const availableFields = $derived(($allFields ?? []).filter((f) => !fieldIds.includes(f.id)));
-
-  function removeField(id: string) {
-    fieldIds = fieldIds.filter((f) => f !== id);
-  }
-
-  function addExistingField(e: Event) {
-    const id = (e.target as HTMLSelectElement).value;
-    if (id) fieldIds = [...fieldIds, id];
-    (e.target as HTMLSelectElement).value = '';
-  }
 
   /** Fills the new-trackable sheet from a template, reusing fields you already have by name and kind. */
   async function applyTemplate(template: TrackableTemplate) {
@@ -177,78 +128,6 @@
     } catch (e) {
       error = e instanceof Error ? e.message : 'Could not use that template. Please try again.';
     }
-  }
-
-  async function createAndAttachField() {
-    const trimmed = newFieldName.trim();
-    if (!trimmed) return;
-    const field = await createFieldDefinition({
-      name: trimmed,
-      kind: newFieldKind,
-      unit: newFieldKind === 'number' && newFieldUnit.trim() ? newFieldUnit.trim() : undefined,
-      ratingMin: newFieldKind === 'rating' ? 1 : undefined,
-      ratingMax: newFieldKind === 'rating' ? Number(newFieldRatingMax) || 5 : undefined,
-      aggregation: newFieldKind !== 'boolean' ? newFieldAggregation : undefined,
-    });
-    fieldIds = [...fieldIds, field.id];
-    showNewField = false;
-    newFieldName = '';
-    newFieldUnit = '';
-    newFieldRatingMax = '5';
-    newFieldAggregation = 'last';
-  }
-
-  // Editing a field's name, unit or scale. Fields are shared, so this saves
-  // straight away (like the combine mode) rather than with the trackable.
-  const allTrackables = liveQuery(() => db.trackableDefinitions.toArray());
-  let editingFieldId = $state<string | null>(null);
-  let editFieldName = $state('');
-  let editFieldUnit = $state('');
-  let editFieldRatingMax = $state('5');
-  let editFieldError = $state('');
-
-  /** Other trackables sharing the field being edited, which a rename also changes. */
-  const editingAlsoUsedBy = $derived(
-    editingFieldId
-      ? ($allTrackables ?? []).filter((t) => t.id !== trackable?.id && t.fieldIds.includes(editingFieldId!)).map((t) => t.name)
-      : [],
-  );
-
-  function startEditField(field: FieldDefinition) {
-    editingFieldId = field.id;
-    editFieldName = field.name;
-    editFieldUnit = field.unit ?? '';
-    editFieldRatingMax = String(field.ratingMax ?? 5);
-    editFieldError = '';
-  }
-
-  async function saveEditField(field: FieldDefinition) {
-    const trimmed = editFieldName.trim();
-    if (!trimmed) {
-      editFieldError = 'Please enter a name.';
-      return;
-    }
-    const patch: Partial<FieldDefinition> = { name: trimmed };
-    if (field.kind === 'number') patch.unit = editFieldUnit.trim() || undefined;
-    if (field.kind === 'rating') {
-      const max = Number(editFieldRatingMax);
-      if (!Number.isInteger(max) || max < 2 || max > 100) {
-        editFieldError = 'The scale must go from 1 to a whole number between 2 and 100.';
-        return;
-      }
-      patch.ratingMax = max;
-    }
-    try {
-      await updateFieldDefinition(field.id, patch);
-      editingFieldId = null;
-    } catch (e) {
-      editFieldError = e instanceof Error ? e.message : 'Could not save this field. Please try again.';
-    }
-  }
-
-  async function handleAggregationChange(fieldId: string, e: Event) {
-    const value = (e.target as HTMLSelectElement).value as FieldAggregation;
-    await updateFieldDefinition(fieldId, { aggregation: value });
   }
 
   async function handleSave() {
@@ -421,69 +300,7 @@
   </label>
 
   {#if summaryMode !== 'ages'}
-    <div class="space-y-2">
-      <label class="block text-sm">
-        <span class="mb-1 flex items-center gap-1.5 text-text-muted">Goal <HelpLink topic="goals" label="goals" /></span>
-        <select
-          bind:value={goalType}
-          class="w-full rounded-lg border bg-transparent p-2 text-text border-border"
-        >
-          <option value="">No goal</option>
-          {#each GOAL_TYPES as g (g)}
-            <option value={g}>{GOAL_LABELS[g]}</option>
-          {/each}
-        </select>
-      </label>
-      {#if goalType && goalType !== 'avoid'}
-        <label class="block text-sm">
-          <span class="mb-1 block text-text-muted">{goalValueLabel}</span>
-          <input
-            type="text"
-            inputmode="decimal"
-            bind:value={goalValueDraft}
-            class="w-32 rounded-lg border bg-transparent p-2 text-text border-border"
-          />
-        </label>
-      {/if}
-      {#if goalType}
-        <p class="text-xs text-text-muted">{GOAL_HINTS[goalType]}</p>
-      {/if}
-      {#if goalType && DAILY_GOALS.includes(goalType)}
-        <div>
-          <p class="mb-1 text-sm text-text-muted">On these days</p>
-          <div class="flex gap-1" role="group" aria-label="Goal days">
-            {#each WEEKDAY_NAMES as name, i (name)}
-              <button
-                type="button"
-                class="flex-1 rounded-lg border py-1.5 text-xs font-medium"
-                style={scheduleDays.includes(i)
-                  ? 'background: var(--color-brand); color: var(--color-brand-fg); border-color: var(--color-brand);'
-                  : 'border-color: var(--color-border); color: var(--color-text-muted);'}
-                aria-pressed={scheduleDays.includes(i)}
-                onclick={() => (scheduleDays = scheduleDays.includes(i) ? scheduleDays.filter((d) => d !== i) : [...scheduleDays, i])}
-              >{name}</button>
-            {/each}
-          </div>
-          <p class="mt-1 text-xs text-text-muted">Other days are rest days: they don't break the streak.</p>
-        </div>
-      {/if}
-      {#if goalType && goalType !== 'avoid'}
-        <label class="block text-sm">
-          <span class="mb-1 block text-text-muted">Paused until (optional)</span>
-          <div class="flex gap-2">
-            <input
-              type="date"
-              bind:value={pausedUntilDraft}
-              class="flex-1 rounded-lg border bg-transparent p-2 text-text border-border"
-            />
-            {#if pausedUntilDraft}
-              <button type="button" class="rounded-lg border px-3 text-sm text-text-muted border-border" onclick={() => (pausedUntilDraft = '')}>Clear</button>
-            {/if}
-          </div>
-          <span class="mt-1 block text-xs text-text-muted">For a holiday or a sick week: nothing is due, and the streak waits.</span>
-        </label>
-      {/if}
-    </div>
+    <GoalEditor bind:goalType bind:goalValueDraft bind:scheduleDays bind:pausedUntilDraft {attachedFields} />
   {:else}
     <div class="space-y-2">
       <label class="block text-sm">
@@ -527,176 +344,7 @@
     </label>
   {/if}
 
-  <div>
-    <p class="mb-1.5 text-sm text-text-muted">Fields</p>
-    {#if attachedFields.length > 0}
-      <ul class="mb-2 flex flex-col gap-1.5">
-        {#each attachedFields as field (field.id)}
-          <li class="rounded-lg border p-2 text-sm border-border">
-            <div class="flex items-center justify-between gap-2">
-              <span class="text-text">{field.name} <span class="text-text-muted">({KIND_LABELS[field.kind]}{field.unit ? `, ${field.unit}` : ''}{field.kind === 'rating' ? `, 1 to ${field.ratingMax ?? 5}` : ''})</span></span>
-              <div class="flex shrink-0 items-center gap-3">
-                {#if editingFieldId !== field.id}
-                  <button type="button" class="text-xs font-medium text-brand" onclick={() => startEditField(field)} aria-label="Edit {field.name}">Edit</button>
-                {/if}
-                <button type="button" class="text-text-muted" onclick={() => removeField(field.id)} aria-label="Remove {field.name}">&times;</button>
-              </div>
-            </div>
-            {#if editingFieldId === field.id}
-              <div class="mt-2 space-y-2 rounded-lg border p-2 border-border">
-                <label class="block text-xs">
-                  <span class="mb-1 block text-text-muted">Field name</span>
-                  <input
-                    type="text"
-                    bind:value={editFieldName}
-                    class="w-full rounded-lg border bg-transparent p-1.5 text-sm text-text border-border"
-                  />
-                </label>
-                {#if field.kind === 'number'}
-                  <label class="block text-xs">
-                    <span class="mb-1 block text-text-muted">Unit</span>
-                    <input
-                      type="text"
-                      bind:value={editFieldUnit}
-                      placeholder="e.g. in"
-                      class="w-full rounded-lg border bg-transparent p-1.5 text-sm text-text placeholder:text-text-muted border-border"
-                    />
-                    <span class="mt-1 block text-text-muted">Only the label changes. Values you already logged are not converted.</span>
-                  </label>
-                {:else if field.kind === 'rating'}
-                  <label class="block text-xs">
-                    <span class="mb-1 block text-text-muted">Scale: 1 to</span>
-                    <input
-                      type="text"
-                      inputmode="numeric"
-                      bind:value={editFieldRatingMax}
-                      class="w-20 rounded-lg border bg-transparent p-1.5 text-sm text-text border-border"
-                    />
-                  </label>
-                {/if}
-                {#if editingAlsoUsedBy.length > 0}
-                  <p class="text-xs text-text-muted">Also changes it in: {editingAlsoUsedBy.join(', ')}</p>
-                {/if}
-                {#if editFieldError}
-                  <p class="text-xs text-danger">{editFieldError}</p>
-                {/if}
-                <div class="flex gap-2">
-                  <button
-                    type="button"
-                    class="flex-1 rounded-lg border py-1.5 text-xs font-medium text-text-muted border-border"
-                    onclick={() => (editingFieldId = null)}
-                  >Cancel</button>
-                  <button
-                    type="button"
-                    class="flex-1 rounded-lg py-1.5 text-xs font-semibold bg-brand text-brand-fg"
-                    onclick={() => saveEditField(field)}
-                  >Save field</button>
-                </div>
-              </div>
-            {/if}
-            {#if field.kind !== 'boolean'}
-              <label class="mt-1.5 block text-xs">
-                <span class="mb-1 block text-text-muted">Combine same-day entries by</span>
-                <select
-                  class="w-full rounded-lg border bg-transparent p-1.5 text-xs text-text border-border"
-                  value={field.aggregation ?? 'last'}
-                  onchange={(e) => handleAggregationChange(field.id, e)}
-                >
-                  {#each ['sum', 'average', 'last'] as const as a (a)}
-                    <option value={a}>{AGGREGATION_LABELS[a]}</option>
-                  {/each}
-                </select>
-              </label>
-            {/if}
-          </li>
-        {/each}
-      </ul>
-    {/if}
-
-    {#if availableFields.length > 0}
-      <select
-        class="mb-2 w-full rounded-lg border bg-transparent p-2 text-sm text-text-muted border-border"
-        onchange={addExistingField}
-      >
-        <option value="">+ Add existing field...</option>
-        {#each availableFields as field (field.id)}
-          <option value={field.id}>{field.name}</option>
-        {/each}
-      </select>
-    {/if}
-
-    {#if !showNewField}
-      <button
-        type="button"
-        class="text-sm font-medium text-brand"
-        onclick={() => (showNewField = true)}
-      >+ Create new field</button>
-    {:else}
-      <div class="space-y-2 rounded-lg border p-3 border-border">
-        <input
-          type="text"
-          bind:value={newFieldName}
-          placeholder="Field name (e.g. Satisfaction)"
-          class="w-full rounded-lg border bg-transparent p-2 text-sm text-text placeholder:text-text-muted border-border"
-        />
-        <div class="flex gap-2">
-          {#each ['number', 'rating', 'boolean'] as const as k (k)}
-            <button
-              type="button"
-              class="flex-1 rounded-lg border py-1.5 text-xs font-medium"
-              style={newFieldKind === k
-                ? 'background: var(--color-brand); color: var(--color-brand-fg); border-color: var(--color-brand);'
-                : 'border-color: var(--color-border); color: var(--color-text-muted);'}
-              onclick={() => (newFieldKind = k)}
-            >{KIND_LABELS[k]}</button>
-          {/each}
-        </div>
-        {#if newFieldKind === 'number'}
-          <input
-            type="text"
-            bind:value={newFieldUnit}
-            placeholder="Unit (optional, e.g. lb)"
-            class="w-full rounded-lg border bg-transparent p-2 text-sm text-text placeholder:text-text-muted border-border"
-          />
-        {:else if newFieldKind === 'rating'}
-          <label class="block text-xs">
-            <span class="mb-1 block text-text-muted">Scale: 1 to</span>
-            <input
-              type="text"
-              inputmode="numeric"
-              bind:value={newFieldRatingMax}
-              class="w-20 rounded-lg border bg-transparent p-1.5 text-sm text-text border-border"
-            />
-          </label>
-        {/if}
-        {#if newFieldKind !== 'boolean'}
-          <label class="block text-xs">
-            <span class="mb-1 block text-text-muted">Combine same-day entries by</span>
-            <select
-              class="w-full rounded-lg border bg-transparent p-1.5 text-xs text-text border-border"
-              bind:value={newFieldAggregation}
-            >
-              {#each ['sum', 'average', 'last'] as const as a (a)}
-                <option value={a}>{AGGREGATION_LABELS[a]}</option>
-              {/each}
-            </select>
-          </label>
-        {/if}
-        <div class="flex gap-2">
-          <button
-            type="button"
-            class="flex-1 rounded-lg border py-1.5 text-xs font-medium text-text-muted border-border"
-            onclick={() => (showNewField = false)}
-          >Cancel</button>
-          <button
-            type="button"
-            class="flex-1 rounded-lg py-1.5 text-xs font-semibold bg-brand text-brand-fg"
-            onclick={createAndAttachField}
-          >Add field</button>
-        </div>
-      </div>
-    {/if}
-  </div>
+  <FieldsEditor bind:fieldIds allFields={$allFields ?? []} trackableId={trackable?.id} {open} />
 
   {#if error}
     <p class="text-sm text-danger">{error}</p>

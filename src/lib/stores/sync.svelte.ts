@@ -13,21 +13,12 @@ import {
   onLocalMutation,
   prunePendingTombstones,
   setSyncMeta,
-  type FastRecord,
-  type FieldDefinition,
   type RemoteSyncChanges,
-  type SettingsRecord,
   type SyncLogRow,
   type SyncRetryKey,
   type SyncRecordType,
-  type SyncTombstone,
-  type Task,
-  type TaskCompletion,
-  type TaskProject,
-  type TrackableDefinition,
-  type TrackableEntry,
 } from '../db';
-import { formatClockTime, formatDateTime } from '../utils/time';
+import { describeReceived, describeSent, findOverwritten, type AppliedRecord, type LocalNames } from '../utils/syncDescribe';
 import { describeRejected, REJECTED_DETAILS_LIMIT, type RejectedRecord } from '../utils/rejected';
 import { canMerge, mergeInto, summarizeSync, type AppliedCounts, type SyncHistoryEntry } from '../utils/syncHistory';
 import { splitForSending } from '../utils/syncChunks';
@@ -84,12 +75,6 @@ class NoBackendError extends Error {
     super('No sync server: your data stays on this device.');
     this.name = 'NoBackendError';
   }
-}
-
-interface AppliedRecord {
-  recordType: SyncRecordType | 'settings';
-  uuid: string;
-  deleted?: boolean;
 }
 
 /** A sync stops after this many requests, sending or pulling; the next sync carries on from where it got to. */
@@ -199,233 +184,14 @@ async function describeRejectedLocally(rejected: RejectedRecord[]): Promise<stri
   });
 }
 
-function formatFieldValue(field: FieldDefinition | undefined, value: number | boolean): string {
-  if (!field) return String(value);
-  if (field.kind === 'boolean') return value ? 'Yes' : 'No';
-  if (field.kind === 'rating') return `${value}/${field.ratingMax ?? 5}`;
-  return field.unit ? `${value} ${field.unit}` : `${value}`;
-}
-
-/** Looks up trackable and field names on this device, for history lines. */
-async function nameLookup() {
-  const [trackables, fields] = await Promise.all([db.trackableDefinitions.toArray(), db.fieldDefinitions.toArray()]);
+/** Trackable, field and task names on this device, for history lines. */
+async function localNames(): Promise<LocalNames> {
+  const [trackables, fields, tasks] = await Promise.all([db.trackableDefinitions.toArray(), db.fieldDefinitions.toArray(), db.tasks.toArray()]);
   return {
     trackableById: new Map(trackables.map((t) => [t.id, t] as const)),
     fieldById: new Map(fields.map((f) => [f.id, f] as const)),
+    taskNameById: new Map(tasks.map((t) => [t.id, t.name] as const)),
   };
-}
-
-type Names = Awaited<ReturnType<typeof nameLookup>>;
-
-function describeFast(fast: FastRecord): string {
-  if (fast.endTime) return `Fast -- ${formatDateTime(fast.startTime)} to ${formatClockTime(fast.endTime)}`;
-  return `Fast started -- ${formatDateTime(fast.startTime)}`;
-}
-
-function describeEntry(entry: TrackableEntry, names: Names): string {
-  const trackableName = names.trackableById.get(entry.trackableId)?.name ?? 'Unknown trackable';
-  const values = Object.entries(entry.values ?? {}).map(([fieldId, value]) => {
-    const field = names.fieldById.get(fieldId);
-    return `${field?.name ?? fieldId}: ${formatFieldValue(field, value)}`;
-  });
-  const suffix = values.length ? ` (${values.join(', ')})` : '';
-  return `${trackableName}${suffix} -- ${formatDateTime(entry.timestamp)}`;
-}
-
-/** "Task -- Change oil, due Nov 30": what a task line in the sync history says. */
-function describeTask(task: Pick<Task, 'name' | 'dueOn' | 'completedAt'>): string {
-  const due = task.dueOn ? `, due ${task.dueOn}` : '';
-  return `${task.completedAt ? 'Task done' : 'Task'} -- ${task.name || 'Untitled'}${due}`;
-}
-
-/** Names the task a completion belongs to, from this device. */
-async function taskNames(): Promise<Map<string, string>> {
-  return new Map((await db.tasks.toArray()).map((t) => [t.id, t.name] as const));
-}
-
-/**
- * One line per record received from the server, for the history's detail view.
- * Names come from the local DB, so call this after `applyRemoteChanges`.
- */
-async function describeReceived(changes: RemoteSyncChanges, from: (deviceId: string | null | undefined) => string): Promise<string[]> {
-  const details: string[] = [];
-  const by = (deviceId: string | null | undefined) => {
-    const name = from(deviceId);
-    return name ? ` (${name})` : '';
-  };
-  for (const fast of changes.fasts) {
-    details.push((fast.deletedAt ? `Fast deleted -- started ${formatDateTime(fast.startTime)}` : describeFast(fast)) + by(fast.updatedBy));
-  }
-  for (const field of changes.fieldDefinitions) {
-    details.push((field.deletedAt ? `Field deleted -- ${field.name}` : `Field -- ${field.name}`) + by(field.updatedBy));
-  }
-  for (const trackable of changes.trackableDefinitions) {
-    details.push((trackable.deletedAt ? `Trackable deleted -- ${trackable.name}` : `Trackable -- ${trackable.name}`) + by(trackable.updatedBy));
-  }
-  if (changes.trackableEntries.length > 0) {
-    const names = await nameLookup();
-    for (const entry of changes.trackableEntries) {
-      if (entry.deletedAt) {
-        details.push(`Entry deleted -- ${names.trackableById.get(entry.trackableId)?.name ?? 'Unknown trackable'}${by(entry.updatedBy)}`);
-        continue;
-      }
-      details.push(describeEntry(entry, names) + by(entry.updatedBy));
-    }
-  }
-  for (const project of changes.taskProjects ?? []) {
-    details.push((project.deletedAt ? `Project deleted -- ${project.name}` : `Project -- ${project.name}`) + by(project.updatedBy));
-  }
-  for (const task of changes.tasks ?? []) {
-    details.push((task.deletedAt ? 'Task deleted' : describeTask(task)) + by(task.updatedBy));
-  }
-  if ((changes.taskCompletions ?? []).length > 0) {
-    const names = await taskNames();
-    for (const c of changes.taskCompletions ?? []) {
-      const name = names.get(c.taskId) ?? 'a task';
-      details.push((c.deletedAt ? `Completion undone -- ${name}` : `Completed -- ${name}`) + by(c.updatedBy));
-    }
-  }
-  if (changes.settings) details.push(`Settings updated${by(changes.settings.updatedBy)}`);
-  return details;
-}
-
-interface SentRecords {
-  fasts: FastRecord[];
-  fieldDefinitions: FieldDefinition[];
-  trackableDefinitions: TrackableDefinition[];
-  trackableEntries: TrackableEntry[];
-  taskProjects: TaskProject[];
-  tasks: Task[];
-  taskCompletions: TaskCompletion[];
-  settings: SettingsRecord | null;
-}
-
-/**
- * Edits made on this device (changed since the last good sync) that a newer
- * edit from another device replaced: the server kept the other one and sent
- * it back. One line each, e.g. "Your edit to Water (12 oz) was replaced by
- * Laptop's newer one". Call before `applyRemoteChanges`, while the local copy
- * still has this device's edit.
- */
-async function findOverwritten(
-  sent: SentRecords,
-  editedSince: number | undefined,
-  changes: RemoteSyncChanges,
-  from: (deviceId: string | null | undefined) => string,
-): Promise<string[]> {
-  if (editedSince == null) return [];
-  const edited = <T extends { updatedAt: number }>(list: T[]) => list.filter((r) => r.updatedAt >= editedSince);
-  const lines: string[] = [];
-  const newer = (remote: { updatedAt: number; deletedAt?: number | null; updatedBy?: string | null }, local: { updatedAt: number }, what: string) => {
-    if (Math.max(remote.updatedAt, remote.deletedAt ?? 0) <= local.updatedAt) return;
-    const who = from(remote.updatedBy) || 'another device';
-    lines.push(remote.deletedAt ? `Your edit to ${what} was replaced: ${who} deleted it` : `Your edit to ${what} was replaced by ${who}'s newer one`);
-  };
-  const fasts = new Map(edited(sent.fasts).map((f) => [f.uuid, f] as const));
-  for (const r of changes.fasts) {
-    const local = fasts.get(r.uuid);
-    if (local) newer(r, local, `the fast from ${formatDateTime(local.startTime)}`);
-  }
-  const fields = new Map(edited(sent.fieldDefinitions).map((f) => [f.id, f] as const));
-  for (const r of changes.fieldDefinitions) {
-    const local = fields.get(r.id);
-    if (local) newer(r, local, `the field ${local.name}`);
-  }
-  const trackables = new Map(edited(sent.trackableDefinitions).map((t) => [t.id, t] as const));
-  for (const r of changes.trackableDefinitions) {
-    const local = trackables.get(r.id);
-    if (local) newer(r, local, local.name);
-  }
-  const entries = new Map(edited(sent.trackableEntries).map((e) => [e.id, e] as const));
-  if (changes.trackableEntries.some((r) => entries.has(r.id))) {
-    const names = await nameLookup();
-    for (const r of changes.trackableEntries) {
-      const local = entries.get(r.id);
-      if (local) newer(r, local, `an entry: ${describeEntry(local, names)}`);
-    }
-  }
-  const projects = new Map(edited(sent.taskProjects).map((p) => [p.id, p] as const));
-  for (const r of changes.taskProjects ?? []) {
-    const local = projects.get(r.id);
-    if (local) newer(r, local, `the project ${local.name}`);
-  }
-  const tasks = new Map(edited(sent.tasks).map((t) => [t.id, t] as const));
-  for (const r of changes.tasks ?? []) {
-    const local = tasks.get(r.id);
-    if (local) newer(r, local, `the task ${local.name}`);
-  }
-  if (sent.settings && sent.settings.updatedAt >= editedSince && changes.settings) newer(changes.settings, sent.settings, 'Settings');
-  return lines;
-}
-
-/** One line per record the server stored from this device (`applied`), named from what was sent. */
-async function describeSent(
-  applied: AppliedRecord[],
-  sent: {
-    fasts: FastRecord[];
-    fieldDefinitions: FieldDefinition[];
-    trackableDefinitions: TrackableDefinition[];
-    trackableEntries: TrackableEntry[];
-    taskProjects: TaskProject[];
-    tasks: Task[];
-    taskCompletions: TaskCompletion[];
-  },
-  tombstones: SyncTombstone[],
-): Promise<string[]> {
-  const names = await nameLookup();
-  const tasksHere = applied.some((a) => a.recordType === 'taskCompletions') ? await taskNames() : new Map<string, string>();
-  const deletedLabel = new Map<string, string | undefined>(tombstones.map((t) => [`${t.recordType}:${t.uuid}`, t.label]));
-  const byKey = {
-    fasts: new Map(sent.fasts.map((f) => [f.uuid, f] as const)),
-    fieldDefinitions: new Map(sent.fieldDefinitions.map((f) => [f.id, f] as const)),
-    trackableDefinitions: new Map(sent.trackableDefinitions.map((t) => [t.id, t] as const)),
-    trackableEntries: new Map(sent.trackableEntries.map((e) => [e.id, e] as const)),
-    taskProjects: new Map(sent.taskProjects.map((p) => [p.id, p] as const)),
-    tasks: new Map(sent.tasks.map((t) => [t.id, t] as const)),
-    taskCompletions: new Map(sent.taskCompletions.map((c) => [c.id, c] as const)),
-  };
-  const kindName: Record<AppliedRecord['recordType'], string> = {
-    fasts: 'Fast',
-    fieldDefinitions: 'Field',
-    trackableDefinitions: 'Trackable',
-    trackableEntries: 'Entry',
-    taskProjects: 'Project',
-    tasks: 'Task',
-    taskCompletions: 'Completion',
-    settings: 'Settings',
-  };
-  return applied.map((a) => {
-    if (a.deleted) {
-      const label = deletedLabel.get(`${a.recordType}:${a.uuid}`);
-      return `${kindName[a.recordType]} deleted${label ? ` -- ${label}` : ''}`;
-    }
-    switch (a.recordType) {
-      case 'fasts': {
-        const fast = byKey.fasts.get(a.uuid);
-        return fast ? describeFast(fast) : 'Fast';
-      }
-      case 'fieldDefinitions':
-        return `Field -- ${byKey.fieldDefinitions.get(a.uuid)?.name ?? a.uuid}`;
-      case 'trackableDefinitions':
-        return `Trackable -- ${byKey.trackableDefinitions.get(a.uuid)?.name ?? a.uuid}`;
-      case 'trackableEntries': {
-        const entry = byKey.trackableEntries.get(a.uuid);
-        return entry ? describeEntry(entry, names) : 'Entry';
-      }
-      case 'taskProjects':
-        return `Project -- ${byKey.taskProjects.get(a.uuid)?.name ?? a.uuid}`;
-      case 'tasks': {
-        const task = byKey.tasks.get(a.uuid);
-        return task ? describeTask(task) : 'Task';
-      }
-      case 'taskCompletions': {
-        const c = byKey.taskCompletions.get(a.uuid);
-        return `Completed -- ${(c && tasksHere.get(c.taskId)) ?? 'a task'}`;
-      }
-      case 'settings':
-        return 'Settings updated';
-    }
-  });
 }
 
 /** Reads this device's history (newest first), first copying in the pre-v1.10.0 entries from localStorage. */
@@ -806,6 +572,8 @@ class SyncStore {
       const overwritten: string[] = [];
       let counts: SyncResponseBody['counts'];
       let cursor = meta.cursor;
+      // Names as they are before this sync, for edits another device replaced.
+      const namesBefore = meta.sentThrough == null ? null : await localNames().catch(() => null);
       for (let i = 0; i < MAX_REQUESTS_PER_SYNC; i++) {
         const part = parts[i];
         const body = await this.post({
@@ -816,7 +584,7 @@ class SyncStore {
           ...(check ? { check: true } : {}),
         });
         if (body.devices) this.devices = body.devices;
-        overwritten.push(...(await findOverwritten(records, meta.sentThrough, body.changes, from).catch(() => [] as string[])));
+        if (namesBefore) overwritten.push(...findOverwritten(records, meta.sentThrough, body.changes, from, namesBefore));
         await applyRemoteChanges(body.changes);
         if (i === 0) await prunePendingTombstones(tombstones.map((t) => t.id).filter((id): id is number => id != null));
         mergeChanges(received, body.changes);
@@ -871,8 +639,9 @@ class SyncStore {
         };
       }
 
-      const receivedLines = await describeReceived(received, from).catch(() => [] as string[]);
-      const sent = await describeSent(applied.slice(0, HISTORY_DETAILS_LIMIT), records, tombstones).catch(() => [] as string[]);
+      const names = await localNames().catch(() => null);
+      const receivedLines = names ? describeReceived(received, from, names) : [];
+      const sent = names ? describeSent(applied.slice(0, HISTORY_DETAILS_LIMIT), records, tombstones, names) : [];
       const sentTotal = Object.values(appliedCounts).reduce((a, b) => a + (b ?? 0), 0);
 
       await this.pushHistory({

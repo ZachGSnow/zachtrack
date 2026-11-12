@@ -3,29 +3,20 @@
 // no time zone or DST change can move a date. Pure; tests/taskRepeat.test.ts.
 
 import type { TaskRepeat } from '../db';
+import { addDaysKey, daysFrom, weekdayOf, ymdKey, ymdOf } from './dayKey';
+
+export { addDaysKey, weekdayOf } from './dayKey';
 
 type Ymd = { y: number; m: number; d: number }; // m: 0 = January
 
 const parse = (key: string): Ymd => {
-  const [y, m, d] = key.split('-').map(Number);
-  return { y, m: m - 1, d };
+  const [y, m, d] = ymdOf(key);
+  return { y, m, d };
 };
 const fromUtc = (ms: number): string => {
   const t = new Date(ms);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${t.getUTCFullYear()}-${pad(t.getUTCMonth() + 1)}-${pad(t.getUTCDate())}`;
+  return ymdKey(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate());
 };
-const utc = ({ y, m, d }: Ymd) => Date.UTC(y, m, d);
-const DAY = 86_400_000;
-
-export function addDaysKey(key: string, n: number): string {
-  return fromUtc(utc(parse(key)) + n * DAY);
-}
-
-/** 0 = Monday ... 6 = Sunday. */
-export function weekdayOf(key: string): number {
-  return (new Date(utc(parse(key))).getUTCDay() + 6) % 7;
-}
 
 const daysInMonth = (y: number, m: number) => new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
 
@@ -85,7 +76,7 @@ export function nextDue(repeat: TaskRepeat, dueOn: string, doneOn: string): stri
       return step(doneOn, repeat.every, repeat.unit);
     case 'days': {
       // Whole intervals past the due date, then one more if still not after `after`.
-      const gap = Math.round((utc(parse(after)) - utc(parse(dueOn))) / DAY);
+      const gap = daysFrom(dueOn, after);
       const k = Math.floor(gap / repeat.every) + 1;
       return addDaysKey(dueOn, k * repeat.every);
     }
@@ -94,7 +85,7 @@ export function nextDue(repeat: TaskRepeat, dueOn: string, doneOn: string): stri
       const days = new Set(repeat.weekdays);
       let day = addDaysKey(after, 1);
       for (let i = 0; i < MAX_STEPS; i++, day = addDaysKey(day, 1)) {
-        const weeks = Math.round((utc(parse(mondayOf(day))) - utc(parse(anchor))) / (7 * DAY));
+        const weeks = Math.round(daysFrom(anchor, mondayOf(day)) / 7);
         if (weeks % repeat.every === 0 && days.has(weekdayOf(day))) return day;
       }
       break;
@@ -155,7 +146,7 @@ export function describeRepeat(repeat: TaskRepeat, dueOn?: string): string {
     case 'monthsNth':
       return `${every(repeat.every, 'month')} on the ${NTH.get(repeat.nth)} ${WEEKDAY_LONG[repeat.weekday]}`;
     case 'years': {
-      const on = dueOn ? ` on ${new Date(utc(parse(dueOn))).toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' })}` : '';
+      const on = dueOn ? ` on ${new Date(Date.UTC(...ymdOf(dueOn))).toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' })}` : '';
       return `${every(repeat.every, 'year')}${on}`;
     }
     case 'afterDone':

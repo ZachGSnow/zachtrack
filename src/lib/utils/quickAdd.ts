@@ -5,7 +5,8 @@
 // inside a name ("Buy sun screen") is left alone. Pure; tests/quickAdd.test.ts.
 
 import type { TaskRepeat } from '../db';
-import { addDaysKey, describeRepeat, repeatFor, weekdayOf } from './taskRepeat';
+import { addDaysKey, pad2 as pad, weekdayOf, ymdKey as key } from './dayKey';
+import { describeRepeat, repeatFor } from './taskRepeat';
 
 export interface QuickAdd {
   /** The task's name: the text without the phrases that were read. */
@@ -35,8 +36,6 @@ const UNIT = '(day|week|month|year)s?';
 
 const weekdayIndex = (w: string) => WEEKDAYS.find(([re]) => re.test(w))?.[1] ?? -1;
 const count = (s: string | undefined) => (s == null ? 1 : (NUM_WORDS[s] ?? Number(s)));
-const pad = (n: number) => String(n).padStart(2, '0');
-const key = (y: number, m: number, d: number) => `${y}-${pad(m + 1)}-${pad(d)}`;
 const parts = (k: string) => k.split('-').map(Number) as [number, number, number];
 const daysIn = (y: number, m: number) => new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
 

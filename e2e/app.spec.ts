@@ -80,7 +80,8 @@ test('records the server refuses are listed by name with the reason', async ({ p
   const pill = page.getByRole('button', { name: /Synced/ });
   await expect(pill).toContainText('1');
   await pill.dblclick();
-  await page.getByText(/1 not synced \(tap for why\)/).first().click({ force: true }).catch(() => {});
+  // The note sits under the history entry; tapping the entry opens the reasons.
+  await expect(page.getByText(/1 not synced \(tap for why\)/).first()).toBeVisible();
   await page.getByRole('button', { name: /No changes/ }).first().click();
   await expect(page.getByText('Trackable "Nutrition": Invalid record: color must be a string')).toBeVisible();
 });
@@ -207,6 +208,27 @@ test('each trackable leads with what matters for its kind, and the kind can be c
 
   await page.goto('/#/trackables');
   await expect(card('Wellness Check-in')).toContainText(/ago/);
+  expect(problems).toEqual([]);
+});
+
+test("going from one trackable's page straight to another's shows the second one", async ({ page }) => {
+  const problems = watchForProblems(page);
+  await mockSync(page, noServer);
+  await importSampleData(page);
+  await page.goto('/#/trackables');
+  await page.getByRole('link', { name: /Nutrition/ }).click();
+  await expect(page.getByRole('heading', { name: 'Nutrition', level: 1 })).toBeVisible();
+  const nutrition = new URL(page.url()).hash;
+  await page.goto('/#/trackables');
+  await page.getByRole('link', { name: /Body Measurements/ }).click();
+  await expect(page.getByRole('heading', { name: 'Body Measurements', level: 1 })).toBeVisible();
+
+  // Only the id in the address changes, as a link or Back would do.
+  await page.evaluate((hash) => (location.hash = hash), nutrition);
+  await expect(page.getByRole('heading', { name: 'Nutrition', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Body Measurements', level: 1 })).toHaveCount(0);
+  await page.goBack();
+  await expect(page.getByRole('heading', { name: 'Body Measurements', level: 1 })).toBeVisible();
   expect(problems).toEqual([]);
 });
 
