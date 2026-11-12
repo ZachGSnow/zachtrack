@@ -247,3 +247,27 @@ export function taskContext(task: Task, tasks: readonly Task[], projects: readon
   const section = project.sections.find((s) => s.id === task.sectionId);
   return section ? `${project.name} / ${section.name}` : project.name;
 }
+
+/** The quick date choices in a task's sheet and the reschedule sheet (3.64), from `today`. */
+export function dateChoices(today: string): Array<{ label: string; dueOn: string }> {
+  const add = (n: number) => {
+    const [y, m, d] = today.split('-').map(Number);
+    const t = new Date(Date.UTC(y, m - 1, d + n));
+    const pad = (x: number) => String(x).padStart(2, '0');
+    return `${t.getUTCFullYear()}-${pad(t.getUTCMonth() + 1)}-${pad(t.getUTCDate())}`;
+  };
+  const weekday = (new Date(dayStart(today)).getDay() + 6) % 7; // 0 = Monday
+  return [
+    { label: 'Today', dueOn: today },
+    { label: 'Tomorrow', dueOn: add(1) },
+    // Saturday, or today when it's already the weekend.
+    { label: 'This weekend', dueOn: weekday >= 5 ? today : add(5 - weekday) },
+    { label: 'Next week', dueOn: add(7 - weekday) },
+  ];
+}
+
+/** The web addresses in a task's notes, in order, without repeats, for links under the notes (3.64). */
+export function linksIn(notes: string): string[] {
+  const found = notes.match(/https?:\/\/[^\s<>"'`)\]]+/gi) ?? [];
+  return [...new Set(found.map((u) => u.replace(/[.,;:!?]+$/, '')))];
+}

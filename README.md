@@ -91,7 +91,13 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
   to calendar downloads them as an .ics file, with optional reminders.
 - **Tasks:** a to-do list with projects, sections (Now / Next / Later, or
   your own), tasks with subtasks at any depth, notes and due dates with an
-  optional time. Due dates can repeat: every few days, weekly on chosen
+  optional time, typed in plain words at the end of a task ("Pay bills fri",
+  "Change oil every 6 months") from a quick-add sheet you can open anywhere.
+  Tap a date to move it; move every overdue task to today in one tap. Drag
+  tasks, subtasks and sections into place; on a phone, swipe a task right to
+  complete it or left to move its date. Duplicate a task, or turn it into a
+  subtask and back. Due
+  dates can repeat: every few days, weekly on chosen
   days, monthly on a date or on the first/last weekday, yearly, or a set
   time after it's done. Completing a repeating task moves it to its next
   date and reopens its subtasks, with Undo, Skip and a history of when it

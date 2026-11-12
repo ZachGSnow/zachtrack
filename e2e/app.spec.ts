@@ -251,7 +251,7 @@ test('a goal shows progress and due dates, and a trackable without fields logs i
 test('the home-screen shortcuts are in the manifest, and Start fast starts the default method once', async ({ page, request }) => {
   const problems = watchForProblems(page);
   const manifest = await (await request.get('/manifest.webmanifest')).json();
-  expect(manifest.shortcuts.map((s: { url: string }) => s.url)).toEqual(['/?shortcut=log-weight#/', '/?shortcut=start-fast#/fasting', '/#/trackables', '/#/journey']);
+  expect(manifest.shortcuts.map((s: { url: string }) => s.url)).toEqual(['/?shortcut=log-weight#/', '/?shortcut=start-fast#/fasting', '/#/trackables', '/?shortcut=add-task#/tasks']);
 
   await mockSync(page, noServer);
   await waitForStarterSet(page);
@@ -1152,7 +1152,7 @@ test('on a laptop, single keys move between pages, W opens a weigh-in and ? list
   await page.keyboard.press('?');
   const sheet = page.getByRole('dialog');
   await expect(sheet.getByRole('heading', { name: 'Keyboard shortcuts' })).toBeVisible();
-  await expect(sheet.getByRole('list', { name: 'Keyboard shortcuts' }).getByRole('listitem')).toHaveCount(11);
+  await expect(sheet.getByRole('list', { name: 'Keyboard shortcuts' }).getByRole('listitem')).toHaveCount(12);
   await page.keyboard.press('Escape');
   await expect(sheet).toHaveCount(0);
 

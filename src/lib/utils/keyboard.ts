@@ -3,7 +3,7 @@
 // never while typing in a field or with Ctrl, Alt or Cmd held, so they can't
 // clash with the browser's own shortcuts. Pure; tests/keyboard.test.ts.
 
-export type ShortcutAction = { type: 'go'; href: string } | { type: 'log-weight' } | { type: 'help' };
+export type ShortcutAction = { type: 'go'; href: string } | { type: 'log-weight' } | { type: 'add-task' } | { type: 'help' };
 
 export interface Shortcut {
   key: string;
@@ -19,6 +19,7 @@ export const SHORTCUTS: Shortcut[] = [
   { key: 'l', label: 'Trackables list', action: { type: 'go', href: '/trackables' } },
   { key: 'd', label: 'Dates', action: { type: 'go', href: '/dates' } },
   { key: 'k', label: 'Tasks', action: { type: 'go', href: '/tasks' } },
+  { key: 'q', label: 'Add a task', action: { type: 'add-task' } },
   { key: 'i', label: 'Insights', action: { type: 'go', href: '/insights' } },
   { key: 's', label: 'Settings', action: { type: 'go', href: '/settings' } },
   { key: 'w', label: 'Log a weigh-in', action: { type: 'log-weight' } },

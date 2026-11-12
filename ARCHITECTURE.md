@@ -1281,9 +1281,9 @@ Trackables and Insights; five still fit a phone's tab bar.
 - **Order:** a new task's `sortOrder` is at least the clock
   (`nextSortOrder`), so tasks typed one after another, or added on two
   devices, keep the order they were added in even before the list has
-  caught up; Reorder renumbers a section from 0. Drag and drop was left
-  for the up and down buttons the Trackables list already uses, which work
-  the same with a finger and a mouse.
+  caught up; a drag renumbers the section it lands in from 0. Up and down
+  buttons came first here, as on the Trackables list; drag and drop
+  replaced them in v1.20.0 (3.65).
 
 `utils/tasks.ts` holds the grouping, due-date words ("Today", "Tomorrow",
 "Fri", "Nov 30", "Jan 5, 2027", with the time when set), subtask counts and
@@ -1370,6 +1370,67 @@ data > Import:
 Help gains a Tasks topic (projects, subtasks, how repeating tasks move on
 early and late, Upcoming and Today, task or goal, importing), linked from
 the Tasks page heading and from Repeat in a task's sheet.
+
+### 3.64 Adding and rescheduling faster (v1.20.0)
+
+- **Quick add** (`QuickAddSheet.svelte`, `stores/quickAdd.svelte.ts`,
+  mounted once in `App.svelte`): from Q on a laptop (into the project on
+  screen), "+ Task" on Tasks and Upcoming, "+ Add" on Today's Tasks block
+  (which now shows whenever there are open tasks, saying "Nothing due
+  today" when nothing is), and an "Add a task" home-screen shortcut, which
+  replaced Journey (fasting has lapsed; Android shows four). The sheet stays
+  open for the next task.
+- **Dates in plain words** (`utils/quickAdd.ts`): "Pay bills fri", "Call
+  the dentist tomorrow 9am", "Change oil every 6 months", "Gym every mon,
+  wed and fri", "Book club every first wed", "Haircut 5 weeks after done".
+  Only the end of the text is read, one phrase at a time (repeat, date,
+  time, in any order), so "Buy sun screen" or "Plan the may trip" keep their
+  names; text that is all date words stays the name. A repeat without a
+  date starts on its first date from today. A preview under the box says
+  what will be set, with a button to keep the words in the name instead.
+  The same reading applies to the add boxes in each section and to
+  subtasks. Written here rather than taken from a library: the few date
+  libraries that parse phrases are large, and the licence policy asks for a
+  check of every dependency.
+- **Rescheduling**: a task's date sits at the right of its row and opens a
+  sheet of quick dates (Today, Tomorrow, This weekend, Next week, No date)
+  or a date picker; the same quick dates sit under the date in the task's
+  sheet. "Move all overdue to today" on Today and on Upcoming's Overdue
+  group, with one Undo for all of them. A repeating task's rule follows a
+  moved date (3.61).
+- **Notes**: web addresses in a task's notes are listed under them as links
+  (`linksIn`); rows mark a task with notes with an icon.
+- **Completing** shows the tick for a moment before the task leaves the
+  list.
+
+### 3.65 Organizing: drag and drop, swipes, duplicating (v1.20.0)
+
+- **Drag and drop** (`actions/sortable.ts`, a Svelte action on a list):
+  tasks within and between sections of a project, subtasks in a task's
+  sheet, and sections in the project sheet. A drag starts only from a
+  row's handle, which has `touch-action: none`, so a finger drags it at
+  once on a phone while the rest of the row still scrolls, taps and swipes.
+  A floating copy follows the pointer and a line shows where it will land;
+  the page scrolls near the top and bottom edges; Escape cancels. Lists in
+  the same group take each other's items, and every section's list is
+  drawn even when empty so a task can be dropped into it. The handle takes
+  Arrow Up and Down for the keyboard. The order maths (`utils/reorder.ts`)
+  renumbers only the list the item lands in, writing only the records whose
+  order changed. Completed tasks sit in their own list below and don't
+  move. Written here rather than taken from a library, which would need a
+  licence check of everything it brings in; the project list keeps its up
+  and down buttons, since it is a grid on a laptop.
+- **Swipes** on a task row, on a touch screen only (`pointerType`
+  `touch`): right completes it (with the tick, 3.64), left opens its
+  reschedule sheet; past 80 px, with what letting go will do shown behind
+  the row. A mostly vertical move is left to the page as a scroll, and the
+  tap that ends a swipe is swallowed so the sheet doesn't open.
+- **Subtask of** in a task's sheet moves it under another open task in the
+  same project (or makes a subtask a task of its own, in the project and
+  section its top-level task is in, just below it), refusing its own
+  subtasks (`setTaskParent`). **Duplicate** copies a task and its subtasks,
+  open again, just below it, with its repeat rule but not its history
+  (`duplicateTask`), and opens the copy.
 
 ### 3.21 Trackables list: pin, archive, order; tag filters
 - **Sort** (per device, `zachtrack:trackables-view`): Due first (goal

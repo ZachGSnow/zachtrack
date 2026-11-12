@@ -214,13 +214,35 @@
       <p>A to-do list: things to finish, each with a checkbox, rather than things you log.</p>
       <ul>
         <li>
-          <strong>Projects and sections.</strong> Tasks > "+ New project" names it and starts it with a set of sections (Now /
+          <strong>Projects and sections.</strong> Tasks > "+ Project" names it and starts it with a set of sections (Now /
           Next / Later and so on) or none. Edit on a project renames, reorders, adds or removes sections; a removed section's
           tasks move to the top. Tap a section's name to fold it. Tasks without a project go to the Inbox.
         </li>
         <li>
           <strong>Adding.</strong> Type in "+ Add a task" at the end of a section and press Enter; type the next one straight
-          away. Reorder puts up and down arrows on each task.
+          away. Or add from anywhere: "+ Task" on Tasks and Upcoming, "+ Add" on Today, Q on a laptop, or "Add a task" from a
+          long press on the app's icon.
+        </li>
+        <li>
+          <strong>Dates in plain words.</strong> End a task with when it's due and the app sets it: "Pay bills fri", "Call the
+          dentist tomorrow 9am", "Taxes apr 15", "Check tires in 3 weeks". Repeats work the same way: "Water plants every 3
+          days", "Take the bins out every week on sun", "Pay rent every month on the 1st", "Book club every first wed", "Change
+          oil 6 months after done". The line under the box shows what will be set; "Keep ... in the name" ignores it.
+        </li>
+        <li>
+          <strong>Reordering.</strong> Drag a task by the dots at its left, within a section or into another; the same works
+          for subtasks in a task's sheet and for sections in Edit. On a laptop, focus the dots and use the arrow keys.
+        </li>
+        <li>
+          <strong>Swipes (phone).</strong> Swipe a task right to complete it, left to move its date.
+        </li>
+        <li>
+          <strong>Subtask of, Duplicate.</strong> In a task's sheet, "Subtask of" puts it under another task in the same project,
+          or makes a subtask a task of its own. Duplicate copies it with its subtasks, all open again.
+        </li>
+        <li>
+          <strong>Moving dates.</strong> Tap a task's date to move it to Today, Tomorrow, This weekend, Next week or another
+          day. "Move all overdue to today" on Today and Upcoming moves every late task at once, with Undo.
         </li>
         <li>
           <strong>A task's sheet.</strong> Tap a task to open it: its name, project and section, due date and time, notes and

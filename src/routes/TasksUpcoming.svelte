@@ -6,6 +6,8 @@
   import EmptyState from '../lib/components/ui/EmptyState.svelte';
   import TaskHost from '../lib/components/TaskHost.svelte';
   import TaskRow from '../lib/components/TaskRow.svelte';
+  import { quickAdd } from '../lib/stores/quickAdd.svelte';
+  import { taskUi } from '../lib/stores/taskUi.svelte';
 
   // Every open task with a due date, across projects, by when it's due
   // (ARCHITECTURE.md 3.62): Asana's My Tasks without the assignee.
@@ -19,7 +21,10 @@
 </script>
 
 <div class="mx-auto flex w-full flex-1 flex-col gap-4 px-5 py-6">
-  <h1 class="text-xl font-semibold text-text">Upcoming</h1>
+  <div class="flex items-center justify-between">
+    <h1 class="text-xl font-semibold text-text">Upcoming</h1>
+    <button class="rounded-full px-3 py-1.5 text-sm font-semibold bg-brand text-brand-fg" onclick={() => quickAdd.show()}>+ Task</button>
+  </div>
 
   {#if $projects === undefined || $tasks === undefined}
     <p class="text-sm text-text-muted">Loading&hellip;</p>
@@ -28,7 +33,13 @@
   {:else}
     {#each groups as g (g.key)}
       <section class="flex flex-col gap-1" aria-labelledby="upcoming-{g.key}">
-        <SectionHeading id="upcoming-{g.key}" title="{g.label} ({g.tasks.length})" tone={TONE[g.state]} />
+        <SectionHeading id="upcoming-{g.key}" title="{g.label} ({g.tasks.length})" tone={TONE[g.state]}>
+          {#snippet action()}
+            {#if g.key === 'overdue'}
+              <button type="button" class="text-xs font-semibold text-brand" onclick={() => taskUi.moveOverdue(g.tasks, today)}>Move all to today</button>
+            {/if}
+          {/snippet}
+        </SectionHeading>
         <ul class="flex flex-col">
           {#each g.tasks as t (t.id)}
             <TaskRow task={t} tasks={$tasks} {today} context={taskContext(t, $tasks, $projects)} />

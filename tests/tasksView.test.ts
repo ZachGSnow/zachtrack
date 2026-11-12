@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { Task, TaskProject } from '../src/lib/db';
 import {
+  dateChoices,
   dayKey,
   daysFrom,
   describeDue,
   dueTasks,
   groupBySection,
   INBOX_ID,
+  linksIn,
   nextSortOrder,
   orderProjects,
   parentChain,
@@ -187,5 +189,25 @@ describe('Upcoming and Today (3.62)', () => {
     expect(taskContext(all[1], all, projects)).toBe('Subtask of Garage');
     expect(taskContext(task(), all, projects)).toBe('Inbox');
     expect(taskContext(task({ projectId: 'p' }), all, projects)).toBe('Home');
+  });
+});
+
+describe('quick dates and links (3.64)', () => {
+  it('offers Today, Tomorrow, This weekend and Next week from any day', () => {
+    expect(dateChoices('2026-11-11').map((c) => [c.label, c.dueOn])).toEqual([
+      ['Today', '2026-11-11'],
+      ['Tomorrow', '2026-11-12'],
+      ['This weekend', '2026-11-14'],
+      ['Next week', '2026-11-16'],
+    ]);
+    // On a Sunday the weekend is today, and next week starts tomorrow.
+    expect(dateChoices('2026-11-15').slice(2).map((c) => c.dueOn)).toEqual(['2026-11-15', '2026-11-16']);
+    // Across a month and year end.
+    expect(dateChoices('2026-12-31').map((c) => c.dueOn)).toEqual(['2026-12-31', '2027-01-01', '2027-01-02', '2027-01-04']);
+  });
+
+  it('finds the web addresses in notes, once each, without trailing punctuation', () => {
+    expect(linksIn('See https://example.com/a?b=1. Or (http://example.org/x) and https://example.com/a?b=1')).toEqual(['https://example.com/a?b=1', 'http://example.org/x']);
+    expect(linksIn('Amazon search: "shelf liner 48 x 24"')).toEqual([]);
   });
 });

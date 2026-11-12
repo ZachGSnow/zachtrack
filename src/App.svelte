@@ -21,6 +21,8 @@
   import { starterStore } from './lib/stores/starter.svelte';
   import { visitStore } from './lib/stores/visit.svelte';
   import ZoneInfoSheet from './lib/components/ZoneInfoSheet.svelte';
+  import QuickAddSheet from './lib/components/QuickAddSheet.svelte';
+  import { quickAdd } from './lib/stores/quickAdd.svelte';
   import SyncStatus from './lib/components/SyncStatus.svelte';
 
   const routes = {
@@ -64,6 +66,12 @@
     })();
   });
 
+  /** On a project's page, Q adds to that project. */
+  function projectFromRoute(): string | undefined {
+    const m = window.location.hash.match(/^#\/tasks\/([^/?]+)$/);
+    return m && m[1] !== 'upcoming' && m[1] !== 'inbox' ? m[1] : undefined;
+  }
+
   // Keyboard shortcuts on a laptop (utils/keyboard.ts): a key to each page, W for a weigh-in, ? for the list.
   let shortcutsOpen = $state(false);
   async function onKey(e: KeyboardEvent) {
@@ -73,6 +81,7 @@
     e.preventDefault();
     if (action.type === 'go') push(action.href);
     else if (action.type === 'help') shortcutsOpen = !shortcutsOpen;
+    else if (action.type === 'add-task') quickAdd.show(projectFromRoute());
     else {
       const holder = await weighInTrackable(settingsStore.data);
       if (!holder) return;
@@ -116,6 +125,7 @@
 </div>
 
 <ZoneInfoSheet />
+<QuickAddSheet />
 
 <BottomSheet bind:open={shortcutsOpen}>
   <div class="space-y-3">

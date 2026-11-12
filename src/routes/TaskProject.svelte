@@ -5,9 +5,12 @@
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import Pencil from '@lucide/svelte/icons/pencil';
-  import { createTask, db, updateTask, updateTaskProject, type Task } from '../lib/db';
+  import { createTask, db, updateTask, updateTaskProject } from '../lib/db';
   import { dayKey, groupBySection, INBOX_ID, nextSortOrder, topLevelTasks, type SectionGroup } from '../lib/utils/tasks';
-  import { moveInOrder } from '../lib/utils/trackableList';
+  import { moveTo, renumber } from '../lib/utils/reorder';
+  import { sortable, type DropEvent } from '../lib/actions/sortable';
+  import { describeQuickAdd, parseQuickAdd } from '../lib/utils/quickAdd';
+  import { describeDue } from '../lib/utils/tasks';
   import { loadPrefs, savePrefs } from '../lib/utils/prefs';
   import BottomSheet from '../lib/components/BottomSheet.svelte';
   import ProjectSheet from '../lib/components/ProjectSheet.svelte';
@@ -15,7 +18,8 @@
   import TaskRow from '../lib/components/TaskRow.svelte';
 
   // One project (or the inbox): its tasks by section, a box to add a task to
-  // each section, completed tasks on request, and reordering (3.60).
+  // each section, completed tasks on request, and drag and drop within and
+  // between sections (3.60, 3.65).
   let { params }: { params: { id: string } } = $props();
 
   const projects = liveQuery(() => db.taskProjects.toArray());
@@ -42,11 +46,15 @@
     collapsed = collapsed.includes(k) ? collapsed.filter((x) => x !== k) : [...collapsed, k];
   }
 
-  let reordering = $state(false);
   let editOpen = $state(false);
 
   // The text in each section's add box, by section key.
   let drafts = $state<Record<string, string>>({});
+
+  /** What a typed date in an add box will set, shown under it. */
+  function draftPreview(text: string | undefined): string {
+    return text?.trim() ? describeQuickAdd(parseQuickAdd(text, today), (d, t) => describeDue(d, t, today).text) : '';
+  }
 
   async function add(g: SectionGroup) {
     const k = keyOf(g);
@@ -54,19 +62,34 @@
     if (!name) return;
     // Cleared first, so typing the next one straight away starts empty.
     drafts = { ...drafts, [k]: '' };
+    // A date typed at the end sets the due date and repeat (3.64).
+    const q = parseQuickAdd(name, today);
     await createTask({
-      name,
+      name: q.name,
+      ...(q.dueOn ? { dueOn: q.dueOn } : {}),
+      ...(q.dueTime ? { dueTime: q.dueTime } : {}),
+      ...(q.repeat ? { repeat: q.repeat } : {}),
       ...(project ? { projectId: project.id } : {}),
       ...(g.section ? { sectionId: g.section.id } : {}),
       sortOrder: nextSortOrder([...g.open, ...g.done]),
     });
   }
 
-  async function move(g: SectionGroup, t: Task, direction: -1 | 1) {
-    const current = new Map(g.open.map((x) => [x.id, x.sortOrder]));
-    for (const change of moveInOrder(g.open.map((x) => x.id), t.id, direction, current)) {
-      await updateTask(change.id, { sortOrder: change.sortOrder });
-    }
+  /** A task dropped at `index` in a section's open tasks, maybe from another section. */
+  async function drop(e: DropEvent) {
+    const target = groups.find((g) => keyOf(g) === e.to);
+    if (!target) return;
+    const order = moveTo(target.open.map((t) => t.id), e.id, e.index);
+    const changes = renumber(order, new Map(target.open.map((t) => [t.id, t.sortOrder])));
+    const moved = e.from !== e.to;
+    for (const c of changes) await updateTask(c.id, { sortOrder: c.sortOrder, ...(c.id === e.id && moved ? { sectionId: target.section?.id } : {}) });
+  }
+
+  /** Arrow Up / Down on a task's handle: one place within its section. */
+  function keyMove(g: SectionGroup, id: string, direction: -1 | 1) {
+    const at = g.open.findIndex((t) => t.id === id);
+    if (at < 0 || at + direction < 0 || at + direction >= g.open.length) return;
+    void drop({ id, from: keyOf(g), to: keyOf(g), index: at + direction });
   }
 </script>
 
@@ -104,9 +127,6 @@
     {/if}
 
     <div class="flex items-center gap-4">
-      {#if openCount > 1}
-        <button class="text-sm text-text-muted" onclick={() => (reordering = !reordering)}>{reordering ? 'Done' : 'Reorder'}</button>
-      {/if}
       {#if doneCount > 0}
         <button class="text-sm text-text-muted" onclick={() => (showDone = !showDone)} aria-pressed={showDone}>{showDone ? 'Hide' : 'Show'} completed ({doneCount})</button>
       {/if}
@@ -124,19 +144,23 @@
           </button>
         {/if}
         {#if !folded}
-          {#if g.open.length > 0 || (showDone && g.done.length > 0)}
-            <ul class="flex flex-col">
-              {#each g.open as t (t.id)}
-                <TaskRow task={t} tasks={$tasks} {today} onMove={reordering ? (d) => move(g, t, d) : undefined} />
+          <!-- Always there, even empty, so a task can be dropped into an empty section. -->
+          <ul
+            class="flex min-h-2 flex-col"
+            use:sortable={{ group: `tasks:${params.id}`, zone: k, onDrop: drop, onKeyMove: (id, d) => keyMove(g, id, d) }}
+          >
+            {#each g.open as t (t.id)}
+              <TaskRow task={t} tasks={$tasks} {today} draggable />
+            {/each}
+          </ul>
+          {#if showDone && g.done.length > 0}
+            <ul class="flex flex-col" aria-label="Completed in {g.section?.name ?? 'this project'}">
+              {#each g.done as t (t.id)}
+                <TaskRow task={t} tasks={$tasks} {today} />
               {/each}
-              {#if showDone}
-                {#each g.done as t (t.id)}
-                  <TaskRow task={t} tasks={$tasks} {today} />
-                {/each}
-              {/if}
             </ul>
           {/if}
-          {#if !reordering}
+          {#if true}
             <form
               class="pl-11"
               onsubmit={(e) => {
@@ -151,6 +175,9 @@
                 aria-label="Add a task{g.section ? ` to ${g.section.name}` : ''}"
                 class="w-full rounded-lg border border-transparent bg-transparent px-2 py-1.5 text-sm text-text placeholder:text-text-muted focus:border-border"
               />
+              {#if draftPreview(drafts[k])}
+                <p class="px-2 text-xs text-brand">{draftPreview(drafts[k])}</p>
+              {/if}
             </form>
           {/if}
         {/if}

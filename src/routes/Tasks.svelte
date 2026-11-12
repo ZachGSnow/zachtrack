@@ -14,9 +14,12 @@
   import EmptyState from '../lib/components/ui/EmptyState.svelte';
   import Button from '../lib/components/ui/Button.svelte';
   import HelpLink from '../lib/components/HelpLink.svelte';
+  import { onMount } from 'svelte';
+  import { takeShortcut } from '../lib/utils/shortcuts';
+  import { quickAdd } from '../lib/stores/quickAdd.svelte';
 
   // The Tasks tab (ARCHITECTURE.md 3.60): every project with its open tasks
-  // and what's due, the inbox of tasks without a project, and + New project.
+  // and what's due, the inbox of tasks without a project, + Project and + Task.
   const projects = liveQuery(() => db.taskProjects.toArray());
   const tasks = liveQuery(() => db.tasks.toArray());
 
@@ -27,6 +30,11 @@
   let reordering = $state(false);
 
   let sheetOpen = $state(false);
+
+  // The home-screen shortcut "Add a task" opens here with the sheet up.
+  onMount(() => {
+    if (takeShortcut('add-task')) quickAdd.show();
+  });
 
   async function move(p: TaskProject, direction: -1 | 1) {
     const list = ordered.active;
@@ -57,7 +65,10 @@
 <div class="mx-auto flex w-full flex-1 flex-col gap-3 px-5 py-6">
   <div class="flex items-center justify-between">
     <h1 class="flex items-center gap-2 text-xl font-semibold text-text">Tasks <HelpLink topic="tasks" label="tasks" /></h1>
-    <button class="rounded-full px-3 py-1.5 text-sm font-semibold bg-brand text-brand-fg" onclick={() => (sheetOpen = true)}>+ New project</button>
+    <div class="flex items-center gap-2">
+      <button class="rounded-full border border-border px-3 py-1.5 text-sm font-semibold text-text" onclick={() => (sheetOpen = true)}>+ Project</button>
+      <button class="rounded-full px-3 py-1.5 text-sm font-semibold bg-brand text-brand-fg" onclick={() => quickAdd.show()}>+ Task</button>
+    </div>
   </div>
 
   {#if $projects === undefined || $tasks === undefined}
