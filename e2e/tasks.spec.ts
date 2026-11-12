@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { mockSync, noServer, watchForProblems } from './helpers';
+import { mockSync, noServer, openSettings, watchForProblems } from './helpers';
 
 // The Tasks tab (ARCHITECTURE.md 3.60): a project with sections, tasks added
 // in each section, a task's sheet with a due date and subtasks, completing
@@ -194,5 +194,56 @@ test('a repeating task moves to its next date when done, with Undo, Skip and its
   // Clearing the due date clears the repeat too.
   await sheet.getByRole('button', { name: 'Clear due date' }).click();
   await expect(sheet.getByText('Set a due date to make it repeat.')).toBeVisible();
+  expect(problems).toEqual([]);
+});
+
+test('tasks come in from an export file, with a repeating task and its history, and importing again adds nothing', async ({ page }) => {
+  const problems = watchForProblems(page);
+  const T = Date.UTC(2026, 9, 1);
+  const file = {
+    format: 'zachtrack-export',
+    version: 1,
+    exportedAt: new Date(T).toISOString(),
+    data: {
+      fasts: [],
+      fieldDefinitions: [],
+      trackableDefinitions: [],
+      trackableEntries: [],
+      taskProjects: [
+        { id: 'p-routines', name: 'Routines', icon: 'R', color: '#a855f7', sections: [{ id: 's-seasonal', name: 'Seasonal' }], createdAt: T, updatedAt: T },
+      ],
+      tasks: [
+        { id: 't-filter', name: 'Swap the furnace filter', projectId: 'p-routines', sectionId: 's-seasonal', dueOn: '2030-03-01', repeat: { type: 'months', every: 3, day: 1 }, sortOrder: 0, createdAt: T, updatedAt: T },
+        { id: 't-buy', name: 'Buy filters', parentId: 't-filter', sortOrder: 0, createdAt: T, updatedAt: T },
+      ],
+      taskCompletions: [{ id: 'c-1', taskId: 't-filter', completedAt: T, dueOn: '2029-12-01', nextDueOn: '2030-03-01', createdAt: T, updatedAt: T }],
+      settings: null,
+    },
+  };
+  const choose = () =>
+    page.locator('input[type=file][accept*=json]').setInputFiles({ name: 'tasks.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(file)) });
+
+  await page.goto('/#/');
+  await openSettings(page);
+  await choose();
+  await expect(page.getByText(/4 new records to add/)).toBeVisible();
+  await page.getByRole('button', { name: 'Import', exact: true }).click();
+  await expect(page.getByText(/^Imported: 4 added/)).toBeVisible();
+
+  await page.goto('/#/tasks');
+  await page.getByRole('link', { name: /Routines/ }).click();
+  const row = page.getByRole('region', { name: 'Seasonal' }).getByRole('listitem');
+  await expect(row).toContainText('0/1 subtasks');
+  await row.getByRole('button', { name: /Swap the furnace filter/ }).click();
+  const sheet = page.getByRole('dialog');
+  await expect(sheet.getByText('Every 3 months on the 1st.', { exact: false })).toBeVisible();
+  await expect(sheet.getByText(/Done 1 time/)).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  // The same file again: everything is already here.
+  await openSettings(page);
+  await choose();
+  await expect(page.getByText('4 records already here with the same or a newer version, left alone')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Nothing to import' })).toBeDisabled();
   expect(problems).toEqual([]);
 });

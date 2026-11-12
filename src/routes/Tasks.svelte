@@ -13,6 +13,7 @@
   import ProjectSheet from '../lib/components/ProjectSheet.svelte';
   import EmptyState from '../lib/components/ui/EmptyState.svelte';
   import Button from '../lib/components/ui/Button.svelte';
+  import HelpLink from '../lib/components/HelpLink.svelte';
 
   // The Tasks tab (ARCHITECTURE.md 3.60): every project with its open tasks
   // and what's due, the inbox of tasks without a project, and + New project.
@@ -55,7 +56,7 @@
 
 <div class="mx-auto flex w-full flex-1 flex-col gap-3 px-5 py-6">
   <div class="flex items-center justify-between">
-    <h1 class="text-xl font-semibold text-text">Tasks</h1>
+    <h1 class="flex items-center gap-2 text-xl font-semibold text-text">Tasks <HelpLink topic="tasks" label="tasks" /></h1>
     <button class="rounded-full px-3 py-1.5 text-sm font-semibold bg-brand text-brand-fg" onclick={() => (sheetOpen = true)}>+ New project</button>
   </div>
 

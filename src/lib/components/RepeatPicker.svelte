@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { TaskRepeat } from '../db';
   import { describeRepeat, repeatFor, WEEKDAY_SHORT, type RepeatKind } from '../utils/taskRepeat';
+  import HelpLink from './HelpLink.svelte';
 
   // How a task's due date repeats (3.61). Each change saves straight away
   // through `onchange`; undefined means it doesn't repeat.
@@ -59,7 +60,7 @@
 
 <div class="space-y-2">
   <label class="block text-sm">
-    <span class="mb-1 block text-text-muted">Repeat</span>
+    <span class="mb-1 flex items-center gap-1.5 text-text-muted">Repeat <HelpLink topic="tasks" label="repeating tasks" /></span>
     <select class="{inputClass} w-full" value={repeat?.type ?? ''} onchange={(e) => setKind(e.currentTarget.value as RepeatKind | '')}>
       {#each KINDS as k (k.id)}
         <option value={k.id}>{k.label}</option>
