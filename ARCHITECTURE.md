@@ -1541,6 +1541,33 @@ send and fail too.
   first page's cursor). They apply as no change; only the history's
   received count is larger.
 
+### 3.70 Deleted rows go after 180 days (v1.21.0)
+
+A delete leaves a row on the server so other devices learn of it (3.6),
+scrubbed of its content but keeping its dates, and for a trackable, field
+or project its name. Until now those rows stayed forever, in D1 and in
+every nightly backup. Now they go 180 days after the delete:
+
+- **The purge** runs from a sync, at most once a day (`purgeState.lastPurgeAt`,
+  migration `0011_purge_old_deletes.sql`), in the same batch as the
+  activity log's own clean-up, so it costs no extra subrequest. It first
+  moves `purgedThroughSeq` past the newest `serverSeq` among the rows it is
+  about to remove (one `MAX` over a subquery per table: D1 limits how many
+  SELECTs a UNION may join), then removes them. Backups lose them as the
+  older backup files expire (30 days, 3.12).
+- **A device away longer than that** may still hold records deleted
+  elsewhere while it was gone. The server no longer has those deletes to
+  send it, and the device would push the records back as new. So a sync
+  whose cursor is below `purgedThroughSeq` (and above 0) gets a 409 with
+  `stale: true` and writes nothing. The app then keeps the changes it
+  hasn't sent yet (and its own pending deletes), clears everything else
+  (`keepUnsyncedAndReset`), notes "Reloaded from the server" in this
+  device's history and syncs again from cursor 0, receiving the server's
+  copy. A device that syncs at least every few months never sees this.
+- A cursor of 0 (a new device, Full resync) passes: such a device either
+  has nothing yet or asked to start over, and Full resync is the repair for
+  a device that already synced recently.
+
 ### 3.21 Trackables list: pin, archive, order; tag filters
 - **Sort** (per device, `zachtrack:trackables-view`): Due first (goal
   urgency from 3.18: overdue, then due, then the rest, then trackables

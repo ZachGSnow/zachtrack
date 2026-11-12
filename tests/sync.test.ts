@@ -594,3 +594,42 @@ describe('sync in parts (v1.21.0)', () => {
     expect(all.size).toBe(1300);
   });
 });
+
+describe('deleted rows are kept 180 days (v1.21.0)', () => {
+  const DAY = 86_400_000;
+  /** A sync as of `when`, with a token signed for then. */
+  async function syncAt(when: number, body: unknown) {
+    const jwt = await signer.sign(ownerClaims(when));
+    const res = await handleSync(request(body, jwt), env(), { now: () => when, fetchKeys: async () => signer.jwks });
+    return { status: res.status, body: (await res.json()) as any };
+  }
+
+  it('removes deletes older than 180 days once a day, keeps newer ones, and sends a device that missed them to reload', async () => {
+    const first = await syncAt(NOW, syncBody(0, { trackableEntries: [entry('e-old', 5, 1), entry('e-new', 5, 2), entry('e-live', 5, 3)] }));
+    const oldDevice = first.body.cursor; // a device that pulled now, then went away
+    await syncAt(NOW, syncBody(0, {}, [
+      { recordType: 'trackableEntries', uuid: 'e-old', deletedAt: NOW - 200 * DAY },
+      { recordType: 'trackableEntries', uuid: 'e-new', deletedAt: NOW - 10 * DAY },
+    ]));
+    // The same day: the purge already ran with the first sync, so nothing goes yet.
+    expect(await db.prepare('SELECT COUNT(*) AS n FROM trackableEntries').first('n')).toBe(3);
+
+    // Two days later the daily purge runs.
+    const later = NOW + 2 * DAY;
+    await syncAt(later, syncBody(0));
+    const ids = (await db.prepare('SELECT id FROM trackableEntries ORDER BY id').all<{ id: string }>()).results.map((r) => r.id);
+    expect(ids).toEqual(['e-live', 'e-new']);
+    const purge = await db.prepare('SELECT purgedThroughSeq, lastPurgeAt FROM purgeState').first<{ purgedThroughSeq: number; lastPurgeAt: number }>();
+    expect(purge!.lastPurgeAt).toBe(later);
+    expect(purge!.purgedThroughSeq).toBeGreaterThan(oldDevice);
+
+    // The device that pulled before that delete can't learn of it any more: it reloads.
+    const stale = await syncAt(later, syncBody(oldDevice, { trackableEntries: [entry('e-old', 5, 1)] }));
+    expect(stale.status).toBe(409);
+    expect(stale.body.stale).toBe(true);
+    expect(await db.prepare("SELECT COUNT(*) AS n FROM trackableEntries WHERE id = 'e-old'").first('n')).toBe(0);
+    // One that saw it, or one starting over, syncs as usual.
+    expect((await syncAt(later, syncBody(purge!.purgedThroughSeq))).status).toBe(200);
+    expect((await syncAt(later, syncBody(0))).status).toBe(200);
+  });
+});

@@ -9,6 +9,7 @@ import {
   getChangedSyncableRecords,
   getPendingTombstones,
   getSyncMeta,
+  keepUnsyncedAndReset,
   onLocalMutation,
   prunePendingTombstones,
   setSyncMeta,
@@ -67,6 +68,14 @@ class UnauthenticatedError extends Error {
   constructor() {
     super('Login session expired -- log in again to resume syncing.');
     this.name = 'UnauthenticatedError';
+  }
+}
+
+/** The server no longer keeps deletes this device missed (3.70): reload from it. */
+class StaleDeviceError extends Error {
+  constructor() {
+    super('This device was away so long that it reloads from the server.');
+    this.name = 'StaleDeviceError';
   }
 }
 
@@ -710,7 +719,18 @@ class SyncStore {
   /** Runs a sync cycle now. Safe to call concurrently -- callers share the in-flight request. */
   async syncNow(): Promise<void> {
     if (this.inFlight) return this.inFlight;
-    const run = this.doSync();
+    const run = this.doSync().catch(async (err) => {
+      // Away too long (3.70): keep what this device hasn't sent, reload the rest, and sync again once.
+      if (!(err instanceof StaleDeviceError)) throw err;
+      const kept = await keepUnsyncedAndReset();
+      await this.pushHistory({
+        completedAt: Date.now(),
+        outcome: 'success',
+        summary: `Reloaded from the server: this device was away longer than deletes are kept${kept ? ` (kept ${kept} change${kept === 1 ? '' : 's'} not yet sent)` : ''}`,
+        rejectedCount: 0,
+      });
+      await this.doSync();
+    });
     this.inFlight = run.finally(() => {
       this.inFlight = undefined;
     });
@@ -734,6 +754,10 @@ class SyncStore {
     });
     if (response.type === 'opaqueredirect' || response.status === 401) throw new UnauthenticatedError();
     if (response.status === 404 || response.status === 405) throw new NoBackendError();
+    if (response.status === 409) {
+      const err = (await response.json().catch(() => ({}))) as { stale?: boolean };
+      if (err.stale) throw new StaleDeviceError();
+    }
     if (!response.ok) {
       let detail = '';
       try {
@@ -880,6 +904,8 @@ class SyncStore {
       this.syncedListeners = [];
       for (const listener of listeners) listener();
     } catch (err) {
+      // Handled by syncNow: reload and sync again, not a failure.
+      if (err instanceof StaleDeviceError) throw err;
       if (err instanceof NoBackendError) {
         // Not a failure: this install simply has no sync server (local-only
         // use, `npm run dev`). Record it once, not on every edit.
