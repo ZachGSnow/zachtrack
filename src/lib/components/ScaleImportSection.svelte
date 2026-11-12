@@ -1,6 +1,6 @@
 <script lang="ts">
   import { liveQuery } from 'dexie';
-  import { addTrackableEntry, db } from '../db';
+  import { addTrackableEntries, db } from '../db';
   import { settingsStore } from '../stores/settings.svelte';
   import { resolveBodyFieldIds } from '../utils/health';
   import { newWeighIns, parseScaleCsv, type ScaleRow, type WeightUnit } from '../utils/scaleImport';
@@ -56,9 +56,9 @@
     if (!preview || !weightField || !holder) return;
     busy = true;
     try {
-      for (const r of preview.add) {
-        await addTrackableEntry({ trackableId: holder.id, timestamp: r.timestamp, values: { [weightField.id]: r.value } });
-      }
+      // One write and one change notice for the whole file.
+      const fieldId = weightField.id;
+      await addTrackableEntries(preview.add.map((r) => ({ trackableId: holder.id, timestamp: r.timestamp, values: { [fieldId]: r.value } })));
       message = `Imported ${preview.add.length} ${preview.add.length === 1 ? 'weigh-in' : 'weigh-ins'} into ${holder.name}.`;
       preview = null;
       if (fileInput) fileInput.value = '';

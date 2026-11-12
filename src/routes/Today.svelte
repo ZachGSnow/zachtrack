@@ -29,6 +29,7 @@
   import SectionHeading from '../lib/components/ui/SectionHeading.svelte';
   import EmptyState from '../lib/components/ui/EmptyState.svelte';
   import TaskHost from '../lib/components/TaskHost.svelte';
+  import { clock } from '../lib/stores/clock.svelte';
   import TaskRow from '../lib/components/TaskRow.svelte';
   import { quickAdd } from '../lib/stores/quickAdd.svelte';
   import { taskUi } from '../lib/stores/taskUi.svelte';
@@ -45,12 +46,10 @@
   const allTasks = liveQuery(() => db.tasks.toArray());
   const taskProjects = liveQuery(() => db.taskProjects.toArray());
 
-  // "2h ago", due states and the fast move with the clock.
-  let now = $state(Date.now());
-  $effect(() => {
-    const timer = setInterval(() => (now = Date.now()), 60_000);
-    return () => clearInterval(timer);
-  });
+  // "2h ago", due states and the fast move with the shared clock (stores/clock.svelte.ts);
+  // what depends on the day alone follows `day`, which changes at midnight (3.68).
+  const now = $derived(clock.now);
+  const day = $derived(clock.day);
 
   const habits = $derived(todayHabits($trackables ?? [], $allFields ?? [], $allEntries ?? [], now));
   const todayKey = $derived(dayKey(now));
@@ -60,7 +59,7 @@
   );
   const overdueCount = $derived(tasksDue.filter((t) => t.dueOn! < todayKey).length);
   const logs = $derived(todayLogs($trackables ?? [], $allFields ?? [], $allEntries ?? [], now, undefined, measurementView.view));
-  const dates = $derived(todayDates($trackables ?? [], $allEntries ?? [], now));
+  const dates = $derived(todayDates($trackables ?? [], $allEntries ?? [], day));
   const hasDates = $derived(($trackables ?? []).some((t) => !t.archived && t.displayMode === 'ages'));
   const groups = $derived(groupByTimeOfDay(habits, now));
 
@@ -85,7 +84,7 @@
       $allEntries ?? [],
       $recentFasts ?? [],
       resolveBodyFieldIds($allFields ?? [], settingsStore.data).weight,
-      now,
+      day,
     ),
   );
   // Since you were last here (utils/sinceLastVisit.ts): needs the sync log from the gap.
@@ -122,7 +121,8 @@
   // Goal suggestions (utils/today.ts): "Not now" hides one on this device for 30 days.
   const SNOOZE_KEY = 'goal-suggestions';
   let snoozed = $state<Record<string, number>>(loadPrefs<Record<string, number>>(SNOOZE_KEY, {}));
-  const suggestions = $derived(suggestGoals($trackables ?? [], $allEntries ?? [], now).filter((s) => !(snoozed[s.trackable.id] > now)));
+  // The end of today, so today's own logging counts.
+  const suggestions = $derived(suggestGoals($trackables ?? [], $allEntries ?? [], addDays(day, 1) - 1).filter((s) => !(snoozed[s.trackable.id] > day)));
   function snooze(id: string) {
     snoozed = { ...snoozed, [id]: Date.now() + 30 * 24 * 3600_000 };
     savePrefs(SNOOZE_KEY, snoozed);

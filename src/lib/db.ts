@@ -490,6 +490,22 @@ export class ZachTrackDB extends Dexie {
       .upgrade(async (tx) => {
         await tx.table<SyncMeta>('syncMeta').update('sync', { cursor: 0 });
       });
+    // v8: an `updatedAt` index on every synced table, so a sync finds what
+    // changed since the last one without reading every record (ARCHITECTURE.md
+    // 3.68). Dexie builds the indexes; no data changes.
+    this.version(8).stores({
+      fasts: '++id, startTime, endTime, startDay, uuid, updatedAt',
+      settings: 'id',
+      fieldDefinitions: 'id, name, updatedAt',
+      trackableDefinitions: 'id, name, updatedAt',
+      trackableEntries: 'id, trackableId, timestamp, updatedAt',
+      syncTombstones: '++id, recordType, uuid, deletedAt',
+      syncMeta: 'id',
+      syncLog: '++id, completedAt',
+      taskProjects: 'id, updatedAt',
+      tasks: 'id, projectId, parentId, updatedAt',
+      taskCompletions: 'id, taskId, updatedAt',
+    });
   }
 }
 
@@ -690,6 +706,16 @@ export async function addTrackableEntry(
   await db.trackableEntries.add(entry);
   notifyMutation();
   return entry;
+}
+
+/** Adds many entries in one write and one change notice (an import, the holiday pack), instead of one sync check each. */
+export async function addTrackableEntries(inputs: Array<Omit<TrackableEntry, 'id' | 'createdAt' | 'updatedAt'>>): Promise<TrackableEntry[]> {
+  if (inputs.length === 0) return [];
+  const now = Date.now();
+  const entries = inputs.map((input) => ({ ...input, id: uuid(), createdAt: now, updatedAt: now }) as TrackableEntry);
+  await db.trackableEntries.bulkAdd(entries);
+  notifyMutation();
+  return entries;
 }
 
 export async function updateTrackableEntry(id: string, patch: Partial<TrackableEntry>): Promise<void> {
@@ -1003,6 +1029,14 @@ export async function getAllSyncableRecords(): Promise<SyncableRecords> {
   return { fasts, fieldDefinitions, trackableDefinitions, trackableEntries, taskProjects, tasks, taskCompletions, settings };
 }
 
+/** What a synced table offers through its indexes (v8), whatever its record type. */
+interface IndexedTable {
+  where(index: string): {
+    aboveOrEqual(value: number): { toArray(): Promise<unknown[]>; count(): Promise<number> };
+    anyOf(keys: string[]): { toArray(): Promise<unknown[]> };
+  };
+}
+
 /**
  * The records a sync sends when it isn't a full send: everything changed at or
  * after `since` (SyncMeta.sentThrough), plus any the server refused last time.
@@ -1012,19 +1046,27 @@ export async function getChangedSyncableRecords(
   since: number,
   retry: SyncRetryKey[] = [],
 ): Promise<Omit<SyncableRecords, 'settings'> & { settings: SettingsRecord | null }> {
-  const again = new Set(retry.map((r) => `${r.recordType}:${r.uuid}`));
-  const changed = (type: SyncRecordType, key: string, updatedAt: number) => updatedAt >= since || again.has(`${type}:${key}`);
+  const again = (type: SyncRecordType) => retry.filter((r) => r.recordType === type).map((r) => r.uuid);
+  // Through the updatedAt index (v8), then the refused ones by their keys.
+  async function changedIn<T>(table: IndexedTable, type: SyncRecordType, key: 'id' | 'uuid'): Promise<T[]> {
+    const recent = (await table.where('updatedAt').aboveOrEqual(since).toArray()) as T[];
+    const keys = again(type);
+    if (keys.length === 0) return recent;
+    const seen = new Set(recent.map((r) => (r as Record<string, unknown>)[key]));
+    const retried = (await table.where(key).anyOf(keys).toArray()) as T[];
+    return [...recent, ...retried.filter((r) => !seen.has((r as Record<string, unknown>)[key]))];
+  }
   const [fasts, fieldDefinitions, trackableDefinitions, trackableEntries, taskProjects, tasks, taskCompletions, settings] = await Promise.all([
-    db.fasts.filter((f) => changed('fasts', f.uuid, f.updatedAt)).toArray(),
-    db.fieldDefinitions.filter((f) => changed('fieldDefinitions', f.id, f.updatedAt)).toArray(),
-    db.trackableDefinitions.filter((t) => changed('trackableDefinitions', t.id, t.updatedAt)).toArray(),
-    db.trackableEntries.filter((e) => changed('trackableEntries', e.id, e.updatedAt)).toArray(),
-    db.taskProjects.filter((p) => changed('taskProjects', p.id, p.updatedAt)).toArray(),
-    db.tasks.filter((t) => changed('tasks', t.id, t.updatedAt)).toArray(),
-    db.taskCompletions.filter((c) => changed('taskCompletions', c.id, c.updatedAt)).toArray(),
+    changedIn<FastRecord>(db.fasts, 'fasts', 'uuid'),
+    changedIn<FieldDefinition>(db.fieldDefinitions, 'fieldDefinitions', 'id'),
+    changedIn<TrackableDefinition>(db.trackableDefinitions, 'trackableDefinitions', 'id'),
+    changedIn<TrackableEntry>(db.trackableEntries, 'trackableEntries', 'id'),
+    changedIn<TaskProject>(db.taskProjects, 'taskProjects', 'id'),
+    changedIn<Task>(db.tasks, 'tasks', 'id'),
+    changedIn<TaskCompletion>(db.taskCompletions, 'taskCompletions', 'id'),
     getSettings(),
   ]);
-  const settingsChanged = settings.updatedAt >= since || again.has(`settings:${settings.id}`);
+  const settingsChanged = settings.updatedAt >= since || retry.some((r) => r.recordType === 'settings' && r.uuid === settings.id);
   return {
     fasts,
     fieldDefinitions,
@@ -1042,18 +1084,12 @@ export async function countWaitingChanges(): Promise<number> {
   const meta = await getSyncMeta();
   const tombstones = await db.syncTombstones.count();
   if (meta.sentThrough == null) return tombstones; // never synced: nothing to compare against
-  const changes = await getChangedSyncableRecords(meta.sentThrough);
-  return (
-    tombstones +
-    changes.fasts.length +
-    changes.fieldDefinitions.length +
-    changes.trackableDefinitions.length +
-    changes.trackableEntries.length +
-    changes.taskProjects.length +
-    changes.tasks.length +
-    changes.taskCompletions.length +
-    (changes.settings ? 1 : 0)
-  );
+  const since = meta.sentThrough;
+  // Counted through the updatedAt index (v8): no record is read.
+  const tables: IndexedTable[] = [db.fasts, db.fieldDefinitions, db.trackableDefinitions, db.trackableEntries, db.taskProjects, db.tasks, db.taskCompletions];
+  const counts = await Promise.all(tables.map((t) => t.where('updatedAt').aboveOrEqual(since).count()));
+  const settings = await getSettings();
+  return tombstones + counts.reduce((a, b) => a + b, 0) + (settings.updatedAt >= since ? 1 : 0);
 }
 
 /** Live records per type on this device, for Check sync and the erase confirmation. */

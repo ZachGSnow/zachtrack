@@ -1,4 +1,4 @@
-import { clampChroma, converter, formatHex, wcagContrast } from 'culori';
+import { clampChroma, converter, formatHex, modeLrgb, modeOklab, modeOklch, modeRgb, useMode, wcagContrast } from 'culori/fn';
 import { THEME, type ThemeName } from './theme';
 
 // Readable colours. A trackable's colour is whatever hex the user picked, and
@@ -9,6 +9,14 @@ import { THEME, type ThemeName } from './theme';
 
 /** WCAG targets: body text 4.5:1 (AA); large text, icons and bars 3:1. */
 export const TARGET = { text: 4.5, graphic: 3 } as const;
+
+// Only the colour spaces used here (3.68): the full culori registers every
+// space it knows, most of the library's size. Hex parses as rgb; contrast
+// works in linear rgb; clamping and lightness in oklch (via oklab).
+useMode(modeRgb);
+useMode(modeLrgb);
+useMode(modeOklab);
+useMode(modeOklch);
 
 const toOklch = converter('oklch');
 

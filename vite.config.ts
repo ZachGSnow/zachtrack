@@ -30,7 +30,10 @@ export default defineConfig({
       devOptions: {
         enabled: true,
       },
-      includeAssets: ['favicon.svg'],
+      // The glob below already precaches the favicon and the icons; listing them
+      // here as well (and the manifest's icons) put each in the precache twice (3.68).
+      includeAssets: [],
+      includeManifestIcons: false,
       manifest: {
         name: 'ZachTrack',
         short_name: 'ZachTrack',
@@ -81,7 +84,8 @@ export default defineConfig({
       workbox: {
         // The latin font files too, so the app looks the same offline; the
         // other subsets (cyrillic, greek...) ship but aren't precached.
-        globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest}', '**/*-latin-wght-normal-*.woff2'],
+        // The web manifest is added by the plugin itself.
+        globPatterns: ['**/*.{js,css,html,svg,png,ico}', '**/*-latin-wght-normal-*.woff2'],
         // Never answer these navigations with the cached app shell -- they must
         // reach the network so Cloudflare Access can run its login/callback
         // flow (see ARCHITECTURE.md 4.9). `?reauth=` is the marker the sync

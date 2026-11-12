@@ -21,11 +21,13 @@ const byName = (a: Listed, b: Listed) => a.name.localeCompare(b.name, undefined,
 
 /** `urgency` is the goal status's urgency (lower is sooner), or undefined for no goal. */
 export function orderTrackables<T extends Listed>(items: readonly T[], sort: ListSort, urgency: (t: T) => number | undefined): T[] {
+  // Each urgency once: it reads all of a trackable's entries, and a sort compares each item many times.
+  const urgent = sort === 'due' ? new Map(items.map((t) => [t.id, urgency(t) ?? Number.POSITIVE_INFINITY] as const)) : null;
   const compare = (a: T, b: T): number => {
     if (Boolean(a.pinned) !== Boolean(b.pinned)) return a.pinned ? -1 : 1;
-    if (sort === 'due') {
-      const ua = urgency(a) ?? Number.POSITIVE_INFINITY;
-      const ub = urgency(b) ?? Number.POSITIVE_INFINITY;
+    if (urgent) {
+      const ua = urgent.get(a.id)!;
+      const ub = urgent.get(b.id)!;
       if (ua !== ub) return ua - ub;
     } else if (sort === 'manual') {
       const oa = a.sortOrder ?? Number.POSITIVE_INFINITY;
