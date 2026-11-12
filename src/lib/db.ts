@@ -1,5 +1,6 @@
 import Dexie, { type EntityTable } from 'dexie';
 import { startOfDay } from './utils/time';
+import { dayKey } from './utils/dayKey';
 import type { CustomFastPreset } from './data/presets';
 import type { SyncHistoryEntry } from './utils/syncHistory';
 import { BODY_FIELD_ROLES, BODY_FIELD_SETTING, resolveBodyField, type BodyFatSex } from './utils/health';
@@ -904,7 +905,7 @@ export async function completeTask(id: string, now: number = Date.now()): Promis
       await db.tasks.put({ ...task, completedAt: now, updatedAt: now });
       return { kind: 'closed' as const, taskId: id };
     }
-    const doneOn = localDayKey(now);
+    const doneOn = dayKey(now);
     const nextDueOn = nextDue(task.repeat, task.dueOn, doneOn);
     const below = (await withDescendants([id])).filter((x) => x !== id);
     const reset = (await db.tasks.bulkGet(below)).filter((t): t is Task => !!t?.completedAt);
@@ -970,17 +971,10 @@ export async function skipTask(id: string, now: number = Date.now()): Promise<st
   if (!task?.repeat || !task.dueOn) return null;
   const was = task.dueOn;
   // A fixed schedule skips to its next date after today; "after it's done" to one interval after the due date.
-  const nextDueOn = nextDue(task.repeat, was, task.repeat.type === 'afterDone' ? was : localDayKey(now));
+  const nextDueOn = nextDue(task.repeat, was, task.repeat.type === 'afterDone' ? was : dayKey(now));
   await db.tasks.put({ ...task, dueOn: nextDueOn, updatedAt: now });
   notifyMutation();
   return was;
-}
-
-/** The local calendar day of `ms`, "YYYY-MM-DD" (as tasks store due dates). */
-function localDayKey(ms: number): string {
-  const d = new Date(ms);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 /** Deletes a task with its subtasks and completion history. */
@@ -1423,10 +1417,4 @@ export async function seedStarterTrackables(names: readonly string[]): Promise<v
       ...(spec.displayMode ? { displayMode: spec.displayMode } : {}),
     });
   }
-}
-
-/** The whole starter set, when the device has none: what a fresh install did before the picker (3.44). */
-export async function seedDefaultTrackablesIfEmpty(): Promise<void> {
-  if ((await db.trackableDefinitions.count()) > 0) return;
-  await seedStarterTrackables(STARTER_TRACKABLES.map((t) => t.name));
 }

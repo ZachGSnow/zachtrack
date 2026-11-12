@@ -1,3 +1,5 @@
+import { dayKey } from './dayKey';
+
 export const HOUR_MS = 60 * 60 * 1000;
 
 /** Elapsed time in fractional hours between two epoch-ms timestamps. */
@@ -72,9 +74,7 @@ export function addDays(ms: number, n: number): number {
 
 /** Converts an epoch-ms timestamp to a value usable by <input type="date">. */
 export function toDateInputValue(ms: number): string {
-  const d = new Date(ms);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  return dayKey(ms);
 }
 
 /** Parses an <input type="date"> value (local time, midnight) back to epoch ms. */

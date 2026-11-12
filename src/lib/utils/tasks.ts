@@ -3,31 +3,12 @@
 // numbers on a project's card. Pure; tests/tasksView.test.ts.
 
 import type { Task, TaskProject, TaskSection } from '../db';
+import { addDaysKey, dayStart, daysFrom, weekdayOf } from './dayKey';
+
+export { dayKey, dayStart, daysFrom } from './dayKey';
 
 /** The pseudo-project of tasks with no project, at /tasks/inbox. */
 export const INBOX_ID = 'inbox';
-
-/** The calendar day of `ms` in local time, "YYYY-MM-DD", as tasks store it. */
-export function dayKey(ms: number): string {
-  const d = new Date(ms);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
-/** Local midnight of a "YYYY-MM-DD" day. */
-export function dayStart(key: string): number {
-  const [y, m, d] = key.split('-').map(Number);
-  return new Date(y, m - 1, d).getTime();
-}
-
-/** Whole calendar days from `from` to `to` (negative when `to` is earlier), DST-safe. */
-export function daysFrom(from: string, to: string): number {
-  const [a, b] = [from, to].map((k) => {
-    const [y, m, d] = k.split('-').map(Number);
-    return Date.UTC(y, m - 1, d);
-  });
-  return Math.round((b - a) / 86_400_000);
-}
 
 export type DueState = 'overdue' | 'today' | 'soon' | 'later';
 
@@ -250,13 +231,8 @@ export function taskContext(task: Task, tasks: readonly Task[], projects: readon
 
 /** The quick date choices in a task's sheet and the reschedule sheet (3.64), from `today`. */
 export function dateChoices(today: string): Array<{ label: string; dueOn: string }> {
-  const add = (n: number) => {
-    const [y, m, d] = today.split('-').map(Number);
-    const t = new Date(Date.UTC(y, m - 1, d + n));
-    const pad = (x: number) => String(x).padStart(2, '0');
-    return `${t.getUTCFullYear()}-${pad(t.getUTCMonth() + 1)}-${pad(t.getUTCDate())}`;
-  };
-  const weekday = (new Date(dayStart(today)).getDay() + 6) % 7; // 0 = Monday
+  const add = (n: number) => addDaysKey(today, n);
+  const weekday = weekdayOf(today); // 0 = Monday
   return [
     { label: 'Today', dueOn: today },
     { label: 'Tomorrow', dueOn: add(1) },
