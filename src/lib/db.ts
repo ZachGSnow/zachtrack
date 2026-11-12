@@ -1120,6 +1120,42 @@ export async function eraseLocalData(): Promise<void> {
   }
 }
 
+/**
+ * Gets this device ready to reload from the server after it was away so long
+ * that deletes it missed are no longer kept there (3.70). Its own changes the
+ * server hasn't had yet (and its pending deletes) stay; everything else is
+ * cleared, to come back from the server on the next sync, which starts from
+ * the beginning. Returns how many changes it kept.
+ */
+export async function keepUnsyncedAndReset(): Promise<number> {
+  const meta = await getSyncMeta();
+  const keep = meta.sentThrough != null ? await getChangedSyncableRecords(meta.sentThrough, meta.retry) : null;
+  await db.transaction('rw', [db.fasts, db.fieldDefinitions, db.trackableDefinitions, db.trackableEntries, db.taskProjects, db.tasks, db.taskCompletions], async () => {
+    await Promise.all([db.fasts, db.fieldDefinitions, db.trackableDefinitions, db.trackableEntries, db.taskProjects, db.tasks, db.taskCompletions].map((t) => t.clear()));
+    if (!keep) return;
+    await db.fasts.bulkAdd(keep.fasts.map(({ id: _id, ...f }) => f));
+    await db.fieldDefinitions.bulkAdd(keep.fieldDefinitions);
+    await db.trackableDefinitions.bulkAdd(keep.trackableDefinitions);
+    await db.trackableEntries.bulkAdd(keep.trackableEntries);
+    await db.taskProjects.bulkAdd(keep.taskProjects);
+    await db.tasks.bulkAdd(keep.tasks);
+    await db.taskCompletions.bulkAdd(keep.taskCompletions);
+  });
+  // Pull everything; send everything left (only what was kept).
+  await setSyncMeta({ cursor: 0, sentThrough: undefined, lastFullSendAt: undefined, retry: [] });
+  notifyMutation();
+  if (!keep) return 0;
+  return (
+    keep.fasts.length +
+    keep.fieldDefinitions.length +
+    keep.trackableDefinitions.length +
+    keep.trackableEntries.length +
+    keep.taskProjects.length +
+    keep.tasks.length +
+    keep.taskCompletions.length
+  );
+}
+
 /** All tombstones not yet acknowledged by the sync server. */
 export async function getPendingTombstones(): Promise<SyncTombstone[]> {
   return db.syncTombstones.toArray();

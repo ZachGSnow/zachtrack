@@ -27,6 +27,8 @@ interface FakeServer {
   status?: number;
   /** Say there are more changes to pull this many more times (3.69). */
   morePulls?: number;
+  /** Answer the next sync with "stale: reload" (3.70). */
+  staleOnce?: boolean;
 }
 
 /** Answers like the real server: counts what was sent as applied, names it, and sends back only `incoming`. */
@@ -35,6 +37,11 @@ async function fakeServer(page: Page): Promise<FakeServer> {
   await page.route('**/api/sync', async (route) => {
     if (server.down) return route.abort('internetdisconnected');
     if (server.status) return route.fulfill({ status: server.status, body: '' });
+    if (server.staleOnce) {
+      server.staleOnce = false;
+      server.sent.push(route.request().postDataJSON() as SentBody);
+      return route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ error: 'away too long', stale: true }) });
+    }
     const body = route.request().postDataJSON() as SentBody;
     server.sent.push(body);
     if (server.morePulls) server.morePulls--;
@@ -331,4 +338,24 @@ test('a big sync goes in parts of at most 500 records, and pulls again while the
   expect(server.sent[0].cursor).toBe(0);
   // Each request carries on from the cursor the one before returned.
   expect(server.sent.slice(1).every((b, i) => b.cursor > server.sent[i].cursor || server.sent[i].cursor === 0)).toBe(true);
+});
+
+test('a device away longer than deletes are kept reloads from the server, keeping what it had not sent', async ({ page }) => {
+  const server = await fakeServer(page);
+  await waitForStarterSet(page);
+  // Wait until the starter set has reached the server, so nothing is left unsent.
+  await expect.poll(() => server.sent.some((b) => b.changes.trackableDefinitions.length > 0)).toBe(true);
+  await expect(page.getByRole('button', { name: /Synced/ }).locator('visible=true')).toBeVisible();
+
+  server.staleOnce = true;
+  server.sent = [];
+  // The server hands back the starter set as if it were the server's copy.
+  await page.goto('/#/sync');
+  await page.getByRole('button', { name: 'Sync now' }).click();
+  await expect.poll(() => server.sent.length).toBeGreaterThanOrEqual(2);
+  // After the refusal the device starts over from cursor 0, sending only what it kept (nothing here).
+  const retry = server.sent[1];
+  expect(retry.cursor).toBe(0);
+  expect(retry.changes.trackableDefinitions).toHaveLength(0);
+  await expect(page.getByText(/Reloaded from the server/).first()).toBeVisible();
 });

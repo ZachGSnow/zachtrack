@@ -13,6 +13,7 @@ import {
   getPendingTombstones,
   getSyncMeta,
   importRecords,
+  keepUnsyncedAndReset,
   setSyncMeta,
   updateSettings,
 } from '../src/lib/db';
@@ -72,6 +73,25 @@ describe('changed records', () => {
     const before = Date.now();
     await importRecords({ fasts: [], fieldDefinitions: [], trackableDefinitions: [], trackableEntries: [], settings: null });
     expect((await getSyncMeta()).fullSendRequestedAt).toBeGreaterThanOrEqual(before);
+  });
+});
+
+describe('reloading after being away too long (3.70)', () => {
+  it('keeps the changes the server has not had, clears the rest and starts the next sync over', async () => {
+    const trackable = await createTrackable({ name: 'Water', icon: 'x', color: '#000000', fieldIds: [] });
+    await addTrackableEntry({ trackableId: trackable.id, timestamp: 1 });
+    await wait();
+    await setSyncMeta({ sentThrough: Date.now(), cursor: 42, lastFullSendAt: Date.now() });
+    await wait();
+    const unsent = await addTrackableEntry({ trackableId: trackable.id, timestamp: 2 });
+
+    expect(await keepUnsyncedAndReset()).toBe(1);
+    expect((await db.trackableEntries.toArray()).map((e) => e.id)).toEqual([unsent.id]);
+    // The trackable was synced before: it comes back from the server.
+    expect(await db.trackableDefinitions.count()).toBe(0);
+    const meta = await getSyncMeta();
+    expect(meta.cursor).toBe(0);
+    expect(meta.sentThrough).toBeUndefined();
   });
 });
 

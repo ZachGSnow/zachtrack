@@ -84,6 +84,10 @@ export const MAX_RECORDS_PER_REQUEST = 2000;
 /** The most rows one response sends back; `more` says there are others to pull next. */
 export const PULL_PAGE = 1000;
 
+/** Deleted rows are removed this long after the delete (3.70). */
+export const DELETED_KEEP_DAYS = 180;
+const SYNCED_TABLES = ['fasts', 'fieldDefinitions', 'trackableDefinitions', 'trackableEntries', 'taskProjects', 'tasks', 'taskCompletions'] as const;
+
 interface SyncResponseBody {
   cursor: number;
   /** Changes from other requests since `cursor`. What this request itself stored isn't sent back. */
@@ -161,8 +165,20 @@ export async function handleSync(request: Request, env: Env, deps: AccessDeps = 
   const now = (deps.now ?? Date.now)();
 
   try {
+    // A device that last pulled before deletes the server has since removed
+    // can't learn of them any more, and would send those records back as new
+    // (3.70). It reloads from the server instead (the app keeps its own
+    // unsynced changes). A cursor of 0 is a device starting over anyway.
+    const purge = await db.prepare('SELECT purgedThroughSeq, lastPurgeAt FROM purgeState WHERE id = 1').first<{ purgedThroughSeq: number; lastPurgeAt: number | null }>();
+    if (purge && body.cursor > 0 && body.cursor < purge.purgedThroughSeq) {
+      return jsonResponse(
+        { error: 'This device was away so long that some deletes it missed are no longer kept. It reloads from the server.', stale: true },
+        409,
+      );
+    }
+
     const { rejected, applied, ownSeq } = await applyIncomingChanges(db, body, device?.id ?? null);
-    await recordActivity(db, device, applied, rejected.length, now);
+    await recordActivity(db, device, applied, rejected.length, now, purge ? purge.lastPurgeAt : now);
     const { changes, pageEnd } = await pullChangesSince(db, body.cursor, ownSeq);
     // A full page: carry on from its last row next time. Otherwise everything is here.
     const cursor = pageEnd ?? (await currentSeq(db));
@@ -221,6 +237,7 @@ async function recordActivity(
   applied: AppliedRecord[],
   rejectedCount: number,
   now: number,
+  lastPurgeAt: number | null,
 ): Promise<void> {
   const statements: D1PreparedStatement[] = [];
   if (device) {
@@ -249,6 +266,18 @@ async function recordActivity(
   const cutoff = now - ACTIVITY_DAYS * DAY_MS;
   statements.push(db.prepare('DELETE FROM syncEvents WHERE at < ?').bind(cutoff));
   statements.push(db.prepare('DELETE FROM devices WHERE lastSeenAt < ?').bind(cutoff));
+  // Once a day: deleted rows older than DELETED_KEEP_DAYS go (3.70). First
+  // the purge mark moves past the newest of them, then they're removed, in
+  // the same batch (one transaction).
+  if (lastPurgeAt == null || now - lastPurgeAt >= DAY_MS) {
+    const before = now - DELETED_KEEP_DAYS * DAY_MS;
+    // One scalar MAX over a subquery per table: D1 limits how many SELECTs a UNION may join.
+    const newestPerTable = SYNCED_TABLES.map((t) => `COALESCE((SELECT MAX(serverSeq) FROM ${t} WHERE deletedAt IS NOT NULL AND deletedAt < ?1), 0)`).join(', ');
+    statements.push(
+      db.prepare(`UPDATE purgeState SET purgedThroughSeq = MAX(purgedThroughSeq, ${newestPerTable}), lastPurgeAt = ?2 WHERE id = 1`).bind(before, now),
+    );
+    for (const t of SYNCED_TABLES) statements.push(db.prepare(`DELETE FROM ${t} WHERE deletedAt IS NOT NULL AND deletedAt < ?`).bind(before));
+  }
   await db.batch(statements);
 }
 

@@ -297,7 +297,8 @@ protocol, the real bugs hit along the way and how they were fixed.
   D1 (`deletedAt`), so other devices delete it too. The server also clears a
   deleted fast's or entry's notes, tags, ratings and values, and a deleted
   task's name and notes; a small row with
-  the id, dates and `deletedAt` stays. For rows deleted before v1.0.1, run
+  the id, dates and `deletedAt` stays for 180 days, then goes too (a device
+  away longer than that reloads from the server). For rows deleted before v1.0.1, run
   `d1/scrub-deleted.sql` once. Clearing site data removes the local copy;
   dropping the D1 database removes the server copy. Neither is a secure erase,
   and D1 Time Travel keeps earlier versions for 7 days.
