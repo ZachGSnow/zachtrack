@@ -28,6 +28,9 @@
   import Card from '../lib/components/ui/Card.svelte';
   import SectionHeading from '../lib/components/ui/SectionHeading.svelte';
   import EmptyState from '../lib/components/ui/EmptyState.svelte';
+  import TaskHost from '../lib/components/TaskHost.svelte';
+  import TaskRow from '../lib/components/TaskRow.svelte';
+  import { dayKey, dueTasks, taskContext } from '../lib/utils/tasks';
 
   // Today: what to do now, gathered from every part of the app (ARCHITECTURE.md
   // 3.41). The fast, the habits with a goal, what you've been logging, and the
@@ -35,6 +38,8 @@
   const trackables = liveQuery(() => db.trackableDefinitions.toArray());
   const allFields = liveQuery(() => db.fieldDefinitions.toArray());
   const allEntries = liveQuery(() => db.trackableEntries.toArray());
+  const allTasks = liveQuery(() => db.tasks.toArray());
+  const taskProjects = liveQuery(() => db.taskProjects.toArray());
 
   // "2h ago", due states and the fast move with the clock.
   let now = $state(Date.now());
@@ -44,6 +49,10 @@
   });
 
   const habits = $derived(todayHabits($trackables ?? [], $allFields ?? [], $allEntries ?? [], now));
+  const todayKey = $derived(dayKey(now));
+  const tasksDue = $derived(
+    dueTasks($allTasks ?? [], todayKey, new Set(($taskProjects ?? []).filter((p) => p.archived).map((p) => p.id))),
+  );
   const logs = $derived(todayLogs($trackables ?? [], $allFields ?? [], $allEntries ?? [], now, undefined, measurementView.view));
   const dates = $derived(todayDates($trackables ?? [], $allEntries ?? [], now));
   const hasDates = $derived(($trackables ?? []).some((t) => !t.archived && t.displayMode === 'ages'));
@@ -237,6 +246,24 @@
         <HabitMatrix {habits} {now} />
       {/if}
     </section>
+
+    {#if tasksDue.length > 0}
+      <!-- Tasks overdue or due today, from every project (3.62); the rest are on Tasks > Upcoming. -->
+      <section class="flex flex-col gap-2" aria-labelledby="today-tasks">
+        <SectionHeading id="today-tasks" title="Tasks">
+          {#snippet action()}
+            <a href="/tasks/upcoming" use:link class="text-xs font-semibold text-brand">Upcoming</a>
+          {/snippet}
+        </SectionHeading>
+        <Card padding="px-1 py-1">
+          <ul class="flex flex-col">
+            {#each tasksDue as t (t.id)}
+              <TaskRow task={t} tasks={$allTasks ?? []} today={todayKey} context={taskContext(t, $allTasks ?? [], $taskProjects ?? [])} />
+            {/each}
+          </ul>
+        </Card>
+      </section>
+    {/if}
   </div>
 
   <div class="flex flex-col gap-4">
@@ -314,3 +341,4 @@
 </div>
 
 <QuickLogHost />
+<TaskHost tasks={$allTasks ?? []} projects={$taskProjects ?? []} />

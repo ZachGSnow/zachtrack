@@ -1,5 +1,7 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
+  import { liveQuery } from 'dexie';
+  import { db } from '../db';
   import { fly } from 'svelte/transition';
   import type { Task, TaskProject } from '../db';
   import { taskUi } from '../stores/taskUi.svelte';
@@ -9,6 +11,8 @@
   // The task sheet and the undo toast (stores/taskUi.svelte.ts). Mounted once
   // on each page that lists tasks, with the tasks and projects it already reads.
   let { tasks, projects }: { tasks: readonly Task[]; projects: readonly TaskProject[] } = $props();
+  // Only the sheet needs the completion history.
+  const completions = liveQuery(() => db.taskCompletions.toArray());
 
   // Leaving the page closes the sheet, so it doesn't reopen on the next page that lists tasks.
   onDestroy(() => {
@@ -31,5 +35,5 @@
 {/if}
 
 <BottomSheet bind:open={taskUi.open}>
-  <TaskSheet {tasks} {projects} />
+  <TaskSheet {tasks} {projects} completions={$completions ?? []} />
 </BottomSheet>

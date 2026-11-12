@@ -22,9 +22,19 @@
       const n = attentionStore.items.length;
       return { text: String(n), label: `${n} need${n === 1 ? 's' : ''} attention` };
     }
+    if (href === '/tasks' && attentionStore.tasksDue > 0) {
+      const n = attentionStore.tasksDue;
+      return { text: String(n), label: `${n} task${n === 1 ? '' : 's'} due` };
+    }
     if (href === '/fasting' && attentionStore.fastingLate) return { text: '', label: 'fast is late' };
     if (href === '/fasting' && fastTimer.milestone) return { text: '', label: 'new fasting milestone' };
     return null;
+  };
+
+  // A page link that also stays marked on the pages under it: one trackable, one project.
+  const SUB_PATHS: Record<string, RegExp> = {
+    '/trackables': /^\/trackables(\/.*)?$/,
+    '/tasks': /^\/tasks(\/(?!upcoming$).*)?$/,
   };
 
   // The sections (data/sections.ts); a section's tab is lit on any of its pages.
@@ -56,7 +66,7 @@
         <a
           href={p.href}
           use:link
-          use:active={{ path: p.href === '/trackables' ? /^\/trackables(\/.*)?$/ : p.href, className: 'current' }}
+          use:active={{ path: SUB_PATHS[p.href] ?? p.href, className: 'current' }}
           class="side sub flex items-center rounded-lg py-1.5 pr-3 pl-11 text-sm"
         >{p.label}</a>
       {/each}

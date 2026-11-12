@@ -39,6 +39,8 @@
     '/sync': wrap({ asyncComponent: () => import('./routes/Sync.svelte') }),
     '/dates': wrap({ asyncComponent: () => import('./routes/Dates.svelte') }),
     '/tasks': wrap({ asyncComponent: () => import('./routes/Tasks.svelte') }),
+    // Before /tasks/:id, which would take "upcoming" for a project id.
+    '/tasks/upcoming': wrap({ asyncComponent: () => import('./routes/TasksUpcoming.svelte') }),
     '/tasks/:id': wrap({ asyncComponent: () => import('./routes/TaskProject.svelte') }),
     '/help/:topic?': wrap({ asyncComponent: () => import('./routes/Help.svelte') }),
   };

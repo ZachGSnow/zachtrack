@@ -51,7 +51,16 @@ export const SECTIONS: Section[] = [
     ],
   },
   // To-dos: projects, sections, tasks and subtasks (ARCHITECTURE.md 3.59, 3.60).
-  { href: '/tasks', label: 'Tasks', icon: ListTodo, match: /^\/tasks(\/.*)?$/ },
+  {
+    href: '/tasks',
+    label: 'Tasks',
+    icon: ListTodo,
+    match: /^\/tasks(\/.*)?$/,
+    pages: [
+      { href: '/tasks', label: 'Projects' },
+      { href: '/tasks/upcoming', label: 'Upcoming' },
+    ],
+  },
   // '/charting' is the old address of the Data tab, kept so links to it still work.
   { href: '/insights', label: 'Insights', icon: Lightbulb, match: /^\/(insights|charting)$/ },
 ];

@@ -1,6 +1,10 @@
 <script lang="ts">
   import ChevronLeft from '@lucide/svelte/icons/chevron-left';
-  import { createTask, deleteTask, updateTask, type Task, type TaskProject } from '../db';
+  import SkipForward from '@lucide/svelte/icons/skip-forward';
+  import { createTask, deleteTask, updateTask, type Task, type TaskCompletion, type TaskProject } from '../db';
+  import { dayKey, daysFrom } from '../utils/tasks';
+  import RepeatPicker from './RepeatPicker.svelte';
+  import { followDueDate } from '../utils/taskRepeat';
   import { INBOX_ID, nextSortOrder, parentChain, subtaskProgress, subtasksOf } from '../utils/tasks';
   import { taskUi } from '../stores/taskUi.svelte';
   import TaskCheck from './TaskCheck.svelte';
@@ -11,9 +15,12 @@
   let {
     tasks,
     projects,
+    completions = [],
   }: {
     tasks: readonly Task[];
     projects: readonly TaskProject[];
+    /** Completions of repeating tasks, for the task's history. */
+    completions?: readonly TaskCompletion[];
   } = $props();
 
   const task = $derived(tasks.find((t) => t.id === taskUi.taskId) ?? null);
@@ -22,6 +29,15 @@
   const progress = $derived(task ? subtaskProgress(tasks, task.id) : null);
   const project = $derived(task?.projectId ? projects.find((p) => p.id === task.projectId) : undefined);
   const activeProjects = $derived(projects.filter((p) => !p.archived || p.id === task?.projectId));
+  const history = $derived(task ? completions.filter((c) => c.taskId === task.id).sort((a, b) => b.completedAt - a.completedAt) : []);
+  /** "on time", "3 days late", "1 day early": when it was done against its due date. */
+  function timing(dueOn: string, completedAt: number): string {
+    const late = daysFrom(dueOn, dayKey(completedAt));
+    if (late === 0) return 'on time';
+    const n = Math.abs(late);
+    return `${n} day${n === 1 ? '' : 's'} ${late > 0 ? 'late' : 'early'}`;
+  }
+  const shortDate = (ms: number) => new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 
   let newSubtask = $state('');
   let confirmDelete = $state(false);
@@ -50,8 +66,10 @@
   }
 
   function setDue(value: string) {
-    // No date means no time either; a repeat rule (later) needs a date too.
-    void save(value ? { dueOn: value } : { dueOn: undefined, dueTime: undefined });
+    // No date means no time and no repeat either; a repeat rule follows the date (followDueDate).
+    if (!value) return void save({ dueOn: undefined, dueTime: undefined, repeat: undefined });
+    const repeat = task?.repeat && task.dueOn ? followDueDate(task.repeat, task.dueOn, value) : task?.repeat;
+    void save({ dueOn: value, ...(repeat ? { repeat } : {}) });
   }
 
   function moveTo(projectId: string) {
@@ -154,6 +172,26 @@
     </div>
     {#if task.dueOn}
       <button type="button" class="-mt-2 text-xs text-text-muted" onclick={() => setDue('')}>Clear due date</button>
+      {#if !task.completedAt}
+        <RepeatPicker repeat={task.repeat} dueOn={task.dueOn} onchange={(repeat) => save({ repeat })} />
+      {/if}
+      {#if task.repeat && !task.completedAt}
+        <button type="button" class="flex items-center gap-1.5 text-sm text-text-muted" onclick={() => taskUi.skip(task)}>
+          <SkipForward size={14} aria-hidden="true" /> Skip this one
+        </button>
+      {/if}
+    {:else}
+      <p class="-mt-2 text-xs text-text-muted">Set a due date to make it repeat.</p>
+    {/if}
+    {#if history.length > 0}
+      <details class="text-sm">
+        <summary class="cursor-pointer text-text-muted">Done {history.length} {history.length === 1 ? 'time' : 'times'}, last on {shortDate(history[0].completedAt)}</summary>
+        <ul class="mt-1 space-y-0.5 text-xs text-text-muted" aria-label="Completion history">
+          {#each history.slice(0, 20) as c (c.id)}
+            <li>{shortDate(c.completedAt)}{c.dueOn ? ` (${timing(c.dueOn, c.completedAt)})` : ''}</li>
+          {/each}
+        </ul>
+      </details>
     {/if}
 
     <label class="block text-sm">

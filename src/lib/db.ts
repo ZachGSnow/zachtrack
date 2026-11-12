@@ -3,6 +3,7 @@ import { startOfDay } from './utils/time';
 import type { CustomFastPreset } from './data/presets';
 import type { SyncHistoryEntry } from './utils/syncHistory';
 import { BODY_FIELD_ROLES, BODY_FIELD_SETTING, resolveBodyField, type BodyFatSex } from './utils/health';
+import { nextDue } from './utils/taskRepeat';
 
 export interface FastRecord {
   id?: number;
@@ -796,6 +797,105 @@ export async function updateTask(id: string, patch: Partial<Omit<Task, 'id' | 'c
   for (const key of Object.keys(next)) if (next[key] === undefined) delete next[key];
   await db.tasks.put(next as unknown as Task);
   notifyMutation();
+}
+
+/** What completing a task did, so Undo can take it back. */
+export type TaskCompleteResult =
+  | { kind: 'closed'; taskId: string }
+  | { kind: 'moved'; taskId: string; completionId: string; nextDueOn: string };
+
+/**
+ * Completes a task. One without a repeat rule is closed (`completedAt`). A
+ * repeating one moves on instead (ARCHITECTURE.md 3.61): a completion row
+ * records the due date it was done for, the task's `dueOn` moves to the next
+ * date, and its completed subtasks, at any depth, are opened again for the
+ * next round. The task itself never closes.
+ */
+export async function completeTask(id: string, now: number = Date.now()): Promise<TaskCompleteResult | null> {
+  const result = await db.transaction('rw', db.tasks, db.taskCompletions, async () => {
+    const task = await db.tasks.get(id);
+    if (!task) return null;
+    if (!task.repeat || !task.dueOn) {
+      await db.tasks.put({ ...task, completedAt: now, updatedAt: now });
+      return { kind: 'closed' as const, taskId: id };
+    }
+    const doneOn = localDayKey(now);
+    const nextDueOn = nextDue(task.repeat, task.dueOn, doneOn);
+    const below = (await withDescendants([id])).filter((x) => x !== id);
+    const reset = (await db.tasks.bulkGet(below)).filter((t): t is Task => !!t?.completedAt);
+    for (const t of reset) {
+      const { completedAt: _done, ...rest } = t;
+      await db.tasks.put({ ...rest, updatedAt: now });
+    }
+    const completion: TaskCompletion = {
+      id: uuid(),
+      taskId: id,
+      completedAt: now,
+      dueOn: task.dueOn,
+      nextDueOn,
+      ...(reset.length ? { subtaskIds: reset.map((t) => t.id) } : {}),
+      createdAt: now,
+      updatedAt: now,
+    };
+    await db.taskCompletions.add(completion);
+    const { completedAt: _c, ...open } = task;
+    await db.tasks.put({ ...open, dueOn: nextDueOn, updatedAt: now });
+    return { kind: 'moved' as const, taskId: id, completionId: completion.id, nextDueOn };
+  });
+  notifyMutation();
+  return result;
+}
+
+/**
+ * Takes a completion back: reopens a closed task, or for a repeating one puts
+ * the due date and the subtasks back as they were and removes the completion
+ * row. The date only goes back while the task is still on the date the
+ * completion moved it to, so an edit made since isn't undone.
+ */
+export async function undoComplete(result: TaskCompleteResult): Promise<void> {
+  const now = Date.now();
+  let removed: string | null = null;
+  await db.transaction('rw', db.tasks, db.taskCompletions, async () => {
+    const task = await db.tasks.get(result.taskId);
+    if (result.kind === 'closed') {
+      if (task?.completedAt) {
+        const { completedAt: _c, ...rest } = task;
+        await db.tasks.put({ ...rest, updatedAt: now });
+      }
+      return;
+    }
+    const completion = await db.taskCompletions.get(result.completionId);
+    if (!completion) return;
+    if (task && task.dueOn === completion.nextDueOn && completion.dueOn) {
+      await db.tasks.put({ ...task, dueOn: completion.dueOn, updatedAt: now });
+    }
+    for (const sub of await db.tasks.bulkGet(completion.subtaskIds ?? [])) {
+      if (sub && !sub.completedAt) await db.tasks.put({ ...sub, completedAt: completion.completedAt, updatedAt: now });
+    }
+    await db.taskCompletions.delete(completion.id);
+    removed = completion.id;
+  });
+  if (removed) await addTombstone('taskCompletions', removed, undefined);
+  notifyMutation();
+}
+
+/** Moves a repeating task to its next date without completing it. Returns the date it was on, for Undo. */
+export async function skipTask(id: string, now: number = Date.now()): Promise<string | null> {
+  const task = await db.tasks.get(id);
+  if (!task?.repeat || !task.dueOn) return null;
+  const was = task.dueOn;
+  // A fixed schedule skips to its next date after today; "after it's done" to one interval after the due date.
+  const nextDueOn = nextDue(task.repeat, was, task.repeat.type === 'afterDone' ? was : localDayKey(now));
+  await db.tasks.put({ ...task, dueOn: nextDueOn, updatedAt: now });
+  notifyMutation();
+  return was;
+}
+
+/** The local calendar day of `ms`, "YYYY-MM-DD" (as tasks store due dates). */
+function localDayKey(ms: number): string {
+  const d = new Date(ms);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 /** Deletes a task with its subtasks and completion history. */
