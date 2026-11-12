@@ -308,6 +308,8 @@ test('overdue tasks move to today in one tap, with one Undo', async ({ page }) =
     await page.getByRole('button', { name: new RegExp(`^${name}`) }).first().click();
     await page.getByRole('dialog').getByLabel('Due date').fill(await dayFromToday(page, -2));
     await page.keyboard.press('Escape');
+    // The sheet must be gone before the next row can be tapped.
+    await expect(page.getByRole('dialog')).toHaveCount(0);
   }
   await page.goto('/#/');
   const todayTasks = page.getByRole('region', { name: 'Tasks' });
