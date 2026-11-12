@@ -8,7 +8,7 @@
 // user; only a confirmed plan is written. See ARCHITECTURE.md 3.13.
 
 import type { FastRecord, FieldDefinition, SettingsRecord, Task, TaskCompletion, TaskProject, TrackableDefinition, TrackableEntry } from './db';
-import { invalidReason, recordKey, type RecordKind } from './validate';
+import { invalidReason, pickKnown, recordKey, type RecordKind } from './validate';
 
 export const EXPORT_FORMAT = 'zachtrack-export';
 export const EXPORT_VERSION = 1;
@@ -115,11 +115,13 @@ export function planImport(text: string, local: LocalSnapshot): ParseResult {
       skipped.push({ recordType: kind, id: '', reason: `${kind} is not a list` });
       return [];
     }
-    return list.filter((record): record is T => {
-      const reason = invalidReason(kind, record);
-      if (reason) skipped.push({ recordType: kind, id: recordKey(record), reason });
-      return reason === null;
-    });
+    return list
+      .filter((record): record is T => {
+        const reason = invalidReason(kind, record);
+        if (reason) skipped.push({ recordType: kind, id: recordKey(record), reason });
+        return reason === null;
+      })
+      .map((record) => (kind === 'tombstones' ? record : pickKnown(kind, record)));
   }
 
   /** Keeps a record only if it is new here or newer than the local copy. */
@@ -243,7 +245,9 @@ export function buildCsv(local: LocalSnapshot): string {
     return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
   };
   const cell = (v: string | number | undefined) => {
-    const s = v == null ? '' : String(v);
+    // Text a spreadsheet would run as a formula (=, +, -, @, or a tab or CR
+    // first) gets a leading apostrophe, which the spreadsheet shows as text.
+    const s = v == null ? '' : typeof v === 'string' && /^[=+\-@\t\r]/.test(v) ? `'${v}` : String(v);
     return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   type Row = { at: number; cells: (string | number | undefined)[] };

@@ -85,3 +85,15 @@ describe('calendar export extras', () => {
     expect(thanks).toContain('TRIGGER:PT9H');
   });
 });
+
+describe('escaping (v1.21.0)', () => {
+  it('turns a lone carriage return into an escaped line break too', async () => {
+    const { escapeText } = await import('../src/lib/utils/ics');
+    // Built from character codes so no editor or tool can blur the backslashes.
+    const CR = String.fromCharCode(13);
+    const LF = String.fromCharCode(10);
+    const ESC = String.fromCharCode(92) + 'n';
+    const input = 'a' + CR + 'DTSTART:x' + CR + LF + 'b' + LF + 'c';
+    expect(escapeText(input)).toBe(['a', 'DTSTART:x', 'b', 'c'].join(ESC));
+  });
+});

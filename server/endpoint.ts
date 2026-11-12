@@ -9,7 +9,7 @@ export interface Env {
   OWNER_EMAIL?: string;
   /** Zero Trust team domain (`your-team.cloudflareaccess.com`). Required. */
   ACCESS_TEAM_DOMAIN?: string;
-  /** The Access application's AUD tag. Optional, checked when set. */
+  /** The Access application's AUD tag. Required, like the two above, so a token Access issued for another app in the same team isn't accepted. */
   ACCESS_AUD?: string;
   /** The nightly backup bucket, read-only use: /api/backup-status lists it. Optional. */
   BACKUPS?: R2Bucket;
@@ -33,9 +33,14 @@ export async function refuseUnlessOwner(request: Request, env: Env, deps: Access
   // `<project>.pages.dev` and per-deployment aliases can reach it without
   // Access. So the Access JWT is verified here, and a missing owner or team
   // domain fails closed instead of skipping the check.
-  if (!env.OWNER_EMAIL || !env.ACCESS_TEAM_DOMAIN) {
-    console.error(`${name}: OWNER_EMAIL and ACCESS_TEAM_DOMAIN must both be set`);
+  if (!env.OWNER_EMAIL || !env.ACCESS_TEAM_DOMAIN || !env.ACCESS_AUD) {
+    console.error(`${name}: OWNER_EMAIL, ACCESS_TEAM_DOMAIN and ACCESS_AUD must all be set`);
     return jsonResponse({ error: 'Sync is not configured on the server' }, 503);
+  }
+  const crossSite = crossSiteReason(request);
+  if (crossSite) {
+    console.warn(`${name}: rejected request (${crossSite})`);
+    return jsonResponse({ error: 'Forbidden' }, 403);
   }
   const access = await verifyAccessJwt(
     request.headers.get('Cf-Access-Jwt-Assertion'),
@@ -49,6 +54,24 @@ export async function refuseUnlessOwner(request: Request, env: Env, deps: Access
   }
   console.warn(`${name}: rejected request (${access.reason})`);
   return jsonResponse({ error: 'Forbidden' }, 403);
+}
+
+/**
+ * Why a request that changes something can't have come from the app itself,
+ * or null. The Access cookie rides along on any request to the domain, so a
+ * page on another site could post a form here while you're logged in
+ * (cross-site request forgery). The app always sends `X-Requested-With`, which
+ * a form can't set and a cross-site script can't send without a CORS
+ * preflight this server never answers; and a browser that says where a
+ * request came from (`Sec-Fetch-Site`) must say this site. Reads (GET) only
+ * return data a cross-site page can't see, so they're left alone.
+ */
+export function crossSiteReason(request: Request): string | null {
+  if (request.method === 'GET' || request.method === 'HEAD') return null;
+  if (request.headers.get('X-Requested-With') !== 'XMLHttpRequest') return 'missing X-Requested-With';
+  const site = request.headers.get('Sec-Fetch-Site');
+  if (site && site !== 'same-origin' && site !== 'none') return `Sec-Fetch-Site ${site}`;
+  return null;
 }
 
 /** A device as the sync endpoint records it and the app lists it. */

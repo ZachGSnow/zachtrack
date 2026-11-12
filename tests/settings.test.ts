@@ -29,7 +29,7 @@ async function push(body: unknown) {
   const res = await handleSync(
     new Request('https://app.example.com/api/sync', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Cf-Access-Jwt-Assertion': await signer.sign(ownerClaims(NOW)) },
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'Cf-Access-Jwt-Assertion': await signer.sign(ownerClaims(NOW)) },
       body: JSON.stringify(body),
     }),
     { DB: proxy.env.DB, OWNER_EMAIL: OWNER, ACCESS_TEAM_DOMAIN: TEAM_DOMAIN, ACCESS_AUD: AUD },

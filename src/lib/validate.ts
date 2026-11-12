@@ -93,6 +93,21 @@ function isDay(v: unknown): boolean {
 const isClock = (v: unknown) => typeof v === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(v);
 
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+
+/**
+ * How far ahead of the server's (or this device's) clock a change time may
+ * be. Last write wins on `updatedAt`, so a time far in the future (a clock set
+ * wrong, a hand-made file) would beat every later edit forever, and a delete
+ * stamped in the future would beat them too.
+ */
+export const MAX_CLOCK_AHEAD_MS = 24 * 3600_000;
+const isChangeTime = (v: unknown): v is number => isNum(v) && v >= 0 && v <= Date.now() + MAX_CLOCK_AHEAD_MS;
+const CHANGE_TIME = 'a time no later than tomorrow';
+
+/** A CSS hex colour: #rgb, #rrggbb or #rrggbbaa. Colours go into style attributes. */
+const isColor = (v: unknown) => typeof v === 'string' && /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(v);
+/** An icon is an emoji or a letter or two; long enough for a family emoji sequence. */
+const isIcon = (v: unknown) => typeof v === 'string' && v.length <= 32;
 const isText = (v: unknown): v is string => typeof v === 'string' && v.length <= MAX_TEXT;
 const isId = (v: unknown): v is string => typeof v === 'string' && v.length > 0 && v.length <= 200;
 
@@ -119,7 +134,7 @@ const checks: Record<Exclude<RecordKind, 'tombstones'>, Check> = {
       required(r, 'startDay', isNum, 'a number'),
       required(r, 'method', (v) => v === 'preset' || v === 'custom', "'preset' or 'custom'"),
       required(r, 'createdAt', isNum, 'a number'),
-      required(r, 'updatedAt', isNum, 'a number'),
+      required(r, 'updatedAt', isChangeTime, CHANGE_TIME),
       optional(r, 'endTime', isNum, 'a number'),
       optional(r, 'presetId', isText, 'a string'),
       optional(r, 'presetLabel', isText, 'a string'),
@@ -136,7 +151,7 @@ const checks: Record<Exclude<RecordKind, 'tombstones'>, Check> = {
       required(r, 'name', isText, 'a string'),
       required(r, 'kind', (v) => v === 'number' || v === 'rating' || v === 'boolean', "'number', 'rating' or 'boolean'"),
       required(r, 'createdAt', isNum, 'a number'),
-      required(r, 'updatedAt', isNum, 'a number'),
+      required(r, 'updatedAt', isChangeTime, CHANGE_TIME),
       optional(r, 'unit', isText, 'a string'),
       optional(r, 'ratingMin', isNum, 'a number'),
       optional(r, 'ratingMax', isNum, 'a number'),
@@ -146,11 +161,11 @@ const checks: Record<Exclude<RecordKind, 'tombstones'>, Check> = {
     all(
       required(r, 'id', isId, 'a non-empty string'),
       required(r, 'name', isText, 'a string'),
-      required(r, 'icon', isText, 'a string'),
-      required(r, 'color', isText, 'a string'),
+      required(r, 'icon', isIcon, 'an icon of up to 32 characters'),
+      required(r, 'color', isColor, 'a hex colour like #a855f7'),
       required(r, 'fieldIds', isStringList(MAX_FIELD_IDS), 'a list of strings'),
       required(r, 'createdAt', isNum, 'a number'),
-      required(r, 'updatedAt', isNum, 'a number'),
+      required(r, 'updatedAt', isChangeTime, CHANGE_TIME),
       optional(
         r,
         'displayMode',
@@ -206,7 +221,7 @@ const checks: Record<Exclude<RecordKind, 'tombstones'>, Check> = {
       required(r, 'trackableId', isId, 'a non-empty string'),
       required(r, 'timestamp', isNum, 'a number'),
       required(r, 'createdAt', isNum, 'a number'),
-      required(r, 'updatedAt', isNum, 'a number'),
+      required(r, 'updatedAt', isChangeTime, CHANGE_TIME),
       optional(r, 'note', isText, 'a string'),
       optional(r, 'tags', isStringList(MAX_TAGS), 'a list of strings'),
       optional(r, 'dateRepeat', isDateRepeat, 'a date repeat rule'),
@@ -225,7 +240,7 @@ const checks: Record<Exclude<RecordKind, 'tombstones'>, Check> = {
     all(
       required(r, 'id', isId, 'a non-empty string'),
       required(r, 'name', isText, 'a string'),
-      required(r, 'color', isText, 'a string'),
+      required(r, 'color', isColor, 'a hex colour like #a855f7'),
       required(
         r,
         'sections',
@@ -237,8 +252,8 @@ const checks: Record<Exclude<RecordKind, 'tombstones'>, Check> = {
         'a list of { id, name } with different ids',
       ),
       required(r, 'createdAt', isNum, 'a number'),
-      required(r, 'updatedAt', isNum, 'a number'),
-      optional(r, 'icon', isText, 'a string'),
+      required(r, 'updatedAt', isChangeTime, CHANGE_TIME),
+      optional(r, 'icon', isIcon, 'an icon of up to 32 characters'),
       optional(r, 'notes', isText, 'a string'),
       optional(r, 'archived', (v) => typeof v === 'boolean', 'a boolean'),
       optional(r, 'sortOrder', isNum, 'a number'),
@@ -249,7 +264,7 @@ const checks: Record<Exclude<RecordKind, 'tombstones'>, Check> = {
       required(r, 'name', isText, 'a string'),
       required(r, 'sortOrder', isNum, 'a number'),
       required(r, 'createdAt', isNum, 'a number'),
-      required(r, 'updatedAt', isNum, 'a number'),
+      required(r, 'updatedAt', isChangeTime, CHANGE_TIME),
       optional(r, 'projectId', isId, 'a non-empty string'),
       optional(r, 'sectionId', isId, 'a non-empty string'),
       optional(r, 'parentId', (v) => isId(v) && v !== r.id, "another task's id"),
@@ -267,7 +282,7 @@ const checks: Record<Exclude<RecordKind, 'tombstones'>, Check> = {
       required(r, 'taskId', isId, 'a non-empty string'),
       required(r, 'completedAt', isNum, 'a number'),
       required(r, 'createdAt', isNum, 'a number'),
-      required(r, 'updatedAt', isNum, 'a number'),
+      required(r, 'updatedAt', isChangeTime, CHANGE_TIME),
       optional(r, 'dueOn', isDay, 'a date like 2026-11-30'),
       optional(r, 'nextDueOn', isDay, 'a date like 2026-11-30'),
       optional(r, 'subtaskIds', (v) => Array.isArray(v) && v.length <= MAX_SUBTASK_IDS && v.every(isId), 'a list of task ids'),
@@ -275,7 +290,7 @@ const checks: Record<Exclude<RecordKind, 'tombstones'>, Check> = {
   settings: (r) =>
     all(
       required(r, 'id', (v) => v === 'app-settings', "'app-settings'"),
-      required(r, 'updatedAt', isNum, 'a number'),
+      required(r, 'updatedAt', isChangeTime, CHANGE_TIME),
       optional(r, 'defaultPresetId', isText, 'a string'),
       optional(r, 'notificationsEnabled', (v) => typeof v === 'boolean', 'a boolean'),
       optional(r, 'heightInches', isNum, 'a number'),
@@ -326,7 +341,7 @@ function checkTombstone(r: Record<string, unknown>): string | null {
   return all(
     required(r, 'recordType', (v) => typeof v === 'string' && TOMBSTONE_TYPES.has(v), 'a known record type'),
     required(r, 'uuid', isId, 'a non-empty string'),
-    required(r, 'deletedAt', isNum, 'a number'),
+    required(r, 'deletedAt', isChangeTime, CHANGE_TIME),
   );
 }
 
@@ -341,4 +356,37 @@ export function recordKey(record: unknown): string {
   if (!isObject(record)) return '';
   const key = record.uuid ?? record.id;
   return typeof key === 'string' ? key.slice(0, 200) : '';
+}
+
+/**
+ * The fields each record type really has. An import keeps only these
+ * (`pickKnown`), so a file can't bring a `deletedAt` that would delete a
+ * record here without telling the server, or anything else that isn't data.
+ * tests/dataFile.test.ts checks a full export keeps every field it has.
+ */
+export const KNOWN_KEYS: Record<Exclude<RecordKind, 'tombstones'>, readonly string[]> = {
+  fasts: ['uuid', 'startTime', 'startDay', 'endTime', 'method', 'presetId', 'presetLabel', 'targetHours', 'moodRating', 'energyRating', 'hungerRating', 'tags', 'note', 'createdAt', 'updatedAt'],
+  fieldDefinitions: ['id', 'name', 'kind', 'unit', 'ratingMin', 'ratingMax', 'aggregation', 'createdAt', 'updatedAt'],
+  trackableDefinitions: [
+    'id', 'name', 'icon', 'color', 'fieldIds', 'displayMode', 'goalType', 'goalValue', 'pinned', 'archived', 'sortOrder', 'scheduleDays', 'skipDays',
+    'pausedUntil', 'dateKind', 'dateLeadDays', 'insightsHidden', 'scheduleHistory', 'createdAt', 'updatedAt',
+  ],
+  trackableEntries: ['id', 'trackableId', 'timestamp', 'note', 'tags', 'values', 'dateRepeat', 'details', 'createdAt', 'updatedAt'],
+  taskProjects: ['id', 'name', 'color', 'icon', 'notes', 'sections', 'archived', 'sortOrder', 'createdAt', 'updatedAt'],
+  tasks: ['id', 'name', 'projectId', 'sectionId', 'parentId', 'notes', 'dueOn', 'dueTime', 'repeat', 'completedAt', 'sortOrder', 'createdAt', 'updatedAt'],
+  taskCompletions: ['id', 'taskId', 'completedAt', 'dueOn', 'nextDueOn', 'subtaskIds', 'createdAt', 'updatedAt'],
+  settings: [
+    'id', 'defaultPresetId', 'notificationsEnabled', 'heightInches', 'goalWeightLb', 'weightFieldId', 'waistFieldId', 'neckFieldId', 'hipFieldId',
+    'bodyFatSex', 'fastScheduleTime', 'customFastPresets', 'fastWeekPlan', 'mutedInsights', 'updatedAt',
+  ],
+};
+
+/** `record` with only the fields its type has (KNOWN_KEYS). */
+export function pickKnown<T>(kind: Exclude<RecordKind, 'tombstones'>, record: T): T {
+  const out: Record<string, unknown> = {};
+  for (const k of KNOWN_KEYS[kind]) {
+    const v = (record as Record<string, unknown>)[k];
+    if (v !== undefined) out[k] = v;
+  }
+  return out as T;
 }

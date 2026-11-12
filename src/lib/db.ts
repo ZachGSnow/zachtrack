@@ -960,7 +960,12 @@ function localDayKey(ms: number): string {
 /** Deletes a task with its subtasks and completion history. */
 export async function deleteTask(id: string): Promise<void> {
   const task = await db.tasks.get(id);
-  await removeTasks([id], true, task?.name);
+  // The label names the project, not the task: a task's name is its content,
+  // and this device's sync history keeps the label for 30 days (3.59).
+  let root = task;
+  for (let i = 0; root?.parentId && i < 100; i++) root = await db.tasks.get(root.parentId);
+  const project = root?.projectId ? await db.taskProjects.get(root.projectId) : undefined;
+  await removeTasks([id], true, project?.name ?? 'Inbox');
   notifyMutation();
 }
 

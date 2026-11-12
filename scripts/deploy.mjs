@@ -11,7 +11,7 @@
 // you didn't choose.
 
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { mkdirSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 
@@ -96,6 +96,18 @@ const stamp = new Date().toISOString().replace(/[:.]/g, '-');
 const backupFile = join(backupDir, `${database}-before-${tag}-${stamp}.sql`);
 run('npx', ['wrangler', 'd1', 'export', database, '--remote', `--output=${backupFile}`]);
 console.log(`Backup: ${backupFile}`);
+// Keep the newest few: each is a full plaintext copy of health data, and
+// older ones are covered by the nightly backups in R2 (30 days).
+const KEEP_BACKUPS = 3;
+const older = readdirSync(backupDir)
+  .filter((f) => f.startsWith(`${database}-before-`) && f.endsWith('.sql'))
+  // Oldest first by time written (names sort v1.9 after v1.20).
+  .sort((a, b) => statSync(join(backupDir, a)).mtimeMs - statSync(join(backupDir, b)).mtimeMs)
+  .slice(0, -KEEP_BACKUPS);
+for (const f of older) {
+  rmSync(join(backupDir, f));
+  console.log(`Removed an older backup: ${f}`);
+}
 
 step('Applying database migrations');
 run('npx', ['wrangler', 'd1', 'migrations', 'apply', database, '--remote']);

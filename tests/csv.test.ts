@@ -37,3 +37,16 @@ describe('CSV export', () => {
     expect(csvFileName(new Date(2026, 9, 23))).toBe('zachtrack-export-2026-10-23.csv');
   });
 });
+
+describe('CSV safety (v1.21.0)', () => {
+  it('makes text a spreadsheet would run as a formula show as text, and leaves numbers alone', () => {
+    const csv = buildCsv({
+      fasts: [],
+      fieldDefinitions: [{ id: 'w', name: 'Weight', kind: 'number', unit: 'lb', createdAt: 1, updatedAt: 1 }],
+      trackableDefinitions: [{ id: 't', name: '=HYPERLINK("http://x","y")', icon: 'x', color: '#000', fieldIds: ['w'], createdAt: 1, updatedAt: 1 }],
+      trackableEntries: [{ id: 'e', trackableId: 't', timestamp: at(20, 8), values: { w: -2 }, note: '@SUM(A1)', tags: ['+1'], createdAt: 1, updatedAt: 1 }],
+      settings: null,
+    });
+    expect(csv.slice(1).split('\r\n')[1]).toBe(`2026-10-20,08:00,"'=HYPERLINK(""http://x"",""y"")",Weight,-2,lb,'@SUM(A1),'+1`);
+  });
+});

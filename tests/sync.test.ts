@@ -55,7 +55,7 @@ interface Changes {
 }
 
 function request(body: unknown, jwt: string | null = token): Request {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
   if (jwt) headers['Cf-Access-Jwt-Assertion'] = jwt;
   return new Request('https://app.example.com/api/sync', { method: 'POST', headers, body: JSON.stringify(body) });
 }
@@ -116,6 +116,24 @@ describe('auth', () => {
     expect((await sync(syncBody(0), env({ ACCESS_TEAM_DOMAIN: '' }))).status).toBe(503);
   });
 
+  it('fails closed without the Access audience tag too', async () => {
+    expect((await sync(syncBody(0), env({ ACCESS_AUD: undefined }))).status).toBe(503);
+  });
+
+  it('refuses a write that did not come from the app itself (cross-site request forgery), and writes nothing', async () => {
+    const body = JSON.stringify(syncBody(0, { fasts: [fast('csrf', day(20), 10)] }));
+    const post = (headers: Record<string, string>) =>
+      handleSync(new Request('https://app.example.com/api/sync', { method: 'POST', headers: { 'Cf-Access-Jwt-Assertion': token, ...headers }, body }), env(), deps());
+    // A form post from another site: text/plain, no custom header.
+    expect((await post({ 'Content-Type': 'text/plain' })).status).toBe(403);
+    // The app's header, but the browser says it came from elsewhere.
+    expect((await post({ 'X-Requested-With': 'XMLHttpRequest', 'Sec-Fetch-Site': 'cross-site' })).status).toBe(403);
+    expect((await post({ 'X-Requested-With': 'XMLHttpRequest', 'Sec-Fetch-Site': 'same-site' })).status).toBe(403);
+    expect(await db.prepare('SELECT COUNT(*) AS n FROM fasts').first('n')).toBe(0);
+    // The app itself.
+    expect((await post({ 'X-Requested-With': 'XMLHttpRequest', 'Sec-Fetch-Site': 'same-origin' })).status).toBe(200);
+  });
+
   it('rejects a request with no Access token, as on pages.dev', async () => {
     expect((await sync(syncBody(0), env(), null)).status).toBe(403);
   });
@@ -129,7 +147,7 @@ describe('auth', () => {
   it('rejects malformed bodies after auth', async () => {
     expect((await sync({ nope: true })).status).toBe(400);
     const res = await handleSync(
-      new Request('https://app.example.com/api/sync', { method: 'POST', headers: { 'Cf-Access-Jwt-Assertion': token }, body: 'not json' }),
+      new Request('https://app.example.com/api/sync', { method: 'POST', headers: { 'Cf-Access-Jwt-Assertion': token, 'X-Requested-With': 'XMLHttpRequest' }, body: 'not json' }),
       env(),
       deps(),
     );
@@ -525,5 +543,24 @@ describe('tasks (v1.19.0)', () => {
     await sync(syncBody(0, {}, [{ recordType: 'tasks', uuid: 'k-sub', deletedAt: 20 }]));
     const res = await sync({ ...syncBody(0), check: true });
     expect(res.body.counts).toMatchObject({ taskProjects: 1, tasks: 1, taskCompletions: 1 });
+  });
+});
+
+describe('change times and display fields (v1.21.0)', () => {
+  it('refuses a record or a delete stamped in the future, and a colour that is not a colour', async () => {
+    const future = Date.now() + 3 * 24 * 3600_000;
+    const res = await sync(
+      syncBody(0, { trackableEntries: [entry('e-future', future, 1)], trackableDefinitions: [{ ...trackable, id: 't-css', color: 'red; position: fixed' }] }, [
+        { recordType: 'fasts', uuid: 'a', deletedAt: future },
+      ]),
+    );
+    expect(res.body.rejected.map((r: { recordType: string; reason: string }) => [r.recordType, r.reason])).toEqual([
+      ['trackableDefinitions', expect.stringContaining('hex colour')],
+      ['trackableEntries', expect.stringContaining('no later than tomorrow')],
+      ['tombstones', expect.stringContaining('no later than tomorrow')],
+    ]);
+    // A clock a few hours fast is fine.
+    const soon = await sync(syncBody(0, { trackableEntries: [entry('e-soon', Date.now() + 3 * 3600_000, 1)] }));
+    expect(soon.body.rejected).toEqual([]);
   });
 });

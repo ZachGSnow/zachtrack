@@ -101,7 +101,8 @@ describe('tasks on the device', () => {
     expect(tombstones.map((t) => `${t.recordType}:${t.uuid}`).sort()).toEqual(
       [`tasks:${parent.id}`, `tasks:${child.id}`, `tasks:${grandchild.id}`, 'taskCompletions:c1'].sort(),
     );
-    expect(tombstones.every((t) => t.label === 'Garage')).toBe(true);
+    // Named by where it was (here the inbox), never by the task's own name.
+    expect(tombstones.every((t) => t.label === 'Inbox')).toBe(true);
   });
 
   it('deletes a project with all of its tasks', async () => {

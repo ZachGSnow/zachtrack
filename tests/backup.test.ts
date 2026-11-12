@@ -28,7 +28,7 @@ async function sync(db: D1Database, body: unknown) {
   const res = await handleSync(
     new Request('https://app.example.com/api/sync', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Cf-Access-Jwt-Assertion': token },
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'Cf-Access-Jwt-Assertion': token },
       body: JSON.stringify(body),
     }),
     { DB: db, OWNER_EMAIL: OWNER, ACCESS_TEAM_DOMAIN: TEAM_DOMAIN, ACCESS_AUD: AUD },

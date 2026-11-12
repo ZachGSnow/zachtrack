@@ -184,9 +184,11 @@ your data goes to your account only.
    your custom domain **and** `zachtrack.pages.dev`, with one Allow policy for
    your email and the One-time PIN login method. Then Pages > zachtrack >
    Settings > enable the access policy for preview deployments
-   (`*.zachtrack.pages.dev`).
-6. **Vars:** set `OWNER_EMAIL`, `ACCESS_TEAM_DOMAIN` and (recommended)
-   `ACCESS_AUD` in `wrangler.toml`, then build and deploy again.
+   (`*.zachtrack.pages.dev`). In the app's settings, set the cookie's
+   SameSite attribute to Lax, so another site can't send requests with your
+   login (the sync endpoint also refuses them on its own).
+6. **Vars:** set `OWNER_EMAIL`, `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD` in
+   `wrangler.toml`, then build and deploy again.
 
 **Deploying a release:** from a clean, pulled `main` at the release tag, run
 `npm run deploy`. It backs up the database to a file outside the repo (your
@@ -212,10 +214,10 @@ All values live in `wrangler.toml` (start from `wrangler.toml.example`).
 | `database_id` | yes | Your D1 database id (`wrangler d1 create` prints it) |
 | `OWNER_EMAIL` | yes | The only email the sync endpoint accepts; must match your Access policy |
 | `ACCESS_TEAM_DOMAIN` | yes | Your Zero Trust team domain, e.g. `your-team.cloudflareaccess.com` |
-| `ACCESS_AUD` | recommended | The Access application's AUD tag (Access > Applications > your app > Overview) |
+| `ACCESS_AUD` | yes | The Access application's AUD tag (Access > Applications > your app > Overview) |
 
-If `OWNER_EMAIL` or `ACCESS_TEAM_DOMAIN` is missing, the sync endpoint refuses
-every request instead of running unchecked.
+If `OWNER_EMAIL`, `ACCESS_TEAM_DOMAIN` or `ACCESS_AUD` is missing, the sync
+endpoint refuses every request instead of running unchecked.
 
 ## Backups
 
