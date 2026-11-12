@@ -337,7 +337,7 @@ browser tests on Linux. See [e2e/README.md](e2e/README.md).
   `d1/scrub-deleted.sql`.
 - Backups: a backup restored into a second local D1 matches every table,
   including awkward text, and devices pull the restored rows.
-- Export and import with the real `db.ts` on fake IndexedDB: a full restore
+- Export and import with the real `db/` on fake IndexedDB: a full restore
   onto a fresh device, merge by newest version, no deletes, re-import is a
   no-op, invalid / orphan / same-day records skipped; and a new device's
   default settings never overwrite synced settings.
