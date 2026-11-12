@@ -41,14 +41,16 @@ test('a fast started and then ended on another device shows up without a restart
   // The phone started a fast three hours ago; this device pulls it.
   next = pull([remoteFast], 10);
   await page.getByRole('button', { name: /Synced/ }).click();
+  const firstTapAt = await page.evaluate(() => Date.now());
   await expect(page.getByRole('button', { name: 'End Fast' })).toBeVisible();
   await expect(page.getByText(/^0?3:0\d:\d\d$/)).toBeVisible();
 
   // The phone ended it; this device pulls the newer version.
   const endTime = Date.now();
   next = pull([{ ...remoteFast, endTime, updatedAt: endTime }], 11);
-  // Two taps on the pill within 350 ms open the history instead of syncing.
-  await page.waitForTimeout(500);
+  // Two taps on the pill within 350 ms open the history instead of syncing:
+  // this one comes later than that (usually it already does).
+  await page.waitForFunction((at) => Date.now() - at > 400, firstTapAt);
   await page.getByRole('button', { name: /Synced/ }).click();
   await expect(page.getByRole('heading', { name: 'Ready when you are' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'End Fast' })).toHaveCount(0);

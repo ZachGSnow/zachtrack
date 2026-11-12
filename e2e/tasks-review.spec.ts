@@ -78,6 +78,32 @@ test('Done lists what was completed by day, repeats included, and Insights and t
   expect(problems).toEqual([]);
 });
 
+test('the weekly review shows this week so far on Sunday, last week on Monday, and nothing midweek', async ({ page }) => {
+  // A fixed week, so this runs whatever day the suite does: Sunday 14 June 2026, 10 am.
+  await page.clock.install({ time: new Date(2026, 5, 14, 10, 0) });
+  const problems = watchForProblems(page);
+  await quickAdd(page, 'Water the ferns every 3 days', 'Post the parcel today');
+  await page.goto('/#/');
+  const todayTasks = page.getByRole('region', { name: 'Tasks' });
+  await todayTasks.getByRole('checkbox', { name: 'Complete Water the ferns' }).click();
+  await todayTasks.getByRole('checkbox', { name: 'Complete Post the parcel' }).click();
+  const review = page.getByRole('region', { name: 'Weekly review' });
+  await expect(review).toContainText('This week so far');
+  await expect(review).toContainText(/Tasks\s*2\s*done, 1 of 1 repeats on time/);
+
+  await page.clock.setSystemTime(new Date(2026, 5, 15, 10, 0));
+  await page.reload();
+  await expect(review).toContainText('Week of');
+  await expect(review).toContainText(/Tasks\s*2\s*done, 1 of 1 repeats on time/);
+
+  await page.clock.setSystemTime(new Date(2026, 5, 17, 10, 0));
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Today', level: 1 })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Tasks' })).toBeVisible();
+  await expect(review).toHaveCount(0);
+  expect(problems).toEqual([]);
+});
+
 test('one undo message at a time: logging a trackable and then completing a task shows only the latest', async ({ page }) => {
   await quickAdd(page, 'Post the parcel today');
   // A trackable without fields logs in one tap, with Undo.

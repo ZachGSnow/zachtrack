@@ -33,7 +33,7 @@
     '/fasting': Fasting,
     '/trackables': Trackables,
     // Lazy-loaded: these pull in ECharts, so keep them out of the initial bundle.
-    '/trackables/:id': wrap({ asyncComponent: () => import('./routes/TrackableDetail.svelte') }),
+    '/trackables/:id': wrap({ asyncComponent: () => import('./routes/TrackableDetailRoute.svelte') }),
     '/journey': wrap({ asyncComponent: () => import('./routes/Journey.svelte') }),
     '/insights': wrap({ asyncComponent: () => import('./routes/Insights.svelte') }),
     // The Data tab's old address, so links and bookmarks to it still work.

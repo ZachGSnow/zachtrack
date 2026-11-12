@@ -4,7 +4,7 @@
     "lib": ["ES2023"],
     "module": "esnext",
     "moduleResolution": "bundler",
-    "types": ["@cloudflare/workers-types", "node"],
+    "types": ["@cloudflare/workers-types", "node", "svelte"],
     "strict": true,
     "noEmit": true,
     "skipLibCheck": true,
