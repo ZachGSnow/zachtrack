@@ -48,7 +48,11 @@ export function weeklyReview(
   let met = 0;
   let of = 0;
   const byId = new Map<string, TrackableEntry[]>();
-  for (const e of entries) byId.set(e.trackableId, [...(byId.get(e.trackableId) ?? []), e]);
+  for (const e of entries) {
+    const list = byId.get(e.trackableId);
+    if (list) list.push(e);
+    else byId.set(e.trackableId, [e]);
+  }
   for (const t of trackables) {
     if (t.archived || !t.goalType || t.goalType === 'avoid' || t.displayMode === 'ages' || !t.goalValue) continue;
     const own = byId.get(t.id) ?? [];

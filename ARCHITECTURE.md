@@ -1466,6 +1466,48 @@ offer replaces the older, whose change simply stays, and the message
 survives moving between pages for its six seconds. The README screenshots
 gained Tasks (a project) and Done.
 
+### 3.68 Staying fast with years of data (v1.21.0)
+
+A review measured what the app does every minute and on every write with
+five and ten years of synthetic entries (about 12k and 24k). Nothing was
+slow yet; these were the parts that grew fastest, now fixed:
+
+- **Quadratic grouping.** The weekly review and the away card grouped
+  entries by copying a trackable's list for every entry; ten years took
+  about 130 ms each per minute on a desktop (several times that on a
+  phone). They push into the list now (about 15 ms). `tests/scale.test.ts`
+  runs Today's per-minute work over 24k entries against loose time
+  budgets, so a regression like this fails CI.
+- **Finding what to sync.** Each edit counted unsynced changes by reading
+  every record of every synced table, through a Dexie filter (a cursor,
+  about twice as slow as a plain read), three times per edit counting the
+  sync's own pass. Dexie v8 indexes `updatedAt` on the seven synced tables:
+  a sync reads only what changed (`getChangedSyncableRecords`) and the
+  waiting count is seven index counts that read no record
+  (`countWaitingChanges`), once after a burst of edits rather than per
+  edit. Imports (a scale CSV, the holiday pack) write their entries in one
+  bulk add with one change notice (`addTrackableEntries`).
+- **The due sort** on Trackables worked out a trackable's goal status on
+  both sides of every comparison; it works each out once now.
+- **One clock** (`stores/clock.svelte.ts`) replaces a minute timer in every
+  trackable card, Coming up and Today. Its `day` changes only at midnight,
+  and what depends on the day alone (the weekly review, goal suggestions,
+  dates coming up) follows it instead of the minute.
+- **Lighter loading.** Opening a trackable's page loaded and parsed ECharts
+  (about 570 kB) even in table view, the default; `EChart.svelte` now
+  imports it (through `echartsSetup.ts`, with only the parts used) the
+  first time a chart is drawn, leaving the page's own chunk at 13 kB. The
+  colour helpers load culori's tree-shakeable entry with the four colour
+  spaces they use instead of all of them (the main bundle went from 349 to
+  326 kB). The offline cache listed the favicon, icons and manifest twice;
+  it no longer does (36 to 32 entries).
+
+Not done: several screens still subscribe to the same table more than once
+(Dexie shares the read but clones the result for each), and each subscriber
+re-derives its own view. With today's data that costs a few milliseconds;
+merging them means a shared store per table, worth it when it shows up in
+a measurement.
+
 ### 3.21 Trackables list: pin, archive, order; tag filters
 - **Sort** (per device, `zachtrack:trackables-view`): Due first (goal
   urgency from 3.18: overdue, then due, then the rest, then trackables

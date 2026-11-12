@@ -3,6 +3,7 @@
   import {
     db,
     addTrackableEntry,
+    addTrackableEntries,
     createFieldDefinition,
     updateFieldDefinition,
     createTrackable,
@@ -313,7 +314,7 @@
       } else {
         const created = await createTrackable(payload);
         if (isDates && withHolidayPack) {
-          for (const spec of US_HOLIDAYS) await addTrackableEntry({ trackableId: created.id, ...holidayEntry(spec) });
+          await addTrackableEntries(US_HOLIDAYS.map((spec) => ({ trackableId: created.id, ...holidayEntry(spec) })));
         }
         onSaved?.(created.id);
       }

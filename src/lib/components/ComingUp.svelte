@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { clock } from '../stores/clock.svelte';
   import { link } from 'svelte-spa-router';
   import type { TrackableDefinition, TrackableEntry } from '../db';
   import { attentionStore } from '../stores/attention.svelte';
@@ -12,11 +13,8 @@
   const WITHIN_DAYS = 14;
   const SHOWN = 5;
 
-  let now = $state(Date.now());
-  $effect(() => {
-    const timer = setInterval(() => (now = Date.now()), 60_000);
-    return () => clearInterval(timer);
-  });
+  // Dates move a day at a time: the shared clock's day (3.68).
+  const now = $derived(clock.day);
 
   const datesTrackables = $derived(trackables.filter((t) => !t.archived && t.displayMode === 'ages'));
   const items = $derived.by(() => {

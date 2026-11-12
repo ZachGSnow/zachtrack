@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { clock } from '../stores/clock.svelte';
   import { link } from 'svelte-spa-router';
   import type { FieldDefinition, TrackableDefinition, TrackableEntry } from '../db';
   import { resolveKind, summarize } from '../utils/trackableKinds';
@@ -41,12 +42,8 @@
   // is; text, rings and the "+" get a version that reads on this theme.
   const ink = $derived(readableGraphic(trackable.color, themeStore.effective));
 
-  // Re-render "2h ago" as time passes, not only when entries change.
-  let now = $state(Date.now());
-  $effect(() => {
-    const timer = setInterval(() => (now = Date.now()), 60_000);
-    return () => clearInterval(timer);
-  });
+  // Re-render "2h ago" as time passes, from the one shared clock (3.68).
+  const now = $derived(clock.now);
 
   // A dates trackable's card lists its next few dates: "Mom in 12 days, Wedding tomorrow".
   const nextUp = $derived(

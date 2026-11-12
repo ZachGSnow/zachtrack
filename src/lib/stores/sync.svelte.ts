@@ -440,6 +440,7 @@ class SyncStore {
   private checkRequested = false;
 
   private debounceTimer: ReturnType<typeof setTimeout> | undefined;
+  private waitingTimer: ReturnType<typeof setTimeout> | undefined;
   private inFlight: Promise<void> | undefined;
   private unsubscribe: (() => void) | undefined;
   private syncedListeners: Array<() => void> = [];
@@ -604,7 +605,9 @@ class SyncStore {
 
     if (!this.unsubscribe) {
       this.unsubscribe = onLocalMutation(() => {
-        void this.refreshWaiting();
+        // Once after a burst of edits (an import, typing quickly), not once per edit.
+        clearTimeout(this.waitingTimer);
+        this.waitingTimer = setTimeout(() => void this.refreshWaiting(), 400);
         this.scheduleSync();
       });
       this.watchForReturn();

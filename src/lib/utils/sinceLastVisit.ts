@@ -51,7 +51,11 @@ export function sinceLastVisit(i: AwayInput): AwayLine[] {
 
   // Daily goals missed on the days you were away (today is still open).
   const byId = new Map<string, TrackableEntry[]>();
-  for (const e of i.entries) byId.set(e.trackableId, [...(byId.get(e.trackableId) ?? []), e]);
+  for (const e of i.entries) {
+    const list = byId.get(e.trackableId);
+    if (list) list.push(e);
+    else byId.set(e.trackableId, [e]);
+  }
   for (const t of i.trackables) {
     if (t.archived || t.displayMode === 'ages' || !t.goalType || !DAILY_GOALS.includes(t.goalType) || !t.goalValue) continue;
     const own = byId.get(t.id) ?? [];
