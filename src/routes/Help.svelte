@@ -12,6 +12,7 @@
     { id: 'today', title: 'Today' },
     { id: 'trackables', title: 'Trackables and what they show' },
     { id: 'dates', title: 'Dates: birthdays, holidays and countdowns' },
+    { id: 'tasks', title: 'Tasks: projects, subtasks and repeating tasks' },
     { id: 'goals', title: 'Goals' },
     { id: 'streaks', title: 'Streaks, rest days, skipping and pausing' },
     { id: 'grid', title: 'The habit grid' },
@@ -48,8 +49,9 @@
     <section id="help-getting-started">
       <h2>Getting started</h2>
       <p class="mb-2">
-        Four tabs: <strong>Today</strong> (what to do now), <strong>Fasting</strong> (the timer, Journey with your stats, and
-        History of past fasts), <strong>Trackables</strong> (the list, and Dates), and <strong>Insights</strong>. Switch a tab's
+        Five tabs: <strong>Today</strong> (what to do now), <strong>Fasting</strong> (the timer, Journey with your stats, and
+        History of past fasts), <strong>Trackables</strong> (the list, and Dates), <strong>Tasks</strong> (your to-do list:
+        Projects and Upcoming), and <strong>Insights</strong>. Switch a tab's
         pages with the buttons at the top of the page; on a laptop they're listed in the sidebar.
       </p>
       <ol>
@@ -205,6 +207,56 @@
           falls on February 28 in other years.
         </li>
       </ul>
+    </section>
+
+    <section id="help-tasks">
+      <h2>Tasks: projects, subtasks and repeating tasks</h2>
+      <p>A to-do list: things to finish, each with a checkbox, rather than things you log.</p>
+      <ul>
+        <li>
+          <strong>Projects and sections.</strong> Tasks > "+ New project" names it and starts it with a set of sections (Now /
+          Next / Later and so on) or none. Edit on a project renames, reorders, adds or removes sections; a removed section's
+          tasks move to the top. Tap a section's name to fold it. Tasks without a project go to the Inbox.
+        </li>
+        <li>
+          <strong>Adding.</strong> Type in "+ Add a task" at the end of a section and press Enter; type the next one straight
+          away. Reorder puts up and down arrows on each task.
+        </li>
+        <li>
+          <strong>A task's sheet.</strong> Tap a task to open it: its name, project and section, due date and time, notes and
+          subtasks. Everything saves as you change it. A subtask opens in the same sheet, with "Subtask of ..." to go back.
+        </li>
+        <li>
+          <strong>Completing.</strong> Tap the circle. Undo appears for a few seconds. Completed tasks hide; "Show completed"
+          brings them back, and tapping a filled circle reopens one.
+        </li>
+      </ul>
+      <p><strong>Repeating tasks.</strong> With a due date set, Repeat makes it come round again:</p>
+      <ul>
+        <li>Daily (or every few days), Weekly on the days you pick, Monthly on a date or the last day, Monthly on a weekday (the first Wednesday, the last Friday), Yearly, or a set time after it's done (180 days after the last oil change).</li>
+        <li>
+          Completing a repeating task doesn't close it: it moves to its next date, and its done subtasks are unchecked for
+          next time. Done early, the next date stays on schedule. Done late, it moves to the next date after today, so it isn't
+          overdue for turns you've already missed. "After it's done" counts from the day you complete it.
+        </li>
+        <li>Undo puts the date and the subtasks back. "Skip this one" moves it on without counting it as done.</li>
+        <li>Moving the due date takes the rule with it: weekly on Thursday becomes weekly on Wednesday if you move it to a Wednesday.</li>
+        <li>Its sheet lists when it was done, and whether that was on time, late or early.</li>
+      </ul>
+      <p><strong>Where tasks show.</strong></p>
+      <ul>
+        <li><strong>Upcoming</strong> (Tasks > Upcoming): everything with a due date, from every project, overdue first, then by day and month.</li>
+        <li><strong>Today</strong> lists tasks overdue or due today, and the Tasks tab shows how many. No notifications, as with goals.</li>
+        <li>An archived project's tasks leave Upcoming, Today and the count.</li>
+      </ul>
+      <p>
+        <strong>Task or goal?</strong> A trackable with a goal is for something you keep doing and want a streak and a
+        history of (water, weigh-ins). A task is for something to get done, with a due date, subtasks or a project.
+      </p>
+      <p>
+        <strong>Moving from another app.</strong> Tasks come in through Settings > Your data > Import, in a ZachTrack export
+        file. Importing merges: nothing here is deleted, and a record already here is only replaced by a newer copy.
+      </p>
     </section>
 
     <section id="help-goals">

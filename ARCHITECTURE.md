@@ -1345,6 +1345,32 @@ walks the screens.
   while a field in the sheet had focus. The sheet now handles Escape
   itself, and blurs the focused field first so an edit in progress saves.
 
+### 3.63 Moving tasks in from Asana, and Help (v1.19.0)
+
+There is no Asana importer in the app. A one-time move doesn't justify an
+OAuth app, a token or a CSV parser that would only ever run once, and
+Asana's API and CSV export both leave out repeat rules anyway. Instead the
+move is a ZachTrack export file (3.13) built outside the repo from Asana's
+data (read through an Asana connector), and loaded with Settings > Your
+data > Import:
+
+- Asana projects become projects, a leading emoji becoming the icon;
+  sections, notes, due dates, subtasks at any depth and completion times
+  carry over, in Asana's order.
+- Asana makes a new copy of a recurring task each time it is completed. The
+  open copy becomes the one repeating task, its rule inferred from the
+  copies' due dates, and the completed copies become its completion rows.
+- Ids are a uuid5 of the Asana id, so building the file again later and
+  importing it merges into the same records (import keeps the newer copy,
+  3.13) instead of duplicating them.
+- The file never enters the repo; `e2e/tasks.spec.ts` imports a fictional
+  one through the real Settings flow, and imports it twice to show the
+  second time adds nothing.
+
+Help gains a Tasks topic (projects, subtasks, how repeating tasks move on
+early and late, Upcoming and Today, task or goal, importing), linked from
+the Tasks page heading and from Repeat in a task's sheet.
+
 ### 3.21 Trackables list: pin, archive, order; tag filters
 - **Sort** (per device, `zachtrack:trackables-view`): Due first (goal
   urgency from 3.18: overdue, then due, then the rest, then trackables
