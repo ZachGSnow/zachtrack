@@ -20,7 +20,8 @@
     try {
       const file = await downloadBackupFile();
       const d = file.data;
-      message = `Exported ${pluralize(d.fasts.length, 'fast')}, ${pluralize(d.trackableEntries.length, 'entry', 'entries')} and ${pluralize(d.trackableDefinitions.length, 'trackable')}.`;
+      const tasks = d.tasks.length ? `, ${pluralize(d.tasks.length, 'task')}` : '';
+      message = `Exported ${pluralize(d.fasts.length, 'fast')}, ${pluralize(d.trackableEntries.length, 'entry', 'entries')}${tasks} and ${pluralize(d.trackableDefinitions.length, 'trackable')}.`;
     } catch (err) {
       error = `Export failed: ${err instanceof Error ? err.message : String(err)}`;
     }

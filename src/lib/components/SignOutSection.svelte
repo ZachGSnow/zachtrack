@@ -47,6 +47,8 @@
           pluralize(check.counts.fasts, 'fast'),
           pluralize(check.counts.trackableDefinitions, 'trackable'),
           pluralize(check.counts.fieldDefinitions, 'field'),
+          ...(check.counts.tasks ? [pluralize(check.counts.tasks, 'task')] : []),
+          ...(check.counts.taskProjects ? [pluralize(check.counts.taskProjects, 'project')] : []),
         ].join(', ')
       : '',
   );

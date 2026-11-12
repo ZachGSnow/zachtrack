@@ -7,7 +7,7 @@
 // of newer data changes nothing. The plan is computed first and shown to the
 // user; only a confirmed plan is written. See ARCHITECTURE.md 3.13.
 
-import type { FastRecord, FieldDefinition, SettingsRecord, TrackableDefinition, TrackableEntry } from './db';
+import type { FastRecord, FieldDefinition, SettingsRecord, Task, TaskCompletion, TaskProject, TrackableDefinition, TrackableEntry } from './db';
 import { invalidReason, recordKey, type RecordKind } from './validate';
 
 export const EXPORT_FORMAT = 'zachtrack-export';
@@ -18,6 +18,10 @@ export interface ExportData {
   fieldDefinitions: FieldDefinition[];
   trackableDefinitions: TrackableDefinition[];
   trackableEntries: TrackableEntry[];
+  /** Files from before tasks have none of these; reading one treats them as empty. */
+  taskProjects: TaskProject[];
+  tasks: Task[];
+  taskCompletions: TaskCompletion[];
   settings: SettingsRecord | null;
 }
 
@@ -33,6 +37,9 @@ export interface LocalSnapshot {
   fieldDefinitions: FieldDefinition[];
   trackableDefinitions: TrackableDefinition[];
   trackableEntries: TrackableEntry[];
+  taskProjects?: TaskProject[];
+  tasks?: Task[];
+  taskCompletions?: TaskCompletion[];
   settings: SettingsRecord | null;
 }
 
@@ -46,6 +53,9 @@ export function buildExport(local: LocalSnapshot, now: Date): ExportFile {
       fieldDefinitions: local.fieldDefinitions,
       trackableDefinitions: local.trackableDefinitions,
       trackableEntries: local.trackableEntries,
+      taskProjects: local.taskProjects ?? [],
+      tasks: local.tasks ?? [],
+      taskCompletions: local.taskCompletions ?? [],
       settings: local.settings,
     },
   };
@@ -165,6 +175,37 @@ export function planImport(text: string, local: LocalSnapshot): ParseResult {
       return newer(f as FastRecord, localFasts.get(f.uuid));
     });
 
+  // Tasks: a task or completion that points at a project, parent or task that
+  // is neither here nor in the file would be invisible, like an entry without
+  // its trackable.
+  const localProjects = byId(local.taskProjects ?? [], (p) => p.id);
+  const taskProjects = valid<TaskProject>('taskProjects', data.taskProjects).filter((p) => newer(p, localProjects.get(p.id)));
+  const knownProjects = new Set([...localProjects.keys(), ...taskProjects.map((p) => p.id)]);
+
+  const localTasks = byId(local.tasks ?? [], (t) => t.id);
+  const fileTasks = valid<Task>('tasks', data.tasks);
+  const knownTasks = new Set([...localTasks.keys(), ...fileTasks.map((t) => t.id)]);
+  const tasks = fileTasks.filter((t) => {
+    if (t.projectId && !knownProjects.has(t.projectId)) {
+      skipped.push({ recordType: 'tasks', id: t.id, reason: 'its project is not on this device or in the file' });
+      return false;
+    }
+    if (t.parentId && !knownTasks.has(t.parentId)) {
+      skipped.push({ recordType: 'tasks', id: t.id, reason: 'its parent task is not on this device or in the file' });
+      return false;
+    }
+    return newer(t, localTasks.get(t.id));
+  });
+
+  const localCompletions = byId(local.taskCompletions ?? [], (c) => c.id);
+  const taskCompletions = valid<TaskCompletion>('taskCompletions', data.taskCompletions).filter((c) => {
+    if (!knownTasks.has(c.taskId)) {
+      skipped.push({ recordType: 'taskCompletions', id: c.id, reason: 'its task is not on this device or in the file' });
+      return false;
+    }
+    return newer(c, localCompletions.get(c.id));
+  });
+
   let settings: SettingsRecord | null = null;
   if (data.settings != null) {
     const [candidate] = valid<SettingsRecord>('settings', [data.settings]);
@@ -175,7 +216,7 @@ export function planImport(text: string, local: LocalSnapshot): ParseResult {
     ok: true,
     plan: {
       exportedAt: typeof parsed.exportedAt === 'string' ? parsed.exportedAt : '',
-      changes: { fasts, fieldDefinitions, trackableDefinitions, trackableEntries, settings },
+      changes: { fasts, fieldDefinitions, trackableDefinitions, trackableEntries, taskProjects, tasks, taskCompletions, settings },
       added,
       updated,
       unchanged,

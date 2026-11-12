@@ -5,7 +5,19 @@ import { join } from 'node:path';
 // of v1.5.0) followed by every d1/migrations/*.sql in order, the same order
 // `wrangler d1 migrations apply` uses.
 
-export const APP_TABLES = ['fasts', 'fieldDefinitions', 'trackableDefinitions', 'trackableEntries', 'settings', 'syncSeq', 'devices', 'syncEvents'] as const;
+export const APP_TABLES = [
+  'fasts',
+  'fieldDefinitions',
+  'trackableDefinitions',
+  'trackableEntries',
+  'taskProjects',
+  'tasks',
+  'taskCompletions',
+  'settings',
+  'syncSeq',
+  'devices',
+  'syncEvents',
+] as const;
 
 const MIGRATIONS_DIR = 'd1/migrations';
 

@@ -119,10 +119,11 @@ interface SyncMeta {
 }
 ```
 
-Dexie is at schema **version 4**. Version 4's migration backfills `uuid` for
-existing fasts and `updatedAt` for existing field definitions/settings -
-additive, no data loss, same pattern as the v2 `startDay` migration before
-it.
+Dexie is at schema **version 7** (v7 adds the task tables, 3.59). Version 4's
+migration backfilled `uuid` for existing fasts and `updatedAt` for existing
+field definitions/settings - additive, no data loss, same pattern as the v2
+`startDay` migration before it. The task records (`TaskProject`, `Task`,
+`TaskCompletion`) are described in 3.59.
 
 The **D1 (remote) schema** (`d1/schema.sql`) mirrors these almost exactly,
 with the same field names (camelCase, not snake_case - a deliberate choice
@@ -245,7 +246,7 @@ safer than guessing which side should win.
 Every sync request that has records to write does, at most: one query to
 reserve a contiguous block of `serverSeq` values (`UPDATE syncSeq SET value
 = value + ? ... RETURNING value`), one query to fetch existing fast
-`(uuid, startDay)` claims, and up to five `db.batch([...])` calls (one per
+`(uuid, startDay)` claims, and up to eight `db.batch([...])` calls (one per
 table) - regardless of how many records are actually being synced. This
 exists because of a real production bug; see Section 4.1 for the story.
 
@@ -1186,6 +1187,66 @@ checkbox for a trackable without fields) and how many entries each day
 already has. Saving adds one entry at noon for each day with a value;
 cells that aren't a number, or a rating out of range, are flagged and left
 out.
+
+### 3.59 Tasks: projects, sections, subtasks and repeating due dates (v1.19.0)
+
+A to-do list in the app, so the Asana it replaces can go: projects with
+sections, tasks with subtasks, due dates that repeat. Assignees, comments,
+attachments, timelines, dependencies and custom fields are left out on
+purpose; this is one person's list. Reminders stay in the app (Today and
+the tab badge, 3.27), and Tasks gets its own tab. This first part is the
+data and sync only; the screens follow.
+
+Three synced tables, local (Dexie v7) and in D1 (migration
+`0010_tasks.sql`), with the same LWW, soft delete and `serverSeq` rules as
+the rest (3.4 to 3.8):
+
+- **taskProjects** (`TaskProject`): name, colour, optional icon and notes,
+  archived and list order. Its **sections** are a JSON list inside the
+  project, in display order, not a table: there are a handful per project,
+  they only change with the project, and one record keeps a reorder to one
+  write. A task in a section that no longer exists shows at the top of the
+  project.
+- **tasks** (`Task`): name, notes, a due day `dueOn` ("YYYY-MM-DD", a
+  calendar day, so no time zone or DST arithmetic, like `skipDays` in 3.25)
+  with an optional `dueTime`, `completedAt`, and `sortOrder` (a number, so
+  moving a task between two others writes only that task). A top-level task
+  has `projectId` (unset = no project) and `sectionId`; a subtask has
+  `parentId` instead and goes wherever its parent goes, at any depth.
+- **taskCompletions** (`TaskCompletion`): one row per completion of a
+  repeating task, with the due date it was done for, the date it moved to,
+  and the subtasks the move reset, which is what Undo needs to put back.
+
+**Repeating tasks move forward instead of copying themselves.** Asana makes
+a new task each time one is completed. That duplicates subtasks, and a
+recurring subtask under a recurring parent multiplies. Here completing a
+repeating task writes a completion row, moves `dueOn` to the next date and
+reopens its subtasks; the task keeps its id. `TaskRepeat` covers every N
+days; every N weeks on chosen weekdays; every N months on a day (clamped
+to the month's end, or the last day); every N months on the nth or last
+weekday; every N years; and N days, weeks, months or years after the day
+it was completed, with no 30-day cap. The rules are checked by
+`validate.ts` (a repeat or a time needs a due date; a day must exist). The
+engine that works out the next date comes with the screens.
+
+**Deletes take what hangs off them.** Deleting a task deletes its subtasks
+and completions, and deleting a project deletes its tasks, each with its own
+tombstone (`removeTasks` in `db.ts`). A delete pulled from another device
+does the same locally without writing tombstones. On the server, a deleted
+task loses its name and notes (its name is its content), and a deleted
+project its notes; the project keeps its name, like a trackable. The shared
+activity log (3.32) names a task by its project ("Task -- Home"), never by
+its own name.
+
+**Older devices.** A device on an older version moves its pull cursor past
+task rows without storing them. The v7 upgrade sets the cursor back to 0
+once, so the first sync after updating receives everything again; nothing
+local is deleted. Requests and export files without the task lists still
+work: the lists are optional on the wire and in `planImport`, which also
+skips a task whose project or parent, or a completion whose task, is
+neither on the device nor in the file. Nightly backups include the three
+tables. A sync now makes at most 8 upsert batches, well under the
+subrequest limit (4.1).
 
 ### 3.21 Trackables list: pin, archive, order; tag filters
 - **Sort** (per device, `zachtrack:trackables-view`): Due first (goal

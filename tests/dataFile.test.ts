@@ -171,3 +171,49 @@ describe('export then import on another device (real db.ts on fake IndexedDB)', 
     expect(await db.fasts.count()).toBe(1);
   });
 });
+
+describe('tasks in the export file (v1.19.0)', () => {
+  const project = { id: 'p1', name: 'Home', color: '#3b82f6', sections: [{ id: 's1', name: 'In flight' }], createdAt: T0, updatedAt: T0 };
+  const task = (id: string, extra: Record<string, unknown> = {}) => ({ id, name: `Task ${id}`, sortOrder: 1, createdAt: T0, updatedAt: T0, ...extra });
+
+  it('exports and imports projects, tasks and completions', () => {
+    const text = fileText({
+      taskProjects: [project],
+      tasks: [task('k1', { projectId: 'p1', dueOn: '2026-12-01', repeat: { type: 'years', every: 1 } }), task('k2', { parentId: 'k1' })],
+      taskCompletions: [{ id: 'c1', taskId: 'k1', completedAt: T0, createdAt: T0, updatedAt: T0 }],
+    });
+    const result = planImport(text, snapshot());
+    if (!result.ok) throw new Error(result.error);
+    expect(result.plan.changes.taskProjects).toHaveLength(1);
+    expect(result.plan.changes.tasks.map((t) => t.id)).toEqual(['k1', 'k2']);
+    expect(result.plan.changes.taskCompletions).toHaveLength(1);
+    expect(result.plan.added).toBe(4);
+    expect(result.plan.skipped).toEqual([]);
+  });
+
+  it('skips a task whose project or parent is missing, and a completion whose task is missing', () => {
+    const text = fileText({
+      tasks: [task('k1', { projectId: 'p-gone' }), task('k2', { parentId: 'k-gone' }), task('k3')],
+      taskCompletions: [{ id: 'c1', taskId: 'k-gone', completedAt: T0, createdAt: T0, updatedAt: T0 }],
+    });
+    const result = planImport(text, snapshot());
+    if (!result.ok) throw new Error(result.error);
+    expect(result.plan.changes.tasks.map((t) => t.id)).toEqual(['k3']);
+    expect(result.plan.skipped.map((s) => [s.recordType, s.id])).toEqual([
+      ['tasks', 'k1'],
+      ['tasks', 'k2'],
+      ['taskCompletions', 'c1'],
+    ]);
+  });
+
+  it('reads a file from before tasks', () => {
+    const file = JSON.parse(fileText({ trackableDefinitions: [nutrition] }));
+    delete file.data.taskProjects;
+    delete file.data.tasks;
+    delete file.data.taskCompletions;
+    const result = planImport(JSON.stringify(file), snapshot());
+    if (!result.ok) throw new Error(result.error);
+    expect(result.plan.changes.tasks).toEqual([]);
+    expect(result.plan.added).toBe(1);
+  });
+});

@@ -8,13 +8,24 @@
 // reported back in the response's `rejected` list, like a day conflict.
 // Extra properties (e.g. Dexie's local `id` on fasts) are allowed and ignored.
 
-export type RecordKind = 'fasts' | 'fieldDefinitions' | 'trackableDefinitions' | 'trackableEntries' | 'settings' | 'tombstones';
+export type RecordKind =
+  | 'fasts'
+  | 'fieldDefinitions'
+  | 'trackableDefinitions'
+  | 'trackableEntries'
+  | 'taskProjects'
+  | 'tasks'
+  | 'taskCompletions'
+  | 'settings'
+  | 'tombstones';
 
 /** Longest string accepted in any text column (notes, names, tags). */
 export const MAX_TEXT = 10_000;
 const MAX_TAGS = 100;
 const MAX_FIELD_IDS = 200;
 const MAX_VALUES = 200;
+const MAX_SECTIONS = 200;
+const MAX_SUBTASK_IDS = 500;
 
 type Check = (record: Record<string, unknown>) => string | null;
 
@@ -41,6 +52,46 @@ function isDateRepeat(v: unknown): boolean {
       return false;
   }
 }
+/** A TaskRepeat (db.ts), with no keys beyond its type's. */
+function isTaskRepeat(v: unknown): boolean {
+  if (!isObject(v)) return false;
+  const keys = Object.keys(v);
+  const only = (...allowed: string[]) => keys.every((k) => allowed.includes(k));
+  if (!isInt(v.every, 1, 365)) return false;
+  switch (v.type) {
+    case 'days':
+    case 'years':
+      return only('type', 'every');
+    case 'weeks':
+      return (
+        only('type', 'every', 'weekdays') &&
+        Array.isArray(v.weekdays) &&
+        v.weekdays.length >= 1 &&
+        v.weekdays.length <= 7 &&
+        v.weekdays.every((d) => isInt(d, 0, 6)) &&
+        new Set(v.weekdays).size === v.weekdays.length
+      );
+    case 'months':
+      return only('type', 'every', 'day') && (isInt(v.day, 1, 31) || v.day === -1);
+    case 'monthsNth':
+      return only('type', 'every', 'nth', 'weekday') && (isInt(v.nth, 1, 5) || v.nth === -1) && isInt(v.weekday, 0, 6);
+    case 'afterDone':
+      return only('type', 'every', 'unit') && ['days', 'weeks', 'months', 'years'].includes(v.unit as string);
+    default:
+      return false;
+  }
+}
+
+/** A real calendar day as "YYYY-MM-DD". */
+function isDay(v: unknown): boolean {
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+  const [y, m, d] = v.split('-').map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d;
+}
+
+const isClock = (v: unknown) => typeof v === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(v);
+
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 const isText = (v: unknown): v is string => typeof v === 'string' && v.length <= MAX_TEXT;
 const isId = (v: unknown): v is string => typeof v === 'string' && v.length > 0 && v.length <= 200;
@@ -170,6 +221,57 @@ const checks: Record<Exclude<RecordKind, 'tombstones'>, Check> = {
         'an object of numbers or booleans',
       ),
     ),
+  taskProjects: (r) =>
+    all(
+      required(r, 'id', isId, 'a non-empty string'),
+      required(r, 'name', isText, 'a string'),
+      required(r, 'color', isText, 'a string'),
+      required(
+        r,
+        'sections',
+        (v) =>
+          Array.isArray(v) &&
+          v.length <= MAX_SECTIONS &&
+          v.every((s) => isObject(s) && isId(s.id) && isText(s.name) && Object.keys(s).every((k) => k === 'id' || k === 'name')) &&
+          new Set(v.map((s) => (s as { id: string }).id)).size === v.length,
+        'a list of { id, name } with different ids',
+      ),
+      required(r, 'createdAt', isNum, 'a number'),
+      required(r, 'updatedAt', isNum, 'a number'),
+      optional(r, 'icon', isText, 'a string'),
+      optional(r, 'notes', isText, 'a string'),
+      optional(r, 'archived', (v) => typeof v === 'boolean', 'a boolean'),
+      optional(r, 'sortOrder', isNum, 'a number'),
+    ),
+  tasks: (r) =>
+    all(
+      required(r, 'id', isId, 'a non-empty string'),
+      required(r, 'name', isText, 'a string'),
+      required(r, 'sortOrder', isNum, 'a number'),
+      required(r, 'createdAt', isNum, 'a number'),
+      required(r, 'updatedAt', isNum, 'a number'),
+      optional(r, 'projectId', isId, 'a non-empty string'),
+      optional(r, 'sectionId', isId, 'a non-empty string'),
+      optional(r, 'parentId', (v) => isId(v) && v !== r.id, "another task's id"),
+      optional(r, 'notes', isText, 'a string'),
+      optional(r, 'dueOn', isDay, 'a date like 2026-11-30'),
+      optional(r, 'dueTime', isClock, "a time like '09:30'"),
+      optional(r, 'repeat', isTaskRepeat, 'a task repeat rule'),
+      optional(r, 'completedAt', isNum, 'a number'),
+      r.dueTime != null && r.dueOn == null ? 'dueTime needs dueOn' : null,
+      r.repeat != null && r.dueOn == null ? 'repeat needs dueOn' : null,
+    ),
+  taskCompletions: (r) =>
+    all(
+      required(r, 'id', isId, 'a non-empty string'),
+      required(r, 'taskId', isId, 'a non-empty string'),
+      required(r, 'completedAt', isNum, 'a number'),
+      required(r, 'createdAt', isNum, 'a number'),
+      required(r, 'updatedAt', isNum, 'a number'),
+      optional(r, 'dueOn', isDay, 'a date like 2026-11-30'),
+      optional(r, 'nextDueOn', isDay, 'a date like 2026-11-30'),
+      optional(r, 'subtaskIds', (v) => Array.isArray(v) && v.length <= MAX_SUBTASK_IDS && v.every(isId), 'a list of task ids'),
+    ),
   settings: (r) =>
     all(
       required(r, 'id', (v) => v === 'app-settings', "'app-settings'"),
@@ -218,7 +320,7 @@ const checks: Record<Exclude<RecordKind, 'tombstones'>, Check> = {
     ),
 };
 
-const TOMBSTONE_TYPES = new Set(['fasts', 'fieldDefinitions', 'trackableDefinitions', 'trackableEntries']);
+const TOMBSTONE_TYPES = new Set(['fasts', 'fieldDefinitions', 'trackableDefinitions', 'trackableEntries', 'taskProjects', 'tasks', 'taskCompletions']);
 
 function checkTombstone(r: Record<string, unknown>): string | null {
   return all(

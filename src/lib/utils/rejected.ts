@@ -13,6 +13,8 @@ export interface RejectedLookup {
   entries: Map<string, { trackableId: string; timestamp: number }>;
   trackables: Map<string, { name: string }>;
   fields: Map<string, { name: string }>;
+  projects?: Map<string, { name: string }>;
+  tasks?: Map<string, { name: string }>;
 }
 
 /** Most rejected lines kept per sync in the history (the count is always exact). */
@@ -40,6 +42,16 @@ function label(r: RejectedRecord, l: RejectedLookup): string {
       const f = l.fields.get(r.uuid);
       return f ? `Field "${f.name}"` : `Field ${shortId(r.uuid)}`;
     }
+    case 'taskProjects': {
+      const p = l.projects?.get(r.uuid);
+      return p ? `Project "${p.name}"` : `Project ${shortId(r.uuid)}`;
+    }
+    case 'tasks': {
+      const t = l.tasks?.get(r.uuid);
+      return t ? `Task "${t.name}"` : `Task ${shortId(r.uuid)}`;
+    }
+    case 'taskCompletions':
+      return `Task completion ${shortId(r.uuid)}`;
     case 'settings':
       return 'Settings';
     case 'tombstones':

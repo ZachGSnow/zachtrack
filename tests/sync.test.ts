@@ -48,6 +48,9 @@ interface Changes {
   fieldDefinitions?: unknown[];
   trackableDefinitions?: unknown[];
   trackableEntries?: unknown[];
+  taskProjects?: unknown[];
+  tasks?: unknown[];
+  taskCompletions?: unknown[];
   settings?: unknown;
 }
 
@@ -65,6 +68,9 @@ function syncBody(cursor: number, changes: Changes = {}, tombstones: unknown[] =
       fieldDefinitions: changes.fieldDefinitions ?? [],
       trackableDefinitions: changes.trackableDefinitions ?? [],
       trackableEntries: changes.trackableEntries ?? [],
+      ...(changes.taskProjects ? { taskProjects: changes.taskProjects } : {}),
+      ...(changes.tasks ? { tasks: changes.tasks } : {}),
+      ...(changes.taskCompletions ? { taskCompletions: changes.taskCompletions } : {}),
       settings: changes.settings ?? null,
     },
     tombstones,
@@ -151,7 +157,7 @@ describe('sync', () => {
     );
     expect(push.status).toBe(200);
     expect(push.body.cursor).toBe(5);
-    expect(push.body.appliedCounts).toEqual({ fasts: 1, fieldDefinitions: 1, trackableDefinitions: 1, trackableEntries: 1, settings: 1, deletes: 0 });
+    expect(push.body.appliedCounts).toEqual({ fasts: 1, fieldDefinitions: 1, trackableDefinitions: 1, trackableEntries: 1, taskProjects: 0, tasks: 0, taskCompletions: 0, settings: 1, deletes: 0 });
 
     const other = await pull(0);
     expect(other.changes.fasts[0]).toMatchObject({ uuid: 'a', tags: ['test'] });
@@ -244,7 +250,7 @@ describe('what a sync sends back', () => {
   it('counts only what changed: a copy the server already has, or an older one, is not applied', async () => {
     await sync(syncBody(0, { fieldDefinitions: [field], trackableEntries: [entry('e1', 20, 16)] }));
     const again = await sync(syncBody(0, { fieldDefinitions: [field], trackableEntries: [entry('e1', 10, 8)] }));
-    expect(again.body.appliedCounts).toEqual({ fasts: 0, fieldDefinitions: 0, trackableDefinitions: 0, trackableEntries: 0, settings: 0, deletes: 0 });
+    expect(again.body.appliedCounts).toEqual({ fasts: 0, fieldDefinitions: 0, trackableDefinitions: 0, trackableEntries: 0, taskProjects: 0, tasks: 0, taskCompletions: 0, settings: 0, deletes: 0 });
     expect(again.body.applied).toEqual([]);
   });
 
@@ -290,7 +296,7 @@ describe('check sync', () => {
     await sync(syncBody(0, {}, [{ recordType: 'trackableEntries', uuid: 'e2', deletedAt: 20 }]));
     expect((await sync(syncBody(0))).body.counts).toBeUndefined();
     const res = await sync({ ...syncBody(0), check: true });
-    expect(res.body.counts).toEqual({ fasts: 1, fieldDefinitions: 1, trackableDefinitions: 0, trackableEntries: 1 });
+    expect(res.body.counts).toEqual({ fasts: 1, fieldDefinitions: 1, trackableDefinitions: 0, trackableEntries: 1, taskProjects: 0, tasks: 0, taskCompletions: 0 });
   });
 });
 
@@ -407,5 +413,117 @@ describe('insight controls and date notes (v1.17.0)', () => {
     await sync(syncBody(0, {}, [{ recordType: 'trackableEntries', uuid: 'e-gone', deletedAt: 20 }]));
     const row = await db.prepare('SELECT details, note FROM trackableEntries WHERE id = ?').bind('e-gone').first<{ details: string | null; note: string | null }>();
     expect(row).toEqual({ details: null, note: null });
+  });
+});
+
+describe('tasks (v1.19.0)', () => {
+  const project = {
+    id: 'p-home',
+    name: 'Home',
+    color: '#3b82f6',
+    icon: 'x',
+    notes: 'House jobs',
+    sections: [
+      { id: 's-now', name: 'In flight' },
+      { id: 's-next', name: 'Queued' },
+    ],
+    archived: false,
+    sortOrder: 1,
+    createdAt: 1,
+    updatedAt: 1,
+  };
+  const task = (id: string, extra: Record<string, unknown> = {}) => ({
+    id,
+    name: `Task ${id}`,
+    projectId: 'p-home',
+    sectionId: 's-now',
+    sortOrder: 1.5,
+    createdAt: 1,
+    updatedAt: 1,
+    ...extra,
+  });
+  const repeating = task('k-filter', {
+    name: 'Replace the furnace filter',
+    notes: 'Size 16x25x1',
+    dueOn: '2026-12-01',
+    dueTime: '09:30',
+    repeat: { type: 'monthsNth', every: 3, nth: 1, weekday: 2 },
+  });
+  const subtask = task('k-sub', { projectId: undefined, sectionId: undefined, parentId: 'k-filter', completedAt: 5 });
+  const completion = { id: 'c-1', taskId: 'k-filter', completedAt: 4, dueOn: '2026-09-01', nextDueOn: '2026-12-01', subtaskIds: ['k-sub'], createdAt: 4, updatedAt: 4 };
+
+  it('round-trips projects with their sections, tasks with subtasks and repeat rules, and completions', async () => {
+    const push = await sync(syncBody(0, { taskProjects: [project], tasks: [repeating, subtask], taskCompletions: [completion] }));
+    expect(push.body.rejected).toEqual([]);
+    expect(push.body.appliedCounts).toMatchObject({ taskProjects: 1, tasks: 2, taskCompletions: 1 });
+
+    const other = await pull(0);
+    expect(other.changes.taskProjects).toEqual([{ ...project }]);
+    const byId = Object.fromEntries(other.changes.tasks.map((t: { id: string }) => [t.id, t]));
+    expect(byId['k-filter']).toEqual(repeating);
+    expect(byId['k-sub']).toMatchObject({ parentId: 'k-filter', completedAt: 5 });
+    expect(byId['k-sub'].projectId).toBeUndefined();
+    expect(other.changes.taskCompletions).toEqual([completion]);
+  });
+
+  it('works with an app that sends no task lists at all', async () => {
+    await sync(syncBody(0, { taskProjects: [project] }));
+    const old = await sync(syncBody(0, { trackableEntries: [entry('e1', 5, 12)] }));
+    expect(old.status).toBe(200);
+    expect(old.body.changes.taskProjects).toHaveLength(1);
+  });
+
+  it('refuses malformed tasks, projects and completions one by one', async () => {
+    const bad: Array<[string, Record<string, unknown>, string]> = [
+      ['tasks', task('k1', { dueOn: '2026-02-30' }), 'dueOn'],
+      ['tasks', task('k2', { repeat: { type: 'days', every: 1 } }), 'repeat needs dueOn'],
+      ['tasks', task('k3', { dueTime: '09:30' }), 'dueTime needs dueOn'],
+      ['tasks', task('k4', { dueOn: '2026-12-01', repeat: { type: 'weeks', every: 1, weekdays: [] } }), 'repeat'],
+      ['tasks', task('k5', { dueOn: '2026-12-01', repeat: { type: 'afterDone', every: 400, unit: 'days' } }), 'repeat'],
+      ['tasks', task('k6', { dueOn: '2026-12-01', repeat: { type: 'days', every: 1, extra: true } }), 'repeat'],
+      ['tasks', task('k7', { parentId: 'k7' }), 'parentId'],
+      ['tasks', task('k8', { sortOrder: undefined }), 'sortOrder'],
+      ['taskProjects', { ...project, id: 'p-dup', sections: [{ id: 's', name: 'A' }, { id: 's', name: 'B' }] }, 'sections'],
+      ['taskCompletions', { ...completion, id: 'c-bad', nextDueOn: 'soon' }, 'nextDueOn'],
+    ];
+    for (const [kind, record, reason] of bad) {
+      const res = await sync(syncBody(0, { [kind]: [record] }));
+      expect(res.body.rejected).toEqual([expect.objectContaining({ recordType: kind, uuid: record.id, reason: expect.stringContaining(reason) })]);
+    }
+    const good = await sync(syncBody(0, { tasks: [task('k-ok', { dueOn: '2028-02-29', repeat: { type: 'months', every: 1, day: -1 } })] }));
+    expect(good.body.rejected).toEqual([]);
+  });
+
+  it("clears a deleted task's name and notes and a deleted project's notes, keeping the project name", async () => {
+    await sync(syncBody(0, { taskProjects: [project], tasks: [repeating] }));
+    await sync(
+      syncBody(0, {}, [
+        { recordType: 'tasks', uuid: 'k-filter', deletedAt: 20 },
+        { recordType: 'taskProjects', uuid: 'p-home', deletedAt: 20 },
+      ]),
+    );
+    expect(await db.prepare('SELECT name, notes, deletedAt FROM tasks WHERE id = ?').bind('k-filter').first()).toEqual({ name: '', notes: null, deletedAt: 20 });
+    expect(await db.prepare('SELECT name, notes, deletedAt FROM taskProjects WHERE id = ?').bind('p-home').first()).toEqual({
+      name: 'Home',
+      notes: null,
+      deletedAt: 20,
+    });
+    const after = await pull(0);
+    expect(after.changes.tasks[0]).toMatchObject({ id: 'k-filter', deletedAt: 20 });
+  });
+
+  it('names a task in the shared activity by its project, never by its own name', async () => {
+    await sync({ ...syncBody(0, { taskProjects: [project], tasks: [repeating, subtask] }), device: { id: 'dev-1', name: 'Phone' } });
+    const row = await db.prepare('SELECT details FROM syncEvents').first<{ details: string }>();
+    const details: string[] = JSON.parse(row!.details);
+    expect(details).toEqual(expect.arrayContaining(['Project -- Home', 'Task -- Home', 'Task']));
+    expect(details.join(' ')).not.toContain('furnace');
+  });
+
+  it('counts live tasks for Check sync', async () => {
+    await sync(syncBody(0, { taskProjects: [project], tasks: [repeating, subtask], taskCompletions: [completion] }));
+    await sync(syncBody(0, {}, [{ recordType: 'tasks', uuid: 'k-sub', deletedAt: 20 }]));
+    const res = await sync({ ...syncBody(0), check: true });
+    expect(res.body.counts).toMatchObject({ taskProjects: 1, tasks: 1, taskCompletions: 1 });
   });
 });
