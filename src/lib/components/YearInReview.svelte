@@ -1,12 +1,19 @@
 <script lang="ts">
-  import type { FastRecord, TrackableDefinition, TrackableEntry } from '../db';
+  import type { FastRecord, Task, TaskCompletion, TrackableDefinition, TrackableEntry } from '../db';
+  import { tallyTasks } from '../utils/taskStats';
   import { reviewYears, yearReview } from '../utils/yearReview';
   import { formatHoursShort } from '../utils/time';
   import SegmentedControl from './SegmentedControl.svelte';
 
   // Insights > Year in review (utils/yearReview.ts): this year so far, or an
   // earlier one, at a glance.
-  let { fasts, trackables, entries }: { fasts: FastRecord[]; trackables: TrackableDefinition[]; entries: TrackableEntry[] } = $props();
+  let {
+    fasts,
+    trackables,
+    entries,
+    tasks = [],
+    completions = [],
+  }: { fasts: FastRecord[]; trackables: TrackableDefinition[]; entries: TrackableEntry[]; tasks?: Task[]; completions?: TaskCompletion[] } = $props();
 
   const now = Date.now();
   const years = $derived(reviewYears(fasts, trackables, entries, now).slice(0, 4));
@@ -14,6 +21,8 @@
   let year = $state(String(new Date(now).getFullYear()));
   const options = $derived(years.map((y) => ({ id: String(y), label: String(y) })));
   const r = $derived(yearReview(Number(year), fasts, trackables, entries, now));
+  // Tasks done in the year (3.66), when there are any tasks.
+  const taskTally = $derived(tallyTasks(tasks, completions, new Date(Number(year), 0, 1).getTime(), new Date(Number(year) + 1, 0, 1).getTime()));
   const nf = new Intl.NumberFormat();
   const days = (n: number) => `${nf.format(n)} ${n === 1 ? 'day' : 'days'}`;
 </script>
@@ -35,6 +44,9 @@
       { label: 'Longest goal streak', value: days(r.fasting.longestGoalStreak), sub: '' },
       { label: 'Entries logged', value: nf.format(r.logging.entries), sub: `on ${days(r.logging.daysLogged)}` },
       { label: 'Busiest month', value: r.busiestMonth ?? '-', sub: '' },
+      ...(tasks.length
+        ? [{ label: 'Tasks done', value: nf.format(taskTally.done), sub: taskTally.repeats ? `${taskTally.repeatsOnTime} of ${taskTally.repeats} repeats on time` : '' }]
+        : []),
     ] as tile (tile.label)}
       <div class="rounded-xl border p-3 border-border">
         <p class="text-xs text-text-muted">{tile.label}</p>

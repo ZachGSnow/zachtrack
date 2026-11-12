@@ -96,7 +96,8 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
   Tap a date to move it; move every overdue task to today in one tap. Drag
   tasks, subtasks and sections into place; on a phone, swipe a task right to
   complete it or left to move its date. Duplicate a task, or turn it into a
-  subtask and back. Due
+  subtask and back. Search every task and its notes; Done lists what you
+  finished by day, and Insights counts it. Due
   dates can repeat: every few days, weekly on chosen
   days, monthly on a date or on the first/last weekday, yearly, or a set
   time after it's done. Completing a repeating task moves it to its next
@@ -108,7 +109,7 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
 - **Five tabs:** Today (what to do now: the fast, habits due, what to log
   and dates coming up, what happened since you were last here, and whether
   your data is safe: last sync, the server's last backup, your last export), Fasting (Timer, Journey, History), Trackables (List,
-  Dates), Tasks (Projects, Upcoming) and Insights, with each tab's pages switched at the top of the page
+  Dates), Tasks (Projects, Upcoming, Done) and Insights, with each tab's pages switched at the top of the page
   on a phone and listed in the sidebar on a laptop. Insights opens with an
   overview of fasting and every trackable, the clearest patterns and a year
   in review, then a table to compare any of them.

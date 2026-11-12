@@ -7,6 +7,8 @@ describe('keyboard shortcuts', () => {
     expect(shortcutFor({ key: 'I' })).toEqual({ type: 'go', href: '/insights' });
     expect(shortcutFor({ key: 'w' })).toEqual({ type: 'log-weight' });
     expect(shortcutFor({ key: '?' })).toEqual({ type: 'help' });
+    expect(shortcutFor({ key: 'q' })).toEqual({ type: 'add-task' });
+    expect(shortcutFor({ key: '/' })).toEqual({ type: 'search-tasks' });
     expect(shortcutFor({ key: 'x' })).toBeNull();
     expect(shortcutFor({ key: 'Enter' })).toBeNull();
   });

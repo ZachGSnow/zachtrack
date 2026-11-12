@@ -33,6 +33,8 @@
   import { quickAdd } from '../lib/stores/quickAdd.svelte';
   import { taskUi } from '../lib/stores/taskUi.svelte';
   import { dayKey, dueTasks, taskContext } from '../lib/utils/tasks';
+  import { tallyTasks } from '../lib/utils/taskStats';
+  import { addDays } from '../lib/utils/time';
 
   // Today: what to do now, gathered from every part of the app (ARCHITECTURE.md
   // 3.41). The fast, the habits with a goal, what you've been logging, and the
@@ -102,7 +104,12 @@
         }),
   );
 
-  const showReview = $derived(review != null && review.weekStart !== reviewDismissed && (review.habits || review.weight || review.fasts.count));
+  // Tasks done that week (3.66), next to habits, weight and fasts.
+  const taskCompletions = liveQuery(() => db.taskCompletions.toArray());
+  const reviewTasks = $derived(review ? tallyTasks($allTasks ?? [], $taskCompletions ?? [], review.weekStart, addDays(review.weekStart, 7)) : null);
+  const showReview = $derived(
+    review != null && review.weekStart !== reviewDismissed && (review.habits || review.weight || review.fasts.count || (reviewTasks?.done ?? 0) > 0),
+  );
   function dismissReview() {
     if (!review) return;
     reviewDismissed = review.weekStart;
@@ -176,6 +183,13 @@
               {#if change != null}
                 <span class="text-xs text-text-muted"> {Math.abs(change) < 0.05 ? 'same as the week before' : `${change > 0 ? '\u25b2' : '\u25bc'}${nf1.format(Math.abs(change))} on the week`}</span>
               {/if}
+            </li>
+          {/if}
+          {#if reviewTasks && reviewTasks.done > 0}
+            <li>
+              <span class="block text-xs text-text-muted">Tasks</span>
+              <span class="font-heading text-lg font-semibold text-text">{reviewTasks.done}</span>
+              <span class="text-xs text-text-muted"> done{reviewTasks.repeats ? `, ${reviewTasks.repeatsOnTime} of ${reviewTasks.repeats} repeats on time` : ''}</span>
             </li>
           {/if}
           <li>

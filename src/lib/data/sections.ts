@@ -59,6 +59,7 @@ export const SECTIONS: Section[] = [
     pages: [
       { href: '/tasks', label: 'Projects' },
       { href: '/tasks/upcoming', label: 'Upcoming' },
+      { href: '/tasks/done', label: 'Done' },
     ],
   },
   // '/charting' is the old address of the Data tab, kept so links to it still work.

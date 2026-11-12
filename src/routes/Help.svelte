@@ -268,6 +268,9 @@
       <p><strong>Where tasks show.</strong></p>
       <ul>
         <li><strong>Upcoming</strong> (Tasks > Upcoming): everything with a due date, from every project, overdue first, then by day and month.</li>
+        <li><strong>Done</strong> (Tasks > Done): what you completed over the last week, month or year, by day, with each repeat marked on time, late or early.</li>
+        <li><strong>Search</strong> (the box on Tasks, or / on a laptop): finds tasks by any words in their name or notes, in every project. "Buy:" finds everything to buy.</li>
+        <li><strong>Insights</strong> counts tasks done over the last 30 days and in Year in review, and the weekly review on Today counts that week's.</li>
         <li><strong>Today</strong> lists tasks overdue or due today, and the Tasks tab shows how many. No notifications, as with goals.</li>
         <li>An archived project's tasks leave Upcoming, Today and the count.</li>
       </ul>

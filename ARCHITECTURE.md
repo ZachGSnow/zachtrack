@@ -1432,6 +1432,27 @@ the Tasks page heading and from Repeat in a task's sheet.
   open again, just below it, with its repeat rule but not its history
   (`duplicateTask`), and opens the copy.
 
+### 3.66 Finding tasks and looking back (v1.20.0)
+
+`utils/taskStats.ts` holds the logic, tested in `tests/taskStats.test.ts`.
+
+- **Search** on Tasks > Projects (and / from any page on a laptop): every
+  word of the query, in any case and order, in a task's or subtask's name
+  or notes, across every project including archived ones (often why you
+  search). Open tasks come first by due date, then completed ones; each hit
+  says where it lives, with a piece of the notes when a word was only
+  found there. Searching "Buy:" gives a shopping list across projects. The
+  query is kept while you leave the page and come back
+  (`stores/taskSearch.svelte.ts`).
+- **Done** (Tasks > Done, the third page): tasks and subtasks closed, and
+  each completion of a repeating task (marked on time, late or early), by
+  day, newest first, over the last 7 or 30 days or the year, with the count
+  and repeats on time at the top. A row opens its task.
+- **Numbers:** Insights gains a "Tasks, last 30 days" card (done, per week,
+  repeats on time, overdue now; only when there are tasks); Year in review
+  a "Tasks done" tile; the weekly review on Today a Tasks tile with that
+  week's count (`tallyTasks`).
+
 ### 3.21 Trackables list: pin, archive, order; tag filters
 - **Sort** (per device, `zachtrack:trackables-view`): Due first (goal
   urgency from 3.18: overdue, then due, then the rest, then trackables

@@ -23,6 +23,7 @@
   import ZoneInfoSheet from './lib/components/ZoneInfoSheet.svelte';
   import QuickAddSheet from './lib/components/QuickAddSheet.svelte';
   import { quickAdd } from './lib/stores/quickAdd.svelte';
+  import { taskSearch } from './lib/stores/taskSearch.svelte';
   import SyncStatus from './lib/components/SyncStatus.svelte';
 
   const routes = {
@@ -43,6 +44,7 @@
     '/tasks': wrap({ asyncComponent: () => import('./routes/Tasks.svelte') }),
     // Before /tasks/:id, which would take "upcoming" for a project id.
     '/tasks/upcoming': wrap({ asyncComponent: () => import('./routes/TasksUpcoming.svelte') }),
+    '/tasks/done': wrap({ asyncComponent: () => import('./routes/TasksDone.svelte') }),
     '/tasks/:id': wrap({ asyncComponent: () => import('./routes/TaskProject.svelte') }),
     '/help/:topic?': wrap({ asyncComponent: () => import('./routes/Help.svelte') }),
   };
@@ -69,7 +71,7 @@
   /** On a project's page, Q adds to that project. */
   function projectFromRoute(): string | undefined {
     const m = window.location.hash.match(/^#\/tasks\/([^/?]+)$/);
-    return m && m[1] !== 'upcoming' && m[1] !== 'inbox' ? m[1] : undefined;
+    return m && !['upcoming', 'done', 'inbox'].includes(m[1]) ? m[1] : undefined;
   }
 
   // Keyboard shortcuts on a laptop (utils/keyboard.ts): a key to each page, W for a weigh-in, ? for the list.
@@ -82,6 +84,11 @@
     if (action.type === 'go') push(action.href);
     else if (action.type === 'help') shortcutsOpen = !shortcutsOpen;
     else if (action.type === 'add-task') quickAdd.show(projectFromRoute());
+    else if (action.type === 'search-tasks') {
+      push('/tasks');
+      await tick();
+      taskSearch.focus();
+    }
     else {
       const holder = await weighInTrackable(settingsStore.data);
       if (!holder) return;

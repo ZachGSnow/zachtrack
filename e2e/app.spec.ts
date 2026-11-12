@@ -1152,7 +1152,7 @@ test('on a laptop, single keys move between pages, W opens a weigh-in and ? list
   await page.keyboard.press('?');
   const sheet = page.getByRole('dialog');
   await expect(sheet.getByRole('heading', { name: 'Keyboard shortcuts' })).toBeVisible();
-  await expect(sheet.getByRole('list', { name: 'Keyboard shortcuts' }).getByRole('listitem')).toHaveCount(12);
+  await expect(sheet.getByRole('list', { name: 'Keyboard shortcuts' }).getByRole('listitem')).toHaveCount(13);
   await page.keyboard.press('Escape');
   await expect(sheet).toHaveCount(0);
 
