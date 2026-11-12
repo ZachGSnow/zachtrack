@@ -89,10 +89,15 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
   under Coming up, and the next year on a Dates page with a list and a
   month calendar; each date can carry notes (gift ideas, sizes), and Export
   to calendar downloads them as an .ics file, with optional reminders.
-- **Four tabs:** Today (what to do now: the fast, habits due, what to log
+- **Tasks:** a to-do list with projects, sections (Now / Next / Later, or
+  your own), tasks with subtasks at any depth, notes and due dates with an
+  optional time. Tap to complete, with Undo; completed tasks hide until you
+  ask for them. Tasks without a project go to an Inbox. Each project card
+  shows what's open, overdue and due next.
+- **Five tabs:** Today (what to do now: the fast, habits due, what to log
   and dates coming up, what happened since you were last here, and whether
   your data is safe: last sync, the server's last backup, your last export), Fasting (Timer, Journey, History), Trackables (List,
-  Dates) and Insights, with each tab's pages switched at the top of the page
+  Dates), Tasks and Insights, with each tab's pages switched at the top of the page
   on a phone and listed in the sidebar on a laptop. Insights opens with an
   overview of fasting and every trackable, the clearest patterns and a year
   in review, then a table to compare any of them.
@@ -265,7 +270,8 @@ protocol, the real bugs hit along the way and how they were fixed.
 ## Your data and privacy
 
 - **What is stored:** fasts, trackable definitions, entries (values, notes,
-  tags, timestamps) and settings (height, goal weight).
+  tags, timestamps), task projects and tasks (names, notes, due dates) and
+  settings (height, goal weight).
 - **Where:** in each browser's IndexedDB, and, if you deploy the backend, in
   your own D1 database. Nothing is sent anywhere else. The app has no
   analytics.
@@ -273,7 +279,8 @@ protocol, the real bugs hit along the way and how they were fixed.
   encrypted at rest by Cloudflare; the app adds no encryption of its own.
 - **Deleting:** deleting a record removes it locally and marks it deleted in
   D1 (`deletedAt`), so other devices delete it too. The server also clears a
-  deleted fast's or entry's notes, tags, ratings and values; a small row with
+  deleted fast's or entry's notes, tags, ratings and values, and a deleted
+  task's name and notes; a small row with
   the id, dates and `deletedAt` stays. For rows deleted before v1.0.1, run
   `d1/scrub-deleted.sql` once. Clearing site data removes the local copy;
   dropping the D1 database removes the server copy. Neither is a secure erase,

@@ -378,11 +378,11 @@ test('on a laptop-width screen the sidebar replaces the tab bar and marks the cu
   expect(problems).toEqual([]);
 });
 
-test('on a phone four tabs mark the section, and tabs at the top switch its pages', async ({ page }) => {
+test('on a phone five tabs mark the section, and tabs at the top switch its pages', async ({ page }) => {
   await mockSync(page, noServer);
   await waitForStarterSet(page);
   const tabs = page.getByRole('navigation', { name: 'Main' });
-  await expect(tabs.getByRole('link')).toHaveText([/Today/, /Fasting/, /Trackables/, /Insights/]);
+  await expect(tabs.getByRole('link')).toHaveText([/Today/, /Fasting/, /Trackables/, /Tasks/, /Insights/]);
 
   await page.goto('/#/journey');
   await expect(tabs.locator('a.active:visible')).toHaveText(/Fasting/);
@@ -1152,7 +1152,7 @@ test('on a laptop, single keys move between pages, W opens a weigh-in and ? list
   await page.keyboard.press('?');
   const sheet = page.getByRole('dialog');
   await expect(sheet.getByRole('heading', { name: 'Keyboard shortcuts' })).toBeVisible();
-  await expect(sheet.getByRole('list', { name: 'Keyboard shortcuts' }).getByRole('listitem')).toHaveCount(10);
+  await expect(sheet.getByRole('list', { name: 'Keyboard shortcuts' }).getByRole('listitem')).toHaveCount(11);
   await page.keyboard.press('Escape');
   await expect(sheet).toHaveCount(0);
 

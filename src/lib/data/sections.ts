@@ -8,6 +8,7 @@ import House from '@lucide/svelte/icons/house';
 import Timer from '@lucide/svelte/icons/timer';
 import ListChecks from '@lucide/svelte/icons/list-checks';
 import Lightbulb from '@lucide/svelte/icons/lightbulb';
+import ListTodo from '@lucide/svelte/icons/list-todo';
 
 export interface SectionPage {
   href: string;
@@ -49,6 +50,8 @@ export const SECTIONS: Section[] = [
       { href: '/dates', label: 'Dates' },
     ],
   },
+  // To-dos: projects, sections, tasks and subtasks (ARCHITECTURE.md 3.59, 3.60).
+  { href: '/tasks', label: 'Tasks', icon: ListTodo, match: /^\/tasks(\/.*)?$/ },
   // '/charting' is the old address of the Data tab, kept so links to it still work.
   { href: '/insights', label: 'Insights', icon: Lightbulb, match: /^\/(insights|charting)$/ },
 ];

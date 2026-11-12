@@ -38,6 +38,8 @@
     '/settings': wrap({ asyncComponent: () => import('./routes/Settings.svelte') }),
     '/sync': wrap({ asyncComponent: () => import('./routes/Sync.svelte') }),
     '/dates': wrap({ asyncComponent: () => import('./routes/Dates.svelte') }),
+    '/tasks': wrap({ asyncComponent: () => import('./routes/Tasks.svelte') }),
+    '/tasks/:id': wrap({ asyncComponent: () => import('./routes/TaskProject.svelte') }),
     '/help/:topic?': wrap({ asyncComponent: () => import('./routes/Help.svelte') }),
   };
 

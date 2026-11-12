@@ -1248,6 +1248,49 @@ neither on the device nor in the file. Nightly backups include the three
 tables. A sync now makes at most 8 upsert batches, well under the
 subrequest limit (4.1).
 
+### 3.60 The Tasks tab (v1.19.0)
+
+The screens over 3.59. A fifth tab, Tasks (`/tasks`, key K), between
+Trackables and Insights; five still fit a phone's tab bar.
+
+- **Projects** (`routes/Tasks.svelte`): a card per project with its open
+  top-level tasks, how many are overdue or due today, and the next due
+  date (`projectSummary`); the Inbox (tasks without a project) first; then
+  Reorder (up and down, as on the Trackables list) and Show archived.
+  + New project names it, picks an icon and colour, and starts from a set
+  of sections (none, Now / Next / Later, To do / Doing / Waiting, Weekly /
+  Monthly / Seasonal / Yearly).
+- **A project** (`routes/TaskProject.svelte`, `/tasks/:id`, `/tasks/inbox`):
+  its tasks by section in the project's order (`groupBySection`), each
+  section foldable, with an add box at the end of every section: type,
+  Enter, type the next. Tasks outside any section (none set, or a section
+  that was removed) come first. Completed tasks hide behind Show completed.
+  Folded sections and Show completed are per device, like other view
+  choices (3.11). Edit opens `ProjectSheet.svelte`: name, icon, colour,
+  notes, sections renamed, reordered, added or removed (a removed
+  section's tasks move to the top), archive and delete.
+- **A task** (`TaskSheet.svelte`, through `TaskHost.svelte` and
+  `stores/taskUi.svelte.ts`): edited in place, each change saved as it is
+  made, like Asana's task pane: name, project and section, due date and
+  optional time, notes, subtasks (add, check, open), delete with a count of
+  the subtasks that go with it. A subtask opens in the same sheet with
+  "Subtask of ..." to go back up.
+- **Completing** is the round checkbox on a row or in the sheet, with
+  Undo for six seconds, like one-tap logging (3.18). Repeat rules can't be
+  set from the screens yet; completing a repeating task (moving it to its
+  next date) comes with the repeat engine.
+- **Order:** a new task's `sortOrder` is at least the clock
+  (`nextSortOrder`), so tasks typed one after another, or added on two
+  devices, keep the order they were added in even before the list has
+  caught up; Reorder renumbers a section from 0. Drag and drop was left
+  for the up and down buttons the Trackables list already uses, which work
+  the same with a finger and a mouse.
+
+`utils/tasks.ts` holds the grouping, due-date words ("Today", "Tomorrow",
+"Fri", "Nov 30", "Jan 5, 2027", with the time when set), subtask counts and
+project summaries, tested in `tests/tasksView.test.ts`; `e2e/tasks.spec.ts`
+walks the screens.
+
 ### 3.21 Trackables list: pin, archive, order; tag filters
 - **Sort** (per device, `zachtrack:trackables-view`): Due first (goal
   urgency from 3.18: overdue, then due, then the rest, then trackables

@@ -18,6 +18,7 @@ export const SHORTCUTS: Shortcut[] = [
   { key: 'h', label: 'Fasting history', action: { type: 'go', href: '/history' } },
   { key: 'l', label: 'Trackables list', action: { type: 'go', href: '/trackables' } },
   { key: 'd', label: 'Dates', action: { type: 'go', href: '/dates' } },
+  { key: 'k', label: 'Tasks', action: { type: 'go', href: '/tasks' } },
   { key: 'i', label: 'Insights', action: { type: 'go', href: '/insights' } },
   { key: 's', label: 'Settings', action: { type: 'go', href: '/settings' } },
   { key: 'w', label: 'Log a weigh-in', action: { type: 'log-weight' } },
