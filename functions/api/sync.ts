@@ -75,6 +75,15 @@ export interface AppliedRecord {
 /** At most this many applied records are named in a response; `appliedCounts` always covers all of them. */
 export const APPLIED_RECORDS_LIMIT = 50;
 
+/**
+ * The most records (and deletes) one request may send. A sync bigger than
+ * this comes in parts (src/lib/utils/syncChunks.ts), so no single request
+ * grows with the data and runs into the free plan's CPU limit (3.69).
+ */
+export const MAX_RECORDS_PER_REQUEST = 2000;
+/** The most rows one response sends back; `more` says there are others to pull next. */
+export const PULL_PAGE = 1000;
+
 interface SyncResponseBody {
   cursor: number;
   /** Changes from other requests since `cursor`. What this request itself stored isn't sent back. */
@@ -97,6 +106,8 @@ interface SyncResponseBody {
   devices: DeviceInfo[];
   /** Only when the request asked to `check`. */
   counts?: ServerCounts;
+  /** More changes are waiting after `cursor`: pull again (3.69). Apps before v1.21.0 ignore it and get the rest next sync. */
+  more?: boolean;
 }
 
 /**
@@ -136,6 +147,14 @@ export async function handleSync(request: Request, env: Env, deps: AccessDeps = 
   if (typeof body?.cursor !== 'number' || !Number.isFinite(body.cursor) || typeof body.changes !== 'object' || body.changes === null) {
     return jsonResponse({ error: 'Malformed sync request' }, 400);
   }
+  const sent =
+    (['fasts', 'fieldDefinitions', 'trackableDefinitions', 'trackableEntries', 'taskProjects', 'tasks', 'taskCompletions'] as const).reduce(
+      (n, k) => n + (Array.isArray(body.changes[k]) ? (body.changes[k] as unknown[]).length : 0),
+      0,
+    ) + (Array.isArray(body.tombstones) ? body.tombstones.length : 0);
+  if (sent > MAX_RECORDS_PER_REQUEST) {
+    return jsonResponse({ error: `Too many records in one request (${sent}; at most ${MAX_RECORDS_PER_REQUEST}). Update the app, which sends them in parts.` }, 413);
+  }
 
   const db = env.DB;
   const device = readDevice(body.device);
@@ -144,8 +163,9 @@ export async function handleSync(request: Request, env: Env, deps: AccessDeps = 
   try {
     const { rejected, applied, ownSeq } = await applyIncomingChanges(db, body, device?.id ?? null);
     await recordActivity(db, device, applied, rejected.length, now);
-    const changes = await pullChangesSince(db, body.cursor, ownSeq);
-    const cursor = await currentSeq(db);
+    const { changes, pageEnd } = await pullChangesSince(db, body.cursor, ownSeq);
+    // A full page: carry on from its last row next time. Otherwise everything is here.
+    const cursor = pageEnd ?? (await currentSeq(db));
 
     const appliedCounts: SyncResponseBody['appliedCounts'] = {
       fasts: 0,
@@ -168,6 +188,7 @@ export async function handleSync(request: Request, env: Env, deps: AccessDeps = 
       applied: applied.slice(0, APPLIED_RECORDS_LIMIT),
       devices: await listDevices(db),
       ...(body.check === true ? { counts: await countLive(db) } : {}),
+      ...(pageEnd != null ? { more: true } : {}),
     };
     return jsonResponse(responseBody);
   } catch (err) {
@@ -735,11 +756,21 @@ function buildTombstoneUpdate(db: D1Database, tombstone: Tombstone, serverSeq: n
 // still comes through.
 // ---------------------------------------------------------------------------
 
-async function pullChangesSince(db: D1Database, cursor: number, ownSeq: [number, number] | null): Promise<SyncResponseBody['changes']> {
+async function pullChangesSince(
+  db: D1Database,
+  cursor: number,
+  ownSeq: [number, number] | null,
+): Promise<{ changes: SyncResponseBody['changes']; pageEnd: number | null }> {
   const [first, last] = ownSeq ?? [0, -1]; // an empty range leaves nothing out
+  // At most a page from each table, oldest first; then the oldest page across
+  // all of them. Any row older than the page's last must be among its own
+  // table's first PULL_PAGE, so nothing is skipped.
   const since = (table: string) =>
-    db.prepare(`SELECT * FROM ${table} WHERE serverSeq > ? AND serverSeq NOT BETWEEN ? AND ?`).bind(cursor, first, last).all();
-  const [fastsRes, fieldsRes, trackablesRes, entriesRes, projectsRes, tasksRes, completionsRes, settingsRes] = await Promise.all([
+    db
+      .prepare(`SELECT * FROM ${table} WHERE serverSeq > ? AND serverSeq NOT BETWEEN ? AND ? ORDER BY serverSeq LIMIT ?`)
+      .bind(cursor, first, last, PULL_PAGE + 1)
+      .all();
+  const results = await Promise.all([
     since('fasts'),
     since('fieldDefinitions'),
     since('trackableDefinitions'),
@@ -749,8 +780,11 @@ async function pullChangesSince(db: D1Database, cursor: number, ownSeq: [number,
     since('taskCompletions'),
     since('settings'),
   ]);
-
-  return {
+  const seqs = results.flatMap((r) => r.results.map((row) => (row as { serverSeq: number }).serverSeq)).sort((a, b) => a - b);
+  const pageEnd = seqs.length > PULL_PAGE ? seqs[PULL_PAGE - 1] : null;
+  const keep = (rows: unknown[]) => (pageEnd == null ? rows : rows.filter((row) => (row as { serverSeq: number }).serverSeq <= pageEnd));
+  const [fastsRes, fieldsRes, trackablesRes, entriesRes, projectsRes, tasksRes, completionsRes, settingsRes] = results.map((r) => ({ results: keep(r.results) }));
+  const changes: SyncResponseBody['changes'] = {
     fasts: fastsRes.results.map((row) => mapFastRow(row as Record<string, unknown>)),
     fieldDefinitions: fieldsRes.results.map((row) => mapFieldRow(row as Record<string, unknown>)),
     trackableDefinitions: trackablesRes.results.map((row) => mapTrackableRow(row as Record<string, unknown>)),
@@ -760,6 +794,7 @@ async function pullChangesSince(db: D1Database, cursor: number, ownSeq: [number,
     taskCompletions: completionsRes.results.map((row) => mapTaskCompletionRow(row as Record<string, unknown>)),
     settings: settingsRes.results[0] ? mapSettingsRow(settingsRes.results[0] as Record<string, unknown>) : null,
   };
+  return { changes, pageEnd };
 }
 
 function mapFastRow(row: Record<string, unknown>): WireRow<FastRecord> {
