@@ -51,6 +51,52 @@ describe('habit grid weeks', () => {
     expect(week.slice(0, 4).map((d) => d.level)).toEqual([1, 0, 1, 1]);
   });
 
+  it('a daily goal marks the days that went by unmet, but not today, rest days or days before it began', () => {
+    const goal = { createdAt: oct(18), goalType: 'perDay' as const, goalValue: 2, scheduleDays: [0, 1, 2, 3, 4] };
+    // Thu Oct 22: Mon met, Tue half done, Wed nothing; Sat and Sun are rest days; today is still open.
+    const week = habitGridWeeks(goal, logs(oct(19), oct(19, 12), oct(20)), [], 1, oct(22, 12))[0];
+    expect(week.slice(0, 4).map((d) => [d.missed, d.note])).toEqual([
+      [false, undefined],
+      [true, 'goal missed'],
+      [true, 'goal missed'],
+      [false, undefined],
+    ]);
+    const before = habitGridWeeks(goal, [], [], 2, oct(22, 12))[0];
+    expect(before.some((d) => d.missed)).toBe(false);
+  });
+
+  it('a weekly goal marks a week that ended short, and this week once it can no longer be reached', () => {
+    const goal = { createdAt: oct(5), goalType: 'perWeek' as const, goalValue: 3 };
+    // Week of Oct 12: two days. Week of Oct 19: one day by Sunday the 25th, one day left can't make three.
+    const grid = habitGridWeeks(goal, logs(oct(6), oct(7), oct(8), oct(13), oct(14), oct(20)), [], 3, oct(25, 12));
+    expect(grid[0].some((d) => d.missed)).toBe(false);
+    expect(grid[1].every((d) => d.missed && d.note === 'week missed: 2 of 3 days')).toBe(true);
+    expect(grid[2].filter((d) => !d.future).every((d) => d.missed)).toBe(true);
+    // On Thursday the 22nd there was still time.
+    expect(habitGridWeeks(goal, logs(oct(20)), [], 1, oct(22, 12))[0].some((d) => d.missed)).toBe(false);
+  });
+
+  it("a week paused or skipped isn't held against a weekly goal", () => {
+    const goal = { createdAt: oct(5), goalType: 'perWeek' as const, goalValue: 3, skipDays: ['2026-10-14'] };
+    expect(habitGridWeeks(goal, [], [], 2, oct(22, 12))[0].some((d) => d.missed)).toBe(false);
+  });
+
+  it('an at-most goal turns its whole week red once over the limit, the logged days solid', () => {
+    const goal = { createdAt: oct(5), goalType: 'maxPerWeek' as const, goalValue: 1 };
+    // Week of Oct 5: once, within. Week of Oct 12: three times. This week: nothing yet.
+    const grid = habitGridWeeks(goal, logs(oct(6), oct(13), oct(15), oct(16)), [], 3, oct(22, 12));
+    expect(grid[0].some((d) => d.missed || d.over)).toBe(false);
+    expect(grid[1].every((d) => d.missed && d.note === 'over the limit: 3 of at most 1 that week')).toBe(true);
+    expect(grid[1].filter((d) => d.over).map((d) => new Date(d.day).getDate())).toEqual([13, 15, 16]);
+    expect(grid[2].some((d) => d.missed || d.over)).toBe(false);
+  });
+
+  it('a slip on an avoid goal is red', () => {
+    const week = habitGridWeeks({ ...created, goalType: 'avoid' }, logs(oct(20)), [], 1, oct(22))[0];
+    expect(week[1]).toMatchObject({ over: true, note: 'slipped' });
+    expect(week[0].over).toBe(false);
+  });
+
   it('every N days marks the day it fell overdue', () => {
     const goal = { ...created, goalType: 'everyDays' as const, goalValue: 3 };
     const grid = habitGridWeeks(goal, logs(oct(6), oct(9), oct(14)), [], 3, oct(22)).flat();

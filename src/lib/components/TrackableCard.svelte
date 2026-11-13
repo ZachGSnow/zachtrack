@@ -64,7 +64,9 @@
   // As many whole weeks as fit the card at about 14px a cell.
   let stripWidth = $state(0);
   const stripWeeks = $derived(Math.max(8, Math.min(53, Math.floor((stripWidth + 3) / 17))));
-  const strip = $derived(check.goalCard ? habitGridWeeks(trackable, entries, attachedFields, stripWeeks, now) : []);
+  // Every goal gets the strip, goals for less too (3.74): their red weeks are the point.
+  const showStrip = $derived(!!trackable.goalType && kind !== 'ages');
+  const strip = $derived(showStrip ? habitGridWeeks(trackable, entries, attachedFields, stripWeeks, now) : []);
 
   // Without fields a tap logs one more until today is done; then it takes the last one back off.
   function tapCheck() {
@@ -124,7 +126,7 @@
       >+</button>
     {/if}
   </div>
-  {#if check.goalCard && !compact}
+  {#if showStrip && !compact}
     <div class="mt-2.5" bind:clientWidth={stripWidth}>
       <HabitGrid weeks={strip} color={ink} labels={false} maxCell={16} />
     </div>

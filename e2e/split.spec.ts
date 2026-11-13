@@ -107,5 +107,13 @@ test('a trackable merges into another, and an at-most goal counts each time this
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByText('Goal: At most 2 times a week')).toBeVisible();
   await expect(page.getByText(/of at most 2 this week|this week, \d+ over the limit/).first()).toBeVisible();
+
+  // Its card on the list has the grid too, and a day says what it was on hover.
+  await page.goto('/#/trackables');
+  const card = page.locator('div.rounded-2xl').filter({ has: page.getByRole('link', { name: /Run/ }) });
+  const days = card.getByRole('group', { name: 'Days' }).getByRole('img');
+  await expect(days.first()).toBeVisible();
+  await days.last().hover();
+  await expect(card.getByRole('tooltip')).toContainText(/^[A-Z][a-z]{2} \d+, /);
   expect(problems).toEqual([]);
 });

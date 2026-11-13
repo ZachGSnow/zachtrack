@@ -23,8 +23,17 @@ export interface GridDay {
   outside: boolean;
   /** After today: drawn blank (days before the trackable existed are drawn faint instead). */
   future: boolean;
-  /** An every-N-days goal fell overdue on this day. */
+  /**
+   * The goal wasn't met here (3.74): an every-N-days goal fell overdue, a
+   * daily goal's day went by unmet, or the day is in a week a weekly goal
+   * missed or an at-most goal went over. Drawn with a red tint when nothing
+   * was logged.
+   */
   missed: boolean;
+  /** Logged, but counting against the goal: a slip on an avoid goal, or a day in a week over an at-most limit. Drawn red. */
+  over: boolean;
+  /** Why the day is red, for its label: "goal missed", "over the limit: 3 of at most 1 that week". */
+  note?: string;
   /** Off the schedule, skipped or paused, with nothing logged: not a miss. */
   off: 'rest' | 'skipped' | 'paused' | null;
 }
@@ -95,6 +104,9 @@ function gridFor(
   const totalField = type === 'dailyTotal' ? goalField(fields) : undefined;
   const totals = totalField ? computeFieldValuesByDay(entries as TimestampedValues[], totalField) : null;
   const missed = type === 'everyDays' && goal ? missedDays(loggedDays, goal, today) : new Set<number>();
+  // Where the goal starts counting: the trackable's first day (or first entry), even where earlier days are drawn.
+  const counted = Math.min(startOfDay(trackable.createdAt), loggedDays[0] ?? Number.POSITIVE_INFINITY);
+  const weekNote = weeklyNotes(trackable, counts, counted, today);
 
   const days: GridDay[] = [];
   for (let i = 0, d = start; i < length; i++, d = addDays(d, 1)) {
@@ -105,9 +117,62 @@ function gridFor(
     if (type === 'perDay' && goal) level = Math.min(1, count / goal);
     if (type === 'avoid') level = count > 0 ? 0 : 1;
     const off = !outside && count === 0 ? offDayReason(trackable, d) : null;
-    days.push({ day: d, level: outside ? 0 : level, count, isToday: d === today, outside, future: d > today, missed: missed.has(d), off });
+    let isMissed = missed.has(d);
+    let over = false;
+    let note: string | undefined = isMissed ? 'overdue' : undefined;
+    if (d <= today && d >= counted) {
+      if ((type === 'dailyTotal' || type === 'perDay') && goal && d < today && level < 1 && !offDayReason(trackable, d)) {
+        isMissed = true;
+        note = 'goal missed';
+      }
+      if (type === 'avoid' && count > 0) {
+        over = true;
+        note = 'slipped';
+      }
+      const week = weekNote.get(bucketStart(d, 'week'));
+      if (week) {
+        isMissed = true;
+        note = week;
+        if (type === 'maxPerWeek' && count > 0) over = true;
+      }
+    }
+    days.push({ day: d, level: outside ? 0 : level, count, isToday: d === today, outside, future: d > today, missed: isMissed, over, ...(note ? { note } : {}), off });
   }
   return days;
+}
+
+/**
+ * Weeks (by their Monday) that count against a weekly goal, with why: a
+ * times-per-week goal that ended short, or can no longer be reached this
+ * week; an at-most goal that went over, for the rest of that week.
+ */
+function weeklyNotes(trackable: GridTrackable, counts: Map<number, number>, counted: number, today: number): Map<number, string> {
+  const { goalType: type, goalValue: goal } = trackable;
+  const notes = new Map<number, string>();
+  if (!goal || (type !== 'perWeek' && type !== 'maxPerWeek')) return notes;
+  const thisWeek = bucketStart(today, 'week');
+  const firstWeek = bucketStart(counted === Number.POSITIVE_INFINITY ? today : counted, 'week');
+  for (let w = firstWeek; w <= thisWeek; w = addDays(w, 7)) {
+    let days = 0;
+    let times = 0;
+    let excused = false;
+    for (let i = 0, d = w; i < 7; i++, d = addDays(d, 1)) {
+      const n = counts.get(d) ?? 0;
+      // A week with a paused or skipped day isn't held against the goal.
+      if (d <= today && offDayReason(trackable, d)) excused = true;
+      if (n > 0) days += 1;
+      times += n;
+    }
+    if (type === 'maxPerWeek') {
+      if (times > goal) notes.set(w, `over the limit: ${times} of at most ${goal} that week`);
+      continue;
+    }
+    if (excused) continue;
+    // Days left this week, today included unless it's already logged.
+    const left = w === thisWeek ? 7 - Math.round((today - w) / 86_400_000) - ((counts.get(today) ?? 0) > 0 ? 1 : 0) : 0;
+    if (days + left < goal) notes.set(w, `week missed: ${days} of ${goal} days`);
+  }
+  return notes;
 }
 
 /** The days an every-N-days goal fell overdue: N days after an entry with no entry since. */

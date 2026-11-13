@@ -327,10 +327,21 @@
       <p>
         One square per day, weeks as columns, Monday at the top. The color shows how far that day went toward the goal: a
         partly filled square is part of a daily total or a times-per-day goal. For an avoid goal it's inverted, so clean days
-        are full. A faint red square is a day an every-N-days goal fell overdue, an outlined one a rest, skipped or paused
-        day, and a dim one a day before the trackable existed. Today has an outline.
+        are full. An outlined square is a rest, skipped or paused day, and a dim one a day before the trackable existed.
+        Today has an outline.
       </p>
-      <p>On a trackable's page, switch between Week, Month, 6 months and Year, and tap any day to see it or add an entry for that date.</p>
+      <p class="mt-2">
+        <strong>Red</strong> is where the goal wasn't met. A faint red square is a daily goal's day that went by unmet (with
+        a red ring if it was partly done), a day an every-N-days goal fell overdue, or a day in a week a times-per-week goal
+        missed (this week too, once it can no longer be reached). Goals for less: a slip on an avoid goal is red, and once an
+        at-most goal goes over its limit, that whole week is red, the days you logged solid. A week with a paused or skipped
+        day isn't held against a weekly goal.
+      </p>
+      <p class="mt-2">
+        Point at a day (or tap it on the Trackables list) to see its date, what was logged and, on a red day, why. Every goal
+        shows its grid on the Trackables list, goals for less too. On a trackable's page, switch between Week, Month, 6
+        months and Year, and tap any day to see it or add an entry for that date.
+      </p>
     </section>
 
     <section id="help-attention">

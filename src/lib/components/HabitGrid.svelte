@@ -46,27 +46,60 @@
   function fill(d: GridDay): string {
     if (d.future) return 'transparent';
     if (d.outside) return 'color-mix(in srgb, var(--color-surface-2) 45%, transparent)';
+    // Logged against the goal (a slip, a day in a week over the limit): red.
+    if (d.over) return 'var(--color-danger)';
     // Rest, skipped and paused days aren't misses: drawn hollow.
     if (d.off && d.level <= 0) return 'transparent';
-    // An every-N-days goal fell overdue: a quiet red tint (an outline turned an every-day goal into a wall of boxes).
+    // A miss with nothing logged: a quiet red tint (an outline turned an every-day goal into a wall of boxes).
     if (d.level <= 0) return d.missed ? 'color-mix(in srgb, var(--color-danger) 30%, var(--color-surface-2))' : 'var(--color-surface-2)';
     return `color-mix(in srgb, ${color} ${Math.round(30 + 70 * d.level)}%, var(--color-surface-2))`;
+  }
+
+  function ring(d: GridDay): string {
+    const rings: string[] = [];
+    if (d.off && d.level <= 0 && !d.outside) rings.push('box-shadow: inset 0 0 0 1px var(--color-border);');
+    // Part of a daily goal, but not all of it: the day's shade with a red ring.
+    else if (d.missed && d.level > 0 && d.level < 1 && !d.over) rings.push('box-shadow: inset 0 0 0 1.5px var(--color-danger);');
+    if (d.isToday) rings.push('outline: 1.5px solid var(--color-text-muted); outline-offset: 1px;');
+    return rings.join(' ');
   }
 
   function describe(d: GridDay): string {
     const parts = [formatShortDate(d.day), d.count === 0 ? 'nothing logged' : `${d.count} ${d.count === 1 ? 'entry' : 'entries'}`];
     if (d.level > 0 && d.level < 1) parts.push(`${Math.round(d.level * 100)}% of goal`);
-    if (d.missed) parts.push('overdue');
+    if (d.note) parts.push(d.note);
     if (d.off) parts.push(d.off === 'rest' ? 'rest day' : d.off);
     if (d.isToday) parts.push('today');
     return parts.join(', ');
+  }
+
+  // A label over the day under the pointer, straight away (a native tooltip
+  // waits a second and never shows on a phone, 3.74). A tap shows it on a
+  // touch screen, for a few seconds.
+  let host: HTMLDivElement | undefined = $state();
+  let tip = $state<{ text: string; x: number; y: number; align: 'left' | 'center' | 'right' } | null>(null);
+  let hideTimer: ReturnType<typeof setTimeout> | undefined;
+
+  function show(d: GridDay, cell: HTMLElement, touch: boolean) {
+    if (d.future || (d.outside && !onSelect) || !host) return;
+    clearTimeout(hideTimer);
+    const box = cell.getBoundingClientRect();
+    const frame = host.getBoundingClientRect();
+    const x = box.left + box.width / 2 - frame.left;
+    tip = { text: describe(d), x, y: box.top - frame.top, align: x < 90 ? 'left' : x > frame.width - 90 ? 'right' : 'center' };
+    if (touch) hideTimer = setTimeout(() => (tip = null), 2500);
+  }
+
+  function hide(event: PointerEvent | FocusEvent) {
+    if (event instanceof PointerEvent && event.pointerType === 'touch') return;
+    tip = null;
   }
 
   // Drawing order: the grid's flow (column-wise for 'weeks', row-wise for 'calendar') places them.
   const cells = $derived(weeks.flat());
 </script>
 
-<div style="max-width: {columns * (maxCell + 4) + (showWeekdayColumn ? 18 : 0)}px;">
+<div class="relative" bind:this={host} style="max-width: {columns * (maxCell + 4) + (showWeekdayColumn ? 18 : 0)}px;">
   {#if labels && orientation === 'weeks'}
     <div class="grid gap-[3px] text-[10px] text-text-muted" style="grid-template-columns: {showWeekdayColumn ? '14px ' : ''}repeat({columns}, minmax(0, 1fr));">
       {#if showWeekdayColumn}<span></span>{/if}
@@ -98,9 +131,12 @@
         <button
           type="button"
           class="cell"
-          style="background: {fill(d)}; {d.off && d.level <= 0 && !d.outside ? 'box-shadow: inset 0 0 0 1px var(--color-border);' : ''} {d.isToday ? 'outline: 1.5px solid var(--color-text-muted); outline-offset: 1px;' : ''}"
+          style="background: {fill(d)}; {ring(d)}"
           aria-label={describe(d)}
-          title={describe(d)}
+          onpointerenter={(e) => show(d, e.currentTarget, e.pointerType === 'touch')}
+          onpointerleave={hide}
+          onfocus={(e) => show(d, e.currentTarget, false)}
+          onblur={hide}
           onclick={() => onSelect(d)}
         >
           {#if dayNumbers}<span class:dark={d.level >= 0.5}>{new Date(d.day).getDate()}</span>{/if}
@@ -108,14 +144,28 @@
       {:else}
         <span
           class="cell"
-          style="background: {fill(d)}; {d.off && d.level <= 0 && !d.outside ? 'box-shadow: inset 0 0 0 1px var(--color-border);' : ''} {d.isToday ? 'outline: 1.5px solid var(--color-text-muted); outline-offset: 1px;' : ''}"
-          title={d.outside ? undefined : describe(d)}
+          style="background: {fill(d)}; {ring(d)}"
+          role={d.outside ? undefined : 'img'}
+          aria-label={d.outside ? undefined : describe(d)}
+          onpointerenter={(e) => show(d, e.currentTarget, e.pointerType === 'touch')}
+          onpointerleave={hide}
         >
           {#if dayNumbers && !d.outside}<span class:dark={d.level >= 0.5}>{new Date(d.day).getDate()}</span>{/if}
         </span>
       {/if}
     {/each}
   </div>
+  {#if tip}
+    <div
+      class="tip pointer-events-none absolute z-20 w-max max-w-[14rem] rounded-md border px-2 py-1 text-xs leading-snug shadow-lg border-border bg-surface text-text"
+      class:left={tip.align === 'left'}
+      class:right={tip.align === 'right'}
+      style="left: {tip.x}px; top: {tip.y - 6}px;"
+      role="tooltip"
+    >
+      {tip.text}
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -132,6 +182,15 @@
   .cell .dark {
     color: var(--color-brand-fg);
     font-weight: 600;
+  }
+  .tip {
+    transform: translate(-50%, -100%);
+  }
+  .tip.left {
+    transform: translate(-12px, -100%);
+  }
+  .tip.right {
+    transform: translate(calc(-100% + 12px), -100%);
   }
   button.cell:focus-visible {
     outline: 2px solid var(--color-brand);

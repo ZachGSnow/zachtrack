@@ -1702,6 +1702,31 @@ when the app is closed.
   scope), `e2e/reminders.spec.ts` (Settings, with the push service and
   permission stubbed: headless Chromium has neither).
 
+### 3.74 Red where a goal wasn't met, and what a day was (v1.23.0)
+
+The grid (3.24) shaded how far each day went but only marked a miss for
+every-N-days goals, the Trackables card drew it only for goals with a check
+button (so not for avoid or at-most goals), and its cells had only a native
+tooltip, which waits a second and never shows on a phone.
+
+- **Red** (`habitGrid.ts`, `GridDay.missed`, `over` and `note`): a daily
+  goal's past scheduled day that ended below the goal; every day of a week
+  a times-per-week goal ended short (and of this week once the days left
+  can't make it); every day of a week an at-most goal went over, the logged
+  days solid red (`over`); and an avoid goal's slips (`over`). Days before
+  the trackable's first day or entry don't count, nor do rest days; a week
+  with a paused or skipped day isn't held against a weekly goal. `note`
+  says why ("goal missed", "week missed: 1 of 3 days", "over the limit: 3
+  of at most 1 that week", "slipped", "overdue"). Unmet days with nothing
+  logged keep the quiet red tint; a partly done day keeps its shade with a
+  red ring.
+- **The card** shows the strip for every goal (`showStrip`), goals for
+  less included; their check button stays a plain "+".
+- **A day's label** (`HabitGrid.svelte`): shown straight away over the cell
+  on hover or focus, and for a few seconds after a tap on a touch screen;
+  it wraps, and keeps inside the card near the edges. The cells' `title`
+  is gone, so there's no second, late tooltip.
+
 ### 3.21 Trackables list: pin, archive, order; tag filters
 - **Sort** (per device, `zachtrack:trackables-view`): Due first (goal
   urgency from 3.18: overdue, then due, then the rest, then trackables
