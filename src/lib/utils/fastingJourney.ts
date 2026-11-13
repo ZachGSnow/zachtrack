@@ -106,6 +106,7 @@ export function fastGridWeeks(fasts: readonly Fast[], weeks: number, now: number
       outside: future,
       future,
       missed: false,
+      over: false,
       off: null,
     });
   }
@@ -331,6 +332,7 @@ export function fastMonth(fasts: readonly Fast[], monthStart: number, now: numbe
       outside: future || !inMonth,
       future,
       missed: false,
+      over: false,
       off: null,
     });
     const total = totals[totals.length - 1];
