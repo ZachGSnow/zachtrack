@@ -1635,6 +1635,73 @@ and loses no history.
   value in the existing `goalType` column, so no migration; an older app
   shows such a goal like avoid until it updates.
 
+### 3.73 Daily reminders on the phone (v1.22.0)
+
+In-app reminders (3.27) only help when the app is open. A closed PWA can't
+reliably schedule its own notifications (Notification Triggers were
+abandoned; periodic background sync runs when the browser decides), so the
+server sends one Web Push message a day per device that asks for it. On
+Android, Chrome wakes the installed app's service worker for a push even
+when the app is closed.
+
+- **Turning it on** (Settings > Reminders, `RemindersSection.svelte`,
+  `stores/reminders.svelte.ts`), per device: the browser asks for
+  permission, `pushManager.subscribe` with the server's VAPID public key
+  (GET `/api/push`), and the subscription goes to the server with the
+  device's time zone, the time to remind, what to include (habits, tasks,
+  dates) and whether to name things. Names are off at first: the lock
+  screen shows the notification, and "Male Health: 1 of 3 this week" isn't
+  for it. Send a test, Save and Turn off use the same endpoint.
+- **Storage:** `pushSubscriptions` (migration 0012), keyed by the push
+  endpoint. Not synced, not in the nightly backups (`BACKUP_TABLES` lists
+  what is): a device that loses its row turns reminders on again. Every
+  call is a POST with the endpoint in the body, since the endpoint works as
+  a key to the device's notifications and URLs end up in logs.
+  `functions/api/push.ts` checks Access like every endpoint, and refuses a
+  subscription whose host isn't a known push service (FCM, Mozilla, Apple,
+  Windows), so the server never posts to an address a request made up.
+- **Sending** (`server/reminders.ts`, from the scheduled Worker in
+  `workers/backup/`, now every 15 minutes): each run reads the
+  subscriptions and stops unless one is due: past its local time, less
+  than three hours past it, not sent that local day, fewer than five
+  failures today. A run at 09:00 UTC makes the backup only; a reminder due
+  then goes 15 minutes later, so the backup, whose CPU time grows with the
+  data, never shares a run's 10 ms. When one is due, the run reads the
+  trackables, recent entries (400 days) of goal trackables, dates and open
+  tasks once, and works out what's due with the app's own code:
+  `attentionItems` (goals due or overdue, and dates in their lead time;
+  goals for less never remind) and `dueTasks`. Nothing is sent on a day
+  with nothing due; the day is still marked.
+- **Time zones.** The app's day logic uses the runtime's local time, which
+  in a Worker is UTC. `shifter(timeZone)` moves each timestamp by that
+  zone's offset at that moment (cached per hour), so the same code sees the
+  device's wall clock, right on both sides of a DST change.
+- **Web Push** (`server/webpush.ts`) with WebCrypto only: RFC 8291's
+  aes128gcm encryption (a fresh key pair and salt per message) and an
+  RFC 8292 VAPID JWT signed with ES256, checked against RFC 8291's own
+  worked example byte for byte. No library: the usual one needs Node's
+  crypto, and any would need a licence check of what it brings in. A 404
+  or 410 from the push service deletes the subscription; other failures
+  retry on the next run. Payloads are kept for a day (TTL) and are
+  encrypted, so the push service (Google's, on Android) carries them
+  without reading them.
+- **The service worker** gains `public/push-sw.js` through workbox's
+  `importScripts`: it shows the message (one at a time, tag
+  `zachtrack-reminder`) and a tap opens Today, or brings an open window
+  there.
+- **Keys:** `npm run vapid-keys` makes the pair; the public key is a var
+  in both `wrangler.toml` files, the private key a secret in the Pages
+  project and the Worker. Without them `/api/push` answers `publicKey:
+  null` and Settings says reminders aren't set up.
+- **Cost:** 96 runs a day, almost all of them one small D1 read; the
+  sending run reads a few hundred rows and makes one request per device.
+- **Tests:** `tests/webpush.test.ts` (the RFC vector, VAPID, the host
+  list), `tests/push.test.ts` (the endpoint, when a reminder is due, the
+  message, sending once and dropping a gone subscription, on a local D1),
+  `tests/pushSw.test.ts` (the service worker's handlers in a stand-in
+  scope), `e2e/reminders.spec.ts` (Settings, with the push service and
+  permission stubbed: headless Chromium has neither).
+
 ### 3.21 Trackables list: pin, archive, order; tag filters
 - **Sort** (per device, `zachtrack:trackables-view`): Due first (goal
   urgency from 3.18: overdue, then due, then the rest, then trackables
@@ -1745,7 +1812,7 @@ saving a second preset silently failed. The picker now writes plain copies
 and shows an error if a save fails.
 
 ### 3.27 In-app reminders
-No notifications by choice: reminders show inside the app.
+No notifications by choice: reminders show inside the app (and, since v1.22.0, in one opt-in daily push per device, 3.73).
 `stores/attention.svelte.ts` follows trackables, fields, entries, recent fasts
 and the schedule setting with one `liveQuery`, and re-checks every minute as
 time passes. `utils/attention.ts` picks the goals that are overdue or due
@@ -2205,7 +2272,11 @@ are kept out of the repo, in the git-ignored `wrangler.toml` and a local
   free plan (30 days on a paid plan). Beyond that, the `zachtrack-backup`
   Worker (`workers/backup/`, its own git-ignored `wrangler.toml`) writes a
   nightly restore-ready SQL file to the private R2 bucket `zachtrack-backups`,
-  kept 30 days by a lifecycle rule. See 3.12 for the format. `npm run deploy`
+  kept 30 days by a lifecycle rule. See 3.12 for the format. Since v1.22.0
+  it runs every 15 minutes (`*/15 * * * *`, still one of the account's five
+  free cron triggers): the backup at 09:00 UTC, daily reminders on the other
+  runs (3.73), with `VAPID_PUBLIC_KEY` and `VAPID_SUBJECT` as vars and
+  `VAPID_PRIVATE_KEY` as a secret, set in the Pages project as well. `npm run deploy`
   also exports the database right before applying migrations, to a file
   outside the repo (it is health data; `*.sql` other than `d1/schema.sql`,
   `d1/scrub-deleted.sql` and `d1/migrations/*.sql` is git-ignored).
@@ -2234,9 +2305,11 @@ this," not a promise.
   the most powerful of the three tag ideas (fits Charting's whole
   correlation-hunting purpose) but touches the data pipeline that builds
   chart series, not just a rendered list - separate scope from the other two.
-- **Notifications of any kind:** not wanted. v1.11.0 removed the local zone
-  and schedule notifications for in-app milestones (3.34); Web Push isn't
-  planned.
+- **Notifications beyond the daily reminder:** v1.11.0 removed the local
+  zone and schedule notifications for in-app milestones (3.34). v1.22.0
+  added one daily Web Push reminder per device, opt-in (3.73). A
+  notification at a task's own time, or the moment a fast reaches its goal,
+  would need the scheduled run to be more often or exact; not planned.
 - **Age-tracker extras:** a relationship label (e.g. "Mom", "Friend") per
   person was considered; decided name + age is enough for now.
 - **Direction-aware trend colors in data tables:** a per-field "higher is

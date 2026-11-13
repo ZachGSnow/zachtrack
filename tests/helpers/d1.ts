@@ -18,6 +18,7 @@ export const APP_TABLES = [
   'devices',
   'syncEvents',
   'purgeState',
+  'pushSubscriptions',
 ] as const;
 
 const MIGRATIONS_DIR = 'd1/migrations';

@@ -9,8 +9,16 @@ workers_dev = false
 preview_urls = false
 
 [triggers]
-# Every day at 09:00 UTC.
-crons = ["0 9 * * *"]
+# Every 15 minutes: the backup at 09:00 UTC, daily reminders on the other
+# runs (ARCHITECTURE.md 3.73). One cron trigger either way.
+crons = ["*/15 * * * *"]
+
+# Reminders. The public key from `npm run vapid-keys`; the private key is a
+# secret: `npx wrangler secret put VAPID_PRIVATE_KEY` in this folder. A push
+# service may use the subject to reach whoever runs the server.
+[vars]
+VAPID_PUBLIC_KEY = ""
+VAPID_SUBJECT = "https://zachtrack.example.com"
 
 [[d1_databases]]
 binding = "DB"

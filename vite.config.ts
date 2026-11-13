@@ -91,6 +91,8 @@ export default defineConfig({
         // flow (see ARCHITECTURE.md 4.9). `?reauth=` is the marker the sync
         // store's `reauthenticate()` uses to force a real network navigation.
         navigateFallbackDenylist: [/^\/api\//, /^\/cdn-cgi\//, /[?&]reauth=/],
+        // Shows daily reminders and opens the app from them (public/push-sw.js, 3.73).
+        importScripts: ['push-sw.js'],
       },
     }),
   ],

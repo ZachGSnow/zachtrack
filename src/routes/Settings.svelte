@@ -10,6 +10,7 @@
   import HelpLink from '../lib/components/HelpLink.svelte';
   import SyncHistory from '../lib/components/SyncHistory.svelte';
   import SignOutSection from '../lib/components/SignOutSection.svelte';
+  import RemindersSection from '../lib/components/RemindersSection.svelte';
   import WeekPlanEditor from '../lib/components/WeekPlanEditor.svelte';
   import SegmentedControl from '../lib/components/SegmentedControl.svelte';
   import { THEME_CHOICES, themeStore } from '../lib/stores/theme.svelte';
@@ -300,6 +301,10 @@
     <DataFileSection />
     <ScaleImportSection />
   </section>
+
+  {#if syncStore.status !== 'local'}
+    <RemindersSection />
+  {/if}
 
   <section class="space-y-3" aria-labelledby="settings-sync">
     <h2 id="settings-sync" class="flex items-center gap-1.5 text-sm font-semibold uppercase tracking-wide text-text-muted"><span>Sync</span> <HelpLink topic="sync-page" label="devices, checking sync and signing out" /></h2>

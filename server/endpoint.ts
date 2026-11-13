@@ -13,6 +13,10 @@ export interface Env {
   ACCESS_AUD?: string;
   /** The nightly backup bucket, read-only use: /api/backup-status lists it. Optional. */
   BACKUPS?: R2Bucket;
+  /** Daily reminders (3.73): the VAPID public key (a var), private key (a secret) and contact. Without the keys, reminders are off. */
+  VAPID_PUBLIC_KEY?: string;
+  VAPID_PRIVATE_KEY?: string;
+  VAPID_SUBJECT?: string;
 }
 
 export function jsonResponse(body: unknown, status = 200): Response {
