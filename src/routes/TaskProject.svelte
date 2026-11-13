@@ -14,12 +14,15 @@
   import { loadPrefs, savePrefs } from '../lib/utils/prefs';
   import BottomSheet from '../lib/components/BottomSheet.svelte';
   import ProjectSheet from '../lib/components/ProjectSheet.svelte';
+  import SegmentedControl from '../lib/components/SegmentedControl.svelte';
+  import TaskBoard from '../lib/components/TaskBoard.svelte';
   import TaskHost from '../lib/components/TaskHost.svelte';
   import TaskRow from '../lib/components/TaskRow.svelte';
 
   // One project (or the inbox): its tasks by section, a box to add a task to
   // each section, completed tasks on request, and drag and drop within and
-  // between sections (3.60, 3.65).
+  // between sections (3.60, 3.65). A project shows as a list or a board of
+  // columns (TaskBoard.svelte, 3.76), chosen per project on each device.
   let { params }: { params: { id: string } } = $props();
 
   const projects = liveQuery(() => db.taskProjects.toArray());
@@ -32,14 +35,29 @@
   const openCount = $derived(groups.reduce((n, g) => n + g.open.length, 0));
   const today = dayKey(Date.now());
 
-  // Per device, like the other view choices: which sections are folded, and completed tasks shown.
+  // Per device, like the other view choices: which sections are folded, completed tasks shown, and which projects are boards.
   const PREFS_KEY = 'task-view';
-  const saved = loadPrefs<{ collapsed: unknown; showDone: unknown }>(PREFS_KEY, { collapsed: [], showDone: false });
-  let collapsed = $state<string[]>(Array.isArray(saved.collapsed) ? saved.collapsed.filter((x): x is string => typeof x === 'string') : []);
+  const saved = loadPrefs<{ collapsed: unknown; showDone: unknown; boards: unknown }>(PREFS_KEY, { collapsed: [], showDone: false, boards: [] });
+  const strings = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
+  let collapsed = $state<string[]>(strings(saved.collapsed));
   let showDone = $state(saved.showDone === true);
+  let boards = $state<string[]>(strings(saved.boards));
   $effect(() => {
-    savePrefs(PREFS_KEY, { collapsed: [...collapsed], showDone });
+    savePrefs(PREFS_KEY, { collapsed: [...collapsed], showDone, boards: [...boards] });
   });
+  type Layout = 'list' | 'board';
+  const LAYOUTS: { id: Layout; label: string }[] = [
+    { id: 'list', label: 'List' },
+    { id: 'board', label: 'Board' },
+  ];
+  const layout = $derived<Layout>(project && boards.includes(project.id) ? 'board' : 'list');
+  function setLayout(next: Layout) {
+    if (!project) return;
+    const id = project.id;
+    boards = next === 'board' ? [...boards.filter((x) => x !== id), id] : boards.filter((x) => x !== id);
+  }
+  // A project without sections still gets a column to add its first task to.
+  const boardGroups = $derived<SectionGroup[]>(groups.length > 0 ? groups : [{ section: null, open: [], done: [] }]);
   const keyOf = (g: SectionGroup) => g.section?.id ?? `${params.id}:top`;
   function toggleCollapsed(g: SectionGroup) {
     const k = keyOf(g);
@@ -62,6 +80,11 @@
     if (!name) return;
     // Cleared first, so typing the next one straight away starts empty.
     drafts = { ...drafts, [k]: '' };
+    await addTask(g, name);
+  }
+
+  /** A task typed into a section's (or a column's) add box. */
+  async function addTask(g: SectionGroup, name: string) {
     // A date typed at the end sets the due date and repeat (3.64).
     const q = parseQuickAdd(name, today);
     await createTask({
@@ -93,7 +116,7 @@
   }
 </script>
 
-<div class="mx-auto flex w-full flex-1 flex-col gap-3 px-5 py-6">
+<div class="mx-auto flex w-full min-w-0 flex-1 flex-col gap-3 px-5 py-6">
   <a href="/tasks" use:link class="flex items-center gap-1 self-start text-sm text-text-muted"><ChevronLeft size={16} aria-hidden="true" /> Projects</a>
 
   {#if $projects === undefined || $tasks === undefined}
@@ -126,74 +149,83 @@
       </div>
     {/if}
 
-    <div class="flex items-center gap-4">
+    <div class="flex items-center justify-between gap-4">
       {#if doneCount > 0}
         <button class="text-sm text-text-muted" onclick={() => (showDone = !showDone)} aria-pressed={showDone}>{showDone ? 'Hide' : 'Show'} completed ({doneCount})</button>
+      {:else}
+        <span></span>
+      {/if}
+      {#if project}
+        <SegmentedControl options={LAYOUTS} value={layout} onchange={setLayout} label="Layout" />
       {/if}
     </div>
 
-    {#each groups as g (keyOf(g))}
-      {@const k = keyOf(g)}
-      {@const folded = collapsed.includes(k)}
-      <section class="flex flex-col gap-1" aria-label={g.section?.name ?? 'Tasks'}>
-        {#if g.section}
-          <button type="button" class="flex items-center gap-1.5 self-start pt-2 text-left" onclick={() => toggleCollapsed(g)} aria-expanded={!folded}>
-            {#if folded}<ChevronRight size={16} class="text-text-muted" aria-hidden="true" />{:else}<ChevronDown size={16} class="text-text-muted" aria-hidden="true" />{/if}
-            <span class="font-heading text-sm font-semibold text-text">{g.section.name}</span>
-            <span class="text-xs text-text-muted">{g.open.length}</span>
-          </button>
-        {/if}
-        {#if !folded}
-          <!-- Always there, even empty, so a task can be dropped into an empty section. -->
-          <ul
-            class="flex min-h-2 flex-col"
-            use:sortable={{ group: `tasks:${params.id}`, zone: k, onDrop: drop, onKeyMove: (id, d) => keyMove(g, id, d) }}
-          >
-            {#each g.open as t (t.id)}
-              <TaskRow task={t} tasks={$tasks} {today} draggable />
-            {/each}
-          </ul>
-          {#if showDone && g.done.length > 0}
-            <ul class="flex flex-col" aria-label="Completed in {g.section?.name ?? 'this project'}">
-              {#each g.done as t (t.id)}
-                <TaskRow task={t} tasks={$tasks} {today} />
+    {#if project && layout === 'board'}
+      <TaskBoard {project} groups={boardGroups} tasks={$tasks} {today} {showDone} {keyOf} onDrop={drop} onKeyMove={keyMove} onAdd={addTask} />
+    {:else}
+      {#each groups as g (keyOf(g))}
+        {@const k = keyOf(g)}
+        {@const folded = collapsed.includes(k)}
+        <section class="flex flex-col gap-1" aria-label={g.section?.name ?? 'Tasks'}>
+          {#if g.section}
+            <button type="button" class="flex items-center gap-1.5 self-start pt-2 text-left" onclick={() => toggleCollapsed(g)} aria-expanded={!folded}>
+              {#if folded}<ChevronRight size={16} class="text-text-muted" aria-hidden="true" />{:else}<ChevronDown size={16} class="text-text-muted" aria-hidden="true" />{/if}
+              <span class="font-heading text-sm font-semibold text-text">{g.section.name}</span>
+              <span class="text-xs text-text-muted">{g.open.length}</span>
+            </button>
+          {/if}
+          {#if !folded}
+            <!-- Always there, even empty, so a task can be dropped into an empty section. -->
+            <ul
+              class="flex min-h-2 flex-col"
+              use:sortable={{ group: `tasks:${params.id}`, zone: k, onDrop: drop, onKeyMove: (id, d) => keyMove(g, id, d), mouseAnywhere: true }}
+            >
+              {#each g.open as t (t.id)}
+                <TaskRow task={t} tasks={$tasks} {today} draggable />
               {/each}
             </ul>
+            {#if showDone && g.done.length > 0}
+              <ul class="flex flex-col" aria-label="Completed in {g.section?.name ?? 'this project'}">
+                {#each g.done as t (t.id)}
+                  <TaskRow task={t} tasks={$tasks} {today} />
+                {/each}
+              </ul>
+            {/if}
+            {#if true}
+              <form
+                class="pl-11"
+                onsubmit={(e) => {
+                  e.preventDefault();
+                  void add(g);
+                }}
+              >
+                <input
+                  type="text"
+                  bind:value={drafts[k]}
+                  placeholder="+ Add a task"
+                  aria-label="Add a task{g.section ? ` to ${g.section.name}` : ''}"
+                  class="w-full rounded-lg border border-transparent bg-transparent px-2 py-1.5 text-sm text-text placeholder:text-text-muted focus:border-border"
+                />
+                {#if draftPreview(drafts[k])}
+                  <p class="px-2 text-xs text-brand">{draftPreview(drafts[k])}</p>
+                {/if}
+              </form>
+            {/if}
           {/if}
-          {#if true}
-            <form
-              class="pl-11"
-              onsubmit={(e) => {
-                e.preventDefault();
-                void add(g);
-              }}
-            >
-              <input
-                type="text"
-                bind:value={drafts[k]}
-                placeholder="+ Add a task"
-                aria-label="Add a task{g.section ? ` to ${g.section.name}` : ''}"
-                class="w-full rounded-lg border border-transparent bg-transparent px-2 py-1.5 text-sm text-text placeholder:text-text-muted focus:border-border"
-              />
-              {#if draftPreview(drafts[k])}
-                <p class="px-2 text-xs text-brand">{draftPreview(drafts[k])}</p>
-              {/if}
-            </form>
-          {/if}
-        {/if}
-      </section>
-    {/each}
+        </section>
+      {/each}
 
-    {#if groups.length === 0}
-      <!-- The inbox, or a project with no sections, before its first task still needs somewhere to type. -->
-      <form
-        onsubmit={(e) => {
-          e.preventDefault();
-          void add({ section: null, open: [], done: [] });
-        }}
-      >
-        <input type="text" bind:value={drafts[`${params.id}:top`]} placeholder="+ Add a task" aria-label="Add a task" class="w-full rounded-lg border border-border bg-transparent px-2 py-1.5 text-sm text-text placeholder:text-text-muted" />
-      </form>
+      {#if groups.length === 0}
+        <!-- The inbox, or a project with no sections, before its first task still needs somewhere to type. -->
+        <form
+          onsubmit={(e) => {
+            e.preventDefault();
+            void add({ section: null, open: [], done: [] });
+          }}
+        >
+          <input type="text" bind:value={drafts[`${params.id}:top`]} placeholder="+ Add a task" aria-label="Add a task" class="w-full rounded-lg border border-border bg-transparent px-2 py-1.5 text-sm text-text placeholder:text-text-muted" />
+        </form>
+      {/if}
     {/if}
   {/if}
 </div>

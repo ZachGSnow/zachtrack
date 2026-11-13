@@ -241,7 +241,15 @@
         </li>
         <li>
           <strong>Reordering.</strong> Drag a task by the dots at its left, within a section or into another; the same works
-          for subtasks in a task's sheet and for sections in Edit. On a laptop, focus the dots and use the arrow keys.
+          for subtasks in a task's sheet and for sections in Edit. With a mouse, drag a task from anywhere on it. On a laptop,
+          focus the dots and use the arrow keys.
+        </li>
+        <li>
+          <strong>Board.</strong> List / Board at the top of a project shows its sections as columns of cards, as in Asana or
+          Trello. Drag a card into another column to move it there, and a column by the dots in its header to reorder the
+          sections. Each column has "+ Add a task" at its foot, and "+ Add a section" after the last adds a column. On a
+          phone one column shows at a time: swipe sideways, or tap a column's name above the board. Each project remembers
+          List or Board on each device.
         </li>
         <li>
           <strong>Swipes (phone).</strong> Swipe a task right to complete it, left to move its date.

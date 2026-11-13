@@ -1,12 +1,15 @@
-// Drag and drop for lists (ARCHITECTURE.md 3.65), as a Svelte action on the
-// list element. Its items carry `data-sort-id`; each item's handle carries
-// `data-drag-handle`. Dragging starts from the handle only, so the rest of a
-// row still scrolls, taps and swipes as usual; the handle has
-// `touch-action: none`, so a finger drags it straight away on a phone.
-// Lists in the same `group` exchange items (a task dragged into another
-// section). Arrow Up and Down on a focused handle move it one place, for the
-// keyboard. Written here rather than taken from a library to keep the
-// dependencies the licence policy checks to a minimum.
+// Drag and drop for lists (ARCHITECTURE.md 3.65, 3.76), as a Svelte action on
+// the list element. Its items carry `data-sort-id`; each item's handle carries
+// `data-drag-handle`. Dragging starts from the handle, so the rest of a row
+// still scrolls, taps and swipes as usual; the handle has `touch-action:
+// none`, so a finger drags it straight away on a phone. With `mouseAnywhere`,
+// a mouse can also drag an item from anywhere on it once it has moved a few
+// pixels, as in Asana; a plain click still clicks. Lists in the same `group`
+// exchange items (a task dragged into another section, or a card into another
+// column of a board). A list is vertical by default, or horizontal with
+// `axis: 'x'` (a board's columns). Arrow keys on a focused handle move it one
+// place, for the keyboard. Written here rather than taken from a library to
+// keep the dependencies the licence policy checks to a minimum.
 
 import { dropIndex } from '../utils/reorder';
 
@@ -23,8 +26,18 @@ export interface SortableOptions {
   group: string;
   zone: string;
   onDrop: (e: DropEvent) => void;
-  /** Arrow Up / Down on a focused handle. */
+  /** Arrow Up / Down (Left / Right on a horizontal list) on a focused handle. */
   onKeyMove?: (id: string, direction: -1 | 1) => void;
+  /** 'y' (the default): items stacked top to bottom. 'x': side by side. */
+  axis?: 'x' | 'y';
+  /** The floating copy follows the pointer both ways, not only along the list (a card moving between columns). */
+  free?: boolean;
+  /** How far past the end of a list, in pixels, the pointer can be and still drop into it. Default 32. */
+  reach?: number;
+  /** A container that scrolls sideways, scrolled while the pointer is near its left or right edge. */
+  scroller?: () => HTMLElement | null | undefined;
+  /** A mouse can drag an item from anywhere on it, not only its handle. */
+  mouseAnywhere?: boolean;
 }
 
 interface Zone {
@@ -33,6 +46,9 @@ interface Zone {
 }
 
 const groups = new Map<string, Set<Zone>>();
+
+/** How far a mouse moves before a press on an item becomes a drag (`mouseAnywhere`). */
+const DRAG_START = 5;
 
 const itemsOf = (node: HTMLElement, except?: Element) =>
   [...node.querySelectorAll<HTMLElement>(':scope > [data-sort-id]')].filter((el) => el !== except);
@@ -56,14 +72,43 @@ export function sortable(node: HTMLElement, options: SortableOptions) {
   function onPointerDown(e: PointerEvent) {
     if (e.button !== 0) return;
     const hit = handleFor(e.target);
-    if (!hit) return;
-    e.preventDefault();
-    startDrag(e, hit.handle, hit.item);
+    if (hit) {
+      e.preventDefault();
+      startDrag(e, hit.handle, hit.item);
+      return;
+    }
+    if (zone.opts.mouseAnywhere && e.pointerType === 'mouse') pressAnywhere(e);
   }
 
-  function startDrag(e: PointerEvent, handle: HTMLElement, item: HTMLElement) {
+  /** A mouse press on an item, outside its handle: a drag once it moves a few pixels, otherwise a click. */
+  function pressAnywhere(e: PointerEvent) {
+    const target = e.target as Element | null;
+    if (!target || target.closest('input, textarea, select, [contenteditable], [data-drag-handle]')) return;
+    const item = target.closest<HTMLElement>('[data-sort-id]');
+    if (!item || item.parentElement !== node) return;
+    const move = (ev: PointerEvent) => {
+      if (ev.pointerId !== e.pointerId) return;
+      if (Math.hypot(ev.clientX - e.clientX, ev.clientY - e.clientY) < DRAG_START) return;
+      stop();
+      startDrag(e, item, item, ev);
+    };
+    const stop = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', stop);
+      window.removeEventListener('pointercancel', stop);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', stop);
+    window.addEventListener('pointercancel', stop);
+  }
+
+  function startDrag(e: PointerEvent, handle: HTMLElement, item: HTMLElement, now: PointerEvent = e) {
     const id = item.dataset.sortId!;
+    const horizontal = zone.opts.axis === 'x';
+    const followX = horizontal || !!zone.opts.free;
+    const followY = !horizontal || !!zone.opts.free;
     const rect = item.getBoundingClientRect();
+    const offsetX = e.clientX - rect.left;
     const offsetY = e.clientY - rect.top;
     const ghost = item.cloneNode(true) as HTMLElement;
     Object.assign(ghost.style, {
@@ -71,6 +116,8 @@ export function sortable(node: HTMLElement, options: SortableOptions) {
       left: `${rect.left}px`,
       top: `${rect.top}px`,
       width: `${rect.width}px`,
+      maxHeight: '60vh',
+      overflow: 'hidden',
       zIndex: '60',
       pointerEvents: 'none',
       background: 'var(--color-surface)',
@@ -82,9 +129,17 @@ export function sortable(node: HTMLElement, options: SortableOptions) {
     ghost.setAttribute('aria-hidden', 'true');
     document.body.appendChild(ghost);
     const line = document.createElement('div');
-    Object.assign(line.style, { position: 'fixed', height: '2px', background: 'var(--color-brand)', zIndex: '61', pointerEvents: 'none', display: 'none' });
+    Object.assign(line.style, { position: 'fixed', background: 'var(--color-brand)', zIndex: '61', pointerEvents: 'none', display: 'none' });
     document.body.appendChild(line);
     item.style.opacity = '0.35';
+    // No text selected by a drag that started on a name.
+    const userSelect = document.body.style.userSelect;
+    document.body.style.userSelect = 'none';
+    window.getSelection()?.removeAllRanges();
+    // A sideways scroller stops snapping to its columns while it is scrolled by the drag.
+    const scroller = zone.opts.scroller?.() ?? null;
+    const snap = scroller?.style.scrollSnapType ?? '';
+    if (scroller) scroller.style.scrollSnapType = 'none';
     try {
       handle.setPointerCapture(e.pointerId);
     } catch {
@@ -92,53 +147,74 @@ export function sortable(node: HTMLElement, options: SortableOptions) {
     }
 
     let target: { zone: Zone; index: number } | null = null;
-    let lastY = e.clientY;
-    let lastX = e.clientX;
+    let lastY = now.clientY;
+    let lastX = now.clientX;
     let raf = 0;
+
+    const place = () => {
+      if (followX) ghost.style.left = `${lastX - offsetX}px`;
+      if (followY) ghost.style.top = `${lastY - offsetY}px`;
+    };
 
     const locate = () => {
       const zones = [...(groups.get(zone.opts.group) ?? [])].filter((z) => z.node.isConnected);
+      // The nearest list along the axis among those the pointer is beside; a list
+      // the pointer is inside sideways beats one it is only near (columns a few
+      // pixels apart).
       let best: Zone | null = null;
-      let bestDistance = Infinity;
+      let bestScore = Infinity;
+      const gap = (a: number, lo: number, hi: number) => (a < lo ? lo - a : a > hi ? a - hi : 0);
       for (const z of zones) {
         const r = z.node.getBoundingClientRect();
-        if (lastX < r.left - 24 || lastX > r.right + 24) continue;
-        const distance = lastY < r.top ? r.top - lastY : lastY > r.bottom ? lastY - r.bottom : 0;
-        if (distance < bestDistance && distance <= 32) {
+        const reach = z.opts.reach ?? 32;
+        const across = horizontal ? gap(lastY, r.top, r.bottom) : gap(lastX, r.left, r.right);
+        const along = horizontal ? gap(lastX, r.left, r.right) : gap(lastY, r.top, r.bottom);
+        if (across > 24 || along > reach) continue;
+        const score = across * 1e6 + along;
+        if (score < bestScore) {
           best = z;
-          bestDistance = distance;
+          bestScore = score;
         }
       }
       if (!best) return;
       const others = itemsOf(best.node, item);
+      const rects = others.map((el) => el.getBoundingClientRect());
       const index = dropIndex(
-        others.map((el) => {
-          const r = el.getBoundingClientRect();
-          return r.top + r.height / 2;
-        }),
-        lastY,
+        rects.map((r) => (horizontal ? r.left + r.width / 2 : r.top + r.height / 2)),
+        horizontal ? lastX : lastY,
       );
       target = { zone: best, index };
       const zr = best.node.getBoundingClientRect();
-      const y = others.length === 0 ? zr.top + 2 : index < others.length ? others[index].getBoundingClientRect().top - 1 : others[others.length - 1].getBoundingClientRect().bottom + 1;
-      Object.assign(line.style, { display: 'block', left: `${zr.left + 8}px`, width: `${zr.width - 16}px`, top: `${y}px` });
+      if (horizontal) {
+        const x = rects.length === 0 ? zr.left + 2 : index < rects.length ? rects[index].left - 6 : rects[rects.length - 1].right + 4;
+        Object.assign(line.style, { display: 'block', left: `${x}px`, top: `${zr.top + 8}px`, width: '2px', height: `${Math.max(24, zr.height - 16)}px` });
+      } else {
+        const y = rects.length === 0 ? zr.top + 2 : index < rects.length ? rects[index].top - 1 : rects[rects.length - 1].bottom + 1;
+        Object.assign(line.style, { display: 'block', left: `${zr.left + 8}px`, top: `${y}px`, width: `${zr.width - 16}px`, height: '2px' });
+      }
     };
 
-    // Scroll the page while the pointer is near the top or bottom edge.
+    // Scroll the page near its top and bottom edges, and a sideways scroller near its left and right edges.
     const tick = () => {
       const edge = 70;
       if (lastY < edge) window.scrollBy(0, -10);
       else if (lastY > window.innerHeight - edge - 60) window.scrollBy(0, 10);
+      if (scroller) {
+        const r = scroller.getBoundingClientRect();
+        if (lastX < r.left + 40) scroller.scrollLeft -= 12;
+        else if (lastX > r.right - 40) scroller.scrollLeft += 12;
+      }
       locate();
       raf = requestAnimationFrame(tick);
     };
+    place();
     raf = requestAnimationFrame(tick);
 
     const move = (ev: PointerEvent) => {
       if (ev.pointerId !== e.pointerId) return;
       lastY = ev.clientY;
       lastX = ev.clientX;
-      ghost.style.top = `${ev.clientY - offsetY}px`;
+      place();
       locate();
     };
     const finish = (drop: boolean) => {
@@ -150,6 +226,15 @@ export function sortable(node: HTMLElement, options: SortableOptions) {
       ghost.remove();
       line.remove();
       item.style.opacity = '';
+      document.body.style.userSelect = userSelect;
+      if (scroller) scroller.style.scrollSnapType = snap;
+      // The click that ends a drag isn't a tap on the item.
+      const swallow = (ev: MouseEvent) => {
+        ev.stopPropagation();
+        ev.preventDefault();
+      };
+      window.addEventListener('click', swallow, true);
+      setTimeout(() => window.removeEventListener('click', swallow, true), 0);
       const t = target as { zone: Zone; index: number } | null;
       if (!drop || !t) return;
       const fromIndex = itemsOf(node).indexOf(item);
@@ -172,11 +257,13 @@ export function sortable(node: HTMLElement, options: SortableOptions) {
   }
 
   function onKeyDown(e: KeyboardEvent) {
-    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+    const [back, forward] = zone.opts.axis === 'x' ? ['ArrowLeft', 'ArrowRight'] : ['ArrowUp', 'ArrowDown'];
+    if (e.key !== back && e.key !== forward) return;
     const hit = handleFor(e.target);
     if (!hit || !zone.opts.onKeyMove) return;
     e.preventDefault();
-    zone.opts.onKeyMove(hit.item.dataset.sortId!, e.key === 'ArrowUp' ? -1 : 1);
+    e.stopPropagation();
+    zone.opts.onKeyMove(hit.item.dataset.sortId!, e.key === back ? -1 : 1);
     // Keep the focus on the moved item's handle once the list has re-rendered.
     const id = hit.item.dataset.sortId!;
     setTimeout(() => node.querySelector<HTMLElement>(`[data-sort-id="${CSS.escape(id)}"] [data-drag-handle]`)?.focus(), 50);
