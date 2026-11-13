@@ -57,6 +57,12 @@ describe('weekly review', () => {
     expect(r.fasts).toEqual({ count: 2, goal: 1 });
   });
 
+  it('counts an at-most goal as met when the week stayed within the limit', () => {
+    const trackables = [t('snacks', { goalType: 'maxPerWeek', goalValue: 2 }), t('soda', { goalType: 'maxPerWeek', goalValue: 1 })];
+    const entries = [e('snacks', nov(3)), e('snacks', nov(5)), e('soda', nov(4)), e('soda', nov(6)), e('soda', oct(30))];
+    expect(weeklyReview(trackables, [], entries, [], undefined, nov(9))?.habits).toEqual({ met: 1, of: 2 });
+  });
+
   it('on Sunday counts the week so far, leaving today open until it is met', () => {
     const entries = [2, 3, 4, 5, 6, 7].map((d) => e('floss', nov(d)));
     const r = weeklyReview([t('floss', { goalType: 'perDay', goalValue: 1 })], [], entries, [], undefined, nov(8, 10))!;

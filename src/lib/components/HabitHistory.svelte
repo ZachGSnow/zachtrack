@@ -1,6 +1,6 @@
 <script lang="ts">
   import { updateTrackable, type FieldDefinition, type TrackableDefinition, type TrackableEntry } from '../db';
-  import { isoDay } from '../utils/trackableGoals';
+  import { isLessGoal, isoDay } from '../utils/trackableGoals';
   import { habitGridMonth, habitGridWeeks, type GridDay } from '../utils/habitGrid';
   import { formatClockTime, startOfDay } from '../utils/time';
   import { loadPrefs, oneOf, savePrefs } from '../utils/prefs';
@@ -137,7 +137,7 @@
         <button class="text-xs font-semibold text-brand" onclick={addForSelected}>
           + Add an entry for this day
         </button>
-        {#if trackable.goalType && trackable.goalType !== 'avoid'}
+        {#if trackable.goalType && !isLessGoal(trackable.goalType)}
           <button class="text-xs text-text-muted hover:text-text" onclick={toggleSkip}>
             {selectedSkipped ? 'Unskip this day' : 'Skip this day'}
           </button>

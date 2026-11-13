@@ -1,5 +1,5 @@
 import type { FieldDefinition, TrackableDefinition, TrackableEntry } from '../db';
-import { goalStatus, type GoalStatus } from './trackableGoals';
+import { goalStatus, isLessGoal, type GoalStatus } from './trackableGoals';
 import type { TrackableKind } from './trackableKinds';
 import { startOfDay } from './time';
 
@@ -32,7 +32,7 @@ export function checkState(
   now: number,
 ): CheckState {
   const goal = kind === 'ages' ? null : goalStatus(trackable, entries, fields, now);
-  const goalCard = !!trackable.goalType && trackable.goalType !== 'avoid' && kind !== 'ages';
+  const goalCard = !!trackable.goalType && !isLessGoal(trackable.goalType) && kind !== 'ages';
   const noFields = trackable.fieldIds.length === 0;
   const today = startOfDay(now);
   const todayCount = entries.filter((e) => startOfDay(e.timestamp) === today).length;

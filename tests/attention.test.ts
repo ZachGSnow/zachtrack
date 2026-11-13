@@ -37,6 +37,17 @@ describe('needs attention', () => {
     ]);
   });
 
+  it('leaves out less-is-better goals, even over the limit: nothing is to be done today', () => {
+    const snapshot = {
+      trackables: [trackable('Snacks', { goalType: 'maxPerWeek', goalValue: 1 }), trackable('Smoking', { goalType: 'avoid' })],
+      fields: [],
+      entries: [entry('Snacks', oct(19)), entry('Snacks', oct(20)), entry('Smoking', oct(21))],
+      recentFasts: [],
+      scheduleTime: undefined,
+    };
+    expect(attentionItems(snapshot, oct(22, 12))).toEqual([]);
+  });
+
   it("lists dates inside their trackable's lead time, after goals due today", () => {
     const dates = { ...trackable('Birthdays', {}), displayMode: 'ages' as const, dateKind: 'birthday' as const, dateLeadDays: 7 };
     const snapshot = {

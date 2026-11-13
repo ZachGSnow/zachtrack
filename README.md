@@ -56,7 +56,7 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
   goal-weight date as a range, or a smoothed trend that can lead instead of
   the scale's reading), today's total (Calories, Water) or logged
   today with a streak (check-ins). Optional goals: a daily total, N times a
-  week, every N days (with due and overdue) or avoid, each with its own
+  week, every N days (with due and overdue), at most N a week or avoid, each with its own
   streak; times per day too, and daily goals can apply on chosen weekdays,
   with days skipped or the goal paused for a holiday without breaking the
   streak. A trackable with a goal gets a habit-grid strip on its card and a

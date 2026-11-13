@@ -57,7 +57,7 @@ export interface FieldDefinition {
 }
 
 /** dailyTotal: the first field's total per day; perDay: entries per day; perWeek: days logged per week; everyDays: due every N days; avoid: time since is the streak. */
-export type TrackableGoalType = 'dailyTotal' | 'perDay' | 'perWeek' | 'everyDays' | 'avoid';
+export type TrackableGoalType = 'dailyTotal' | 'perDay' | 'perWeek' | 'everyDays' | 'avoid' | 'maxPerWeek';
 
 /** How a trackable is summarised; 'occurrences' (or unset) = automatic from its fields. See utils/trackableKinds.ts. */
 export type TrackableDisplayMode = 'occurrences' | 'ages' | 'event' | 'measurement' | 'daily' | 'checkin';

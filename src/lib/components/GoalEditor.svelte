@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { FieldDefinition, TrackableGoalType } from '../db';
-  import { DAILY_GOALS, GOAL_LABELS, GOAL_TYPES, goalField, WEEKDAY_NAMES } from '../utils/trackableGoals';
+  import { DAILY_GOALS, GOAL_LABELS, GOAL_TYPES, goalField, isLessGoal, WEEKDAY_NAMES } from '../utils/trackableGoals';
   import HelpLink from './HelpLink.svelte';
 
   // A trackable's goal in the edit sheet (EditTrackableSheet.svelte, 3.18,
@@ -26,11 +26,13 @@
     perDay: 'Counts each entry today; without fields, each tap of the check button is one.',
     perWeek: 'Counts the days you log it, Monday to Sunday.',
     everyDays: 'Due again that many days after the last entry; shows when it is due or overdue.',
-    avoid: 'For things you want to do less: the time since it last happened is the streak.',
+    avoid: 'For things you want to stop: the time since it last happened is the streak.',
+    maxPerWeek: 'For things you want to do less, but not never: counts each time, Monday to Sunday, and turns red over the limit.',
   };
 
   const goalValueLabel = $derived.by(() => {
     if (goalType === 'perWeek') return 'Times per week';
+    if (goalType === 'maxPerWeek') return 'At most how many times a week';
     if (goalType === 'perDay') return 'Times per day';
     if (goalType === 'everyDays') return 'Every how many days';
     const f = goalField(attachedFields);
@@ -84,7 +86,7 @@
       <p class="mt-1 text-xs text-text-muted">Other days are rest days: they don't break the streak.</p>
     </div>
   {/if}
-  {#if goalType && goalType !== 'avoid'}
+  {#if goalType && !isLessGoal(goalType)}
     <label class="block text-sm">
       <span class="mb-1 block text-text-muted">Paused until (optional)</span>
       <div class="flex gap-2">

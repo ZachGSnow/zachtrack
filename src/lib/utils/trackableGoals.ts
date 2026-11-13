@@ -10,13 +10,15 @@ import { bucketStart, computeFieldValuesByDay, formatTimeSinceAdaptive, type Tim
  * - perWeek:    log on N days each week, Monday to Sunday (gym 3 times a week)
  * - everyDays:  do it every N days; due and overdue follow from the last entry
  * - avoid:      less is better; the streak is the time since it last happened
+ * - maxPerWeek: at most N times a week, Monday to Sunday: less, but not never;
+ *               the streak is weeks in a row within the limit
  *
  * The daily goals (dailyTotal, perDay) can apply on chosen weekdays only
  * (scheduleDays). Days off the schedule, skipped days and days while paused
  * neither count toward a streak nor break it; while paused nothing is due.
  */
 
-export const GOAL_TYPES: TrackableGoalType[] = ['dailyTotal', 'perDay', 'perWeek', 'everyDays', 'avoid'];
+export const GOAL_TYPES: TrackableGoalType[] = ['dailyTotal', 'perDay', 'perWeek', 'everyDays', 'maxPerWeek', 'avoid'];
 
 export const GOAL_LABELS: Record<TrackableGoalType, string> = {
   dailyTotal: 'Reach a total each day',
@@ -24,7 +26,17 @@ export const GOAL_LABELS: Record<TrackableGoalType, string> = {
   perWeek: 'Times per week',
   everyDays: 'Every N days',
   avoid: 'Avoid it',
+  maxPerWeek: 'At most N a week',
 };
+
+/**
+ * Goals where less is better (avoid, maxPerWeek): nothing is ever due, so they
+ * get no check button, no place in Needs attention or Today's habits, no
+ * pause or skip, and no habit strength.
+ */
+export function isLessGoal(type: TrackableGoalType | '' | undefined | null): boolean {
+  return type === 'avoid' || type === 'maxPerWeek';
+}
 
 /** Goals that apply day by day, and so can follow a weekday schedule. */
 export const DAILY_GOALS: readonly TrackableGoalType[] = ['dailyTotal', 'perDay'];
@@ -131,6 +143,7 @@ export function describeGoal(
   }
   if (type === 'perDay') return `${n === 1 ? 'Once' : `${fmt(n)} times`} a day${on}`;
   if (type === 'perWeek') return `${fmt(n)} ${n === 1 ? 'time' : 'times'} a week`;
+  if (type === 'maxPerWeek') return `At most ${n === 1 ? 'once' : `${fmt(n)} times`} a week`;
   return n === 1 ? 'Every day' : `Every ${fmt(n)} days`;
 }
 
@@ -147,7 +160,7 @@ export function goalStatus(
   const times = entries.map((e) => e.timestamp).sort((a, b) => a - b);
   const last = times.at(-1);
 
-  if (type !== 'avoid' && isPaused(trackable, today)) {
+  if (!isLessGoal(type) && isPaused(trackable, today)) {
     return {
       text: `Paused until ${new Date(trackable.pausedUntil!).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`,
       state: 'ok',
@@ -210,6 +223,19 @@ export function goalStatus(
     };
   }
 
+  if (type === 'maxPerWeek') {
+    const { count, current } = limitWeeks(times, goal!, now);
+    const over = count - goal!;
+    return {
+      text: over > 0 ? `${count} this week, ${fmt(over)} over the limit` : `${count} of at most ${fmt(goal!)} this week`,
+      state: over > 0 ? 'overdue' : 'ok',
+      progress: Math.min(1, count / goal!),
+      streak: current > 0 ? `${current} ${current === 1 ? 'week' : 'weeks'} within` : undefined,
+      // Nothing to do about it today: it sorts with the avoid goals.
+      urgency: 500,
+    };
+  }
+
   if (type === 'everyDays') {
     if (last == null) return { text: 'Due now', state: 'due', progress: 1, urgency: 0 };
     const dueDay = addDays(startOfDay(last), goal!);
@@ -244,7 +270,7 @@ export function goalStatus(
 export function goalCardLine(status: GoalStatus, type: TrackableGoalType, kindCard: string, strength?: number | null): string {
   // Never zero (3.53): how established the habit is comes before the streak, which one missed day resets.
   const strong = strength != null ? `${Math.round(strength * 100)}% strong` : null;
-  if (type === 'avoid') return status.streak ? `${status.text} \u00b7 ${status.streak}` : status.text;
+  if (isLessGoal(type)) return status.streak ? `${status.text} \u00b7 ${status.streak}` : status.text;
   if (type === 'dailyTotal' || type === 'perDay') return [status.text, strong, status.streak].filter(Boolean).join(' \u00b7 ');
   return [status.text, strong ?? kindCard].filter(Boolean).join(' \u00b7 ');
 }
@@ -256,6 +282,34 @@ export const GOAL_STATE_COLORS: Record<GoalState, string | undefined> = {
   overdue: 'var(--color-danger)',
   ok: undefined,
 };
+
+/**
+ * An at-most-N-a-week goal week by week, Monday to Sunday, counting each time
+ * (not days, unlike perWeek: twice in a day is twice). The current week
+ * counts toward a streak while it's within the limit; weeks before the first
+ * entry don't count.
+ */
+function limitWeeks(times: readonly number[], goal: number, now: number) {
+  const weekStart = bucketStart(now, 'week');
+  const firstWeek = times.length ? bucketStart(times[0], 'week') : weekStart;
+  const countIn = (start: number) => times.filter((t) => t >= start && t < addDays(start, 7)).length;
+  const within = (start: number) => countIn(start) <= goal;
+  let current = 0;
+  for (let w = weekStart; w >= firstWeek && within(w); w = addDays(w, -7)) current += 1;
+  let best = 0;
+  let run = 0;
+  for (let w = firstWeek; w <= weekStart; w = addDays(w, 7)) {
+    run = within(w) ? run + 1 : 0;
+    best = Math.max(best, run);
+  }
+  let recentWeeks = 0;
+  let recentWithin = 0;
+  for (let w = Math.max(firstWeek, addDays(weekStart, -7 * 11)); w <= weekStart; w = addDays(w, 7)) {
+    recentWeeks += 1;
+    if (within(w)) recentWithin += 1;
+  }
+  return { count: countIn(weekStart), current, best, recentWeeks, recentWithin };
+}
 
 // ---------------------------------------------------------------------------
 // The stat tiles on a goal trackable's page (TrackableDetail.svelte): how the
@@ -366,6 +420,16 @@ export function goalStats(
     ];
   }
 
+  if (type === 'maxPerWeek') {
+    const { count, current, best, recentWeeks, recentWithin } = limitWeeks(times, goal!, now);
+    return [
+      { label: 'This week', value: `${count} of at most ${fmt(goal!)}` },
+      { label: 'Weeks within (12)', value: recentWeeks ? `${recentWithin} of ${recentWeeks}` : dash },
+      { label: 'Current streak', value: plural(current, 'week') },
+      { label: 'Best streak', value: plural(best, 'week') },
+    ];
+  }
+
   if (type === 'everyDays') {
     // Each interval between two logs, on time when it's within the goal; the last 90 days by the later log.
     const since90 = addDays(today, -89);
@@ -427,7 +491,7 @@ export function habitStrength(
 ): number | null {
   const type = trackable.goalType;
   const goal = trackable.goalValue;
-  if (!type || type === 'avoid' || goal == null || goal <= 0) return null;
+  if (!type || isLessGoal(type) || goal == null || goal <= 0) return null;
   const today = startOfDay(now);
   const times = entries.map((e) => e.timestamp).filter((t) => t <= now).sort((a, b) => a - b);
   const first = Math.min(startOfDay(trackable.createdAt ?? now), times.length ? startOfDay(times[0]) : today);

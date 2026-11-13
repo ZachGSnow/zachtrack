@@ -28,6 +28,7 @@
   import { DATE_KINDS, DATE_KIND_LABELS, DEFAULT_LEAD_DAYS } from '../utils/dates';
   import FieldsEditor from './FieldsEditor.svelte';
   import GoalEditor from './GoalEditor.svelte';
+  import SplitMergeSection from './SplitMergeSection.svelte';
   import HelpLink from './HelpLink.svelte';
 
   const KINDS: TrackableKind[] = ['event', 'measurement', 'daily', 'checkin', 'ages'];
@@ -345,6 +346,10 @@
   {/if}
 
   <FieldsEditor bind:fieldIds allFields={$allFields ?? []} trackableId={trackable?.id} {open} />
+
+  {#if trackable}
+    <SplitMergeSection {trackable} allFields={$allFields ?? []} onDone={() => (open = false)} />
+  {/if}
 
   {#if error}
     <p class="text-sm text-danger">{error}</p>
