@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { dropIndex, moveTo, renumber } from '../src/lib/utils/reorder';
+import { dropIndex, moveManyTo, moveTo, renumber } from '../src/lib/utils/reorder';
 
-// Drag and drop order (ARCHITECTURE.md 3.65).
+// Drag and drop order (ARCHITECTURE.md 3.65, 3.77).
 
 describe('drag and drop order', () => {
   it('finds the gap a drop lands in from the items midpoints', () => {
@@ -18,6 +18,15 @@ describe('drag and drop order', () => {
     expect(moveTo(['a', 'b', 'c'], 'c', 0)).toEqual(['c', 'a', 'b']);
     expect(moveTo(['a', 'b'], 'x', 1)).toEqual(['a', 'x', 'b']);
     expect(moveTo(['a', 'b'], 'x', 9)).toEqual(['a', 'b', 'x']);
+  });
+
+  it('moves several selected items together, in the order given, from this list or others', () => {
+    // b and d out of a, b, c, d, e, dropped between c and e (index 2 among a, c, e).
+    expect(moveManyTo(['a', 'b', 'c', 'd', 'e'], ['b', 'd'], 2)).toEqual(['a', 'c', 'b', 'd', 'e']);
+    // One from this list and one from another, to the top.
+    expect(moveManyTo(['a', 'b', 'c'], ['c', 'x'], 0)).toEqual(['c', 'x', 'a', 'b']);
+    // Past the end lands at the end.
+    expect(moveManyTo(['a', 'b'], ['x', 'y'], 9)).toEqual(['a', 'b', 'x', 'y']);
   });
 
   it('writes only the orders that change', () => {

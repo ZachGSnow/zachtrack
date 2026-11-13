@@ -17,6 +17,7 @@
   import { INBOX_ID, nextSortOrder, parentChain, subtaskProgress, subtasksOf } from '../utils/tasks';
   import { taskUi } from '../stores/taskUi.svelte';
   import TaskCheck from './TaskCheck.svelte';
+  import SectionChips from './SectionChips.svelte';
   import Button from './ui/Button.svelte';
 
   // One task, edited in place: every change saves as it's made, like Asana's
@@ -87,7 +88,7 @@
     const open = subtasks.filter((s) => !s.completedAt);
     const at = open.findIndex((s) => s.id === id);
     if (at < 0 || at + direction < 0 || at + direction >= open.length) return;
-    void dropSubtask({ id, from: '', to: '', index: at + direction });
+    void dropSubtask({ id, ids: [id], from: '', to: '', index: at + direction });
   }
   const history = $derived(task ? completions.filter((c) => c.taskId === task.id).sort((a, b) => b.completedAt - a.completedAt) : []);
   /** "on time", "3 days late", "1 day early": when it was done against its due date. */
@@ -199,7 +200,7 @@
     {/if}
 
     {#if !task.parentId}
-      <div class="grid grid-cols-2 gap-2">
+      <div class="space-y-3">
         <label class="block text-sm">
           <span class="mb-1 block text-text-muted">Project</span>
           <select class={inputClass} value={task.projectId ?? INBOX_ID} onchange={(e) => moveTo(e.currentTarget.value)}>
@@ -210,19 +211,10 @@
           </select>
         </label>
         {#if project && project.sections.length > 0}
-          <label class="block text-sm">
+          <div class="text-sm">
             <span class="mb-1 block text-text-muted">Section</span>
-            <select
-              class={inputClass}
-              value={task.sectionId && project.sections.some((s) => s.id === task.sectionId) ? task.sectionId : ''}
-              onchange={(e) => save({ sectionId: e.currentTarget.value || undefined })}
-            >
-              <option value="">(none)</option>
-              {#each project.sections as s (s.id)}
-                <option value={s.id}>{s.name}</option>
-              {/each}
-            </select>
-          </label>
+            <SectionChips {task} {project} allowNone />
+          </div>
         {/if}
       </div>
     {/if}

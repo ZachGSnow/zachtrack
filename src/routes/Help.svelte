@@ -252,6 +252,15 @@
           List or Board on each device.
         </li>
         <li>
+          <strong>Quick menu.</strong> Press and hold a task on a phone, or right-click it on a laptop: its project's
+          sections are buttons, so one tap moves it to another section or column (with Undo), then Open, Set or Move the
+          date, Duplicate and Delete. On a phone that's quicker than dragging across a board.
+        </li>
+        <li>
+          <strong>Several at once (laptop).</strong> In a project, Ctrl+click (Cmd+click on a Mac) tasks to pick them, then
+          drag any one of them: they all move, in the order they were in. Esc or Clear lets go of them.
+        </li>
+        <li>
           <strong>Swipes (phone).</strong> Swipe a task right to complete it, left to move its date.
         </li>
         <li>
@@ -263,8 +272,8 @@
           day. "Move all overdue to today" on Today and Upcoming moves every late task at once, with Undo.
         </li>
         <li>
-          <strong>A task's sheet.</strong> Tap a task to open it: its name, project and section, due date and time, notes and
-          subtasks. Everything saves as you change it. A subtask opens in the same sheet, with "Subtask of ..." to go back.
+          <strong>A task's sheet.</strong> Tap a task to open it: its name, project and section (tap another section's
+          button to move it there), due date and time, notes and subtasks. Everything saves as you change it. A subtask opens in the same sheet, with "Subtask of ..." to go back.
         </li>
         <li>
           <strong>Completing.</strong> Tap the circle. Undo appears for a few seconds. Completed tasks hide; "Show completed"

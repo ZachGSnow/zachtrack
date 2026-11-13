@@ -10,9 +10,19 @@ export function dropIndex(midpoints: readonly number[], y: number): number {
 
 /** `ids` with `id` taken out (if it's there) and put back at `index`. */
 export function moveTo(ids: readonly string[], id: string, index: number): string[] {
-  const rest = ids.filter((x) => x !== id);
+  return moveManyTo(ids, [id], index);
+}
+
+/**
+ * `ids` with every one of `moving` taken out (those that are there) and put
+ * back together, in the order given, at `index` among the rest: several
+ * selected tasks dragged as one (3.77).
+ */
+export function moveManyTo(ids: readonly string[], moving: readonly string[], index: number): string[] {
+  const out = new Set(moving);
+  const rest = ids.filter((x) => !out.has(x));
   const at = Math.max(0, Math.min(index, rest.length));
-  return [...rest.slice(0, at), id, ...rest.slice(at)];
+  return [...rest.slice(0, at), ...moving, ...rest.slice(at)];
 }
 
 /**

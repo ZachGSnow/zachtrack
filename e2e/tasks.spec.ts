@@ -89,9 +89,12 @@ test('moving a task, renaming and removing sections, then deleting the project',
   await addTask(page, 'To do', 'Post the parcel');
   await addTask(page, 'Waiting', 'Collect the dry cleaning');
 
-  // Move a task to another section from its sheet.
+  // Move a task to another section from its sheet: one tap on the section's button (3.77).
   await page.getByRole('button', { name: /^Post the parcel/ }).click();
-  await page.getByRole('dialog').getByRole('combobox', { name: 'Section' }).selectOption({ label: 'Doing' });
+  const sections = page.getByRole('dialog').getByRole('group', { name: 'Section' });
+  await expect(sections.getByRole('button', { name: 'To do' })).toHaveAttribute('aria-pressed', 'true');
+  await sections.getByRole('button', { name: 'Doing' }).click();
+  await expect(sections.getByRole('button', { name: 'Doing' })).toHaveAttribute('aria-pressed', 'true');
   await page.keyboard.press('Escape');
   await expect(section(page, 'Doing').getByRole('listitem')).toHaveText([/Post the parcel/]);
 
