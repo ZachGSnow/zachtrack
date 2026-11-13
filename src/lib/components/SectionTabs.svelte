@@ -3,7 +3,7 @@
   import { sectionFor } from '../data/sections';
 
   // The pages of the current section (Timer, Journey, History under Fasting;
-  // List and Dates under Trackables) as tabs at the top of the page, on a
+  // Coming up, Calendar and Lists under Dates) as tabs at the top of the page, on a
   // phone. On a laptop the sidebar lists them instead. Not shown on pages
   // inside a section, such as one trackable's page.
   const current = $derived(sectionFor(router.location));

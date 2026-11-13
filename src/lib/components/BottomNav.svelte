@@ -18,9 +18,13 @@
   // In-app reminders: how many trackables are due or overdue, and a dot on Fasting while a scheduled
   // fast is late or a running fast has reached a milestone you have not seen.
   const badge = (href: string): { text: string; label: string } | null => {
-    if (href === '/trackables' && attentionStore.items.length > 0) {
-      const n = attentionStore.items.length;
+    if (href === '/trackables' && attentionStore.goals.length > 0) {
+      const n = attentionStore.goals.length;
       return { text: String(n), label: `${n} need${n === 1 ? 's' : ''} attention` };
+    }
+    if (href === '/dates' && attentionStore.dates.length > 0) {
+      const n = attentionStore.dates.length;
+      return { text: String(n), label: `${n} date${n === 1 ? '' : 's'} coming up` };
     }
     if (href === '/tasks' && attentionStore.tasksDue > 0) {
       const n = attentionStore.tasksDue;

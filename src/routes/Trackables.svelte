@@ -13,7 +13,6 @@
   import { link } from 'svelte-spa-router';
   import { GOAL_STATE_COLORS } from '../lib/utils/trackableGoals';
   import TrackableCard from '../lib/components/TrackableCard.svelte';
-  import ComingUp from '../lib/components/ComingUp.svelte';
   import BottomSheet from '../lib/components/BottomSheet.svelte';
   import EditTrackableSheet from '../lib/components/EditTrackableSheet.svelte';
   import QuickLogHost from '../lib/components/QuickLogHost.svelte';
@@ -58,7 +57,10 @@
     return goalStatus(t, entriesByTrackable.get(t.id) ?? [], fields)?.urgency;
   }
 
-  const active = $derived(orderTrackables(($trackables ?? []).filter((t) => !t.archived), sort, urgency));
+  // Date lists (birthdays, holidays...) live on the Dates tab (3.75); this list is what you log.
+  const logged = $derived(($trackables ?? []).filter((t) => t.displayMode !== 'ages'));
+  const datesCount = $derived(($trackables ?? []).length - logged.length);
+  const active = $derived(orderTrackables(logged.filter((t) => !t.archived), sort, urgency));
 
   // Quiet trackables (utils/trackableList.ts): offered for archiving, unless "Not now" snoozed the offer on this device.
   const QUIET_PREFS_KEY = 'quiet-trackables';
@@ -72,7 +74,7 @@
     const last = (entriesByTrackable.get(t.id) ?? []).reduce((max, e) => Math.max(max, e.timestamp), 0);
     return last ? `last ${formatTimeSinceAdaptive(Date.now() - last)} ago` : 'never logged';
   }
-  const archived = $derived(orderTrackables(($trackables ?? []).filter((t) => t.archived), 'name', () => undefined));
+  const archived = $derived(orderTrackables(logged.filter((t) => t.archived), 'name', () => undefined));
 
   async function move(t: TrackableDefinition, direction: -1 | 1) {
     const current = new Map(active.map((a) => [a.id, a.sortOrder]));
@@ -119,19 +121,19 @@
 
   {#if $trackables === undefined}
     <p class="text-sm text-text-muted">Loading&hellip;</p>
-  {:else if $trackables.length === 0}
-    {#if starterStore.pending}
+  {:else if logged.length === 0}
+    {#if starterStore.pending && datesCount === 0}
       <StarterPicker />
     {:else}
-      <EmptyState title="No trackables yet" text={'Tap "+ New" to create your first one, or start from a template.'} class="mt-4" />
+      <EmptyState title="No trackables yet" text={'Tap "+ New" to create your first one, or start from a template. Birthdays and holidays go on the Dates tab.'} class="mt-4" />
     {/if}
   {:else}
-    {#if attentionStore.items.length > 0}
+    {#if attentionStore.goals.length > 0}
       <!-- In-app reminders: goals that are overdue or due today, most urgent first. -->
       <section class="rounded-2xl border p-3" style="border-color: var(--color-danger-line); background: var(--color-danger-soft);" aria-label="Needs attention">
         <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-danger">Needs attention</p>
         <ul class="flex flex-col gap-1">
-          {#each attentionStore.items as item (item.key)}
+          {#each attentionStore.goals as item (item.key)}
             <li>
               <a href="/trackables/{item.id}" use:link class="flex items-center gap-2 rounded-lg px-1 py-1 text-sm hover:bg-surface-2">
                 <span class="w-6 text-center">{item.icon}</span>
@@ -143,7 +145,6 @@
         </ul>
       </section>
     {/if}
-    <ComingUp trackables={$trackables ?? []} entries={$allEntries ?? []} />
     {#if quiet.length > 0}
       <!-- Trackables that have gone quiet: offer to archive them so they stop crowding the list. -->
       <section class="rounded-2xl border border-border bg-surface-2 p-3" aria-label="Quiet trackables">

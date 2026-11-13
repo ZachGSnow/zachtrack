@@ -8,30 +8,35 @@
   import { dateItemKey, UPCOMING_DAYS, upcomingDates, type DateItem } from '../lib/utils/dates';
   import { addDays, startOfDay } from '../lib/utils/time';
   import { bucketStart } from '../lib/utils/trackableStats';
-  import { loadPrefs, oneOf, savePrefs } from '../lib/utils/prefs';
-  import SegmentedControl from '../lib/components/SegmentedControl.svelte';
+  import { push } from 'svelte-spa-router';
   import HelpLink from '../lib/components/HelpLink.svelte';
+  import BottomSheet from '../lib/components/BottomSheet.svelte';
+  import EditTrackableSheet from '../lib/components/EditTrackableSheet.svelte';
+  import QuickLogHost from '../lib/components/QuickLogHost.svelte';
+  import { quickLog } from '../lib/stores/quickLog.svelte';
   import { datesToIcs } from '../lib/utils/ics';
 
-  // Every dates trackable in one place (ARCHITECTURE.md 3.38): the next year
-  // of birthdays, anniversaries, holidays and countdowns, as an agenda or a
-  // month calendar. Opened from Trackables > Coming up.
+  // The Dates tab (ARCHITECTURE.md 3.38, 3.75): birthdays, anniversaries,
+  // holidays and countdowns, kept apart from the trackables you log. Three
+  // pages: what's coming up in the next year, a month calendar, and the
+  // lists themselves. Under the hood each list is still a trackable of the
+  // dates kind, so its own page and syncing are unchanged.
+  type View = 'list' | 'calendar' | 'lists';
+  let { view = 'list' }: { view?: View } = $props();
 
   const trackables = liveQuery(() => db.trackableDefinitions.toArray());
   const entries = liveQuery(() => db.trackableEntries.toArray());
 
-  type View = 'list' | 'calendar';
-  const VIEWS: { id: View; label: string }[] = [
-    { id: 'list', label: 'List' },
-    { id: 'calendar', label: 'Calendar' },
-  ];
-  const PREFS_KEY = 'dates-view';
-  let view = $state<View>(oneOf(loadPrefs<{ view: unknown }>(PREFS_KEY, { view: 'list' }).view, VIEWS.map((v) => v.id), 'list'));
-  $effect(() => savePrefs(PREFS_KEY, { view }));
-
   const now = Date.now();
   const today = startOfDay(now);
   const datesTrackables = $derived(($trackables ?? []).filter((t) => !t.archived && t.displayMode === 'ages'));
+  const archivedLists = $derived(($trackables ?? []).filter((t) => t.archived && t.displayMode === 'ages').sort((a, b) => a.name.localeCompare(b.name)));
+  const lists = $derived([...datesTrackables].sort((a, b) => (a.pinned === b.pinned ? a.name.localeCompare(b.name) : a.pinned ? -1 : 1)));
+  let showArchived = $state(false);
+  const countIn = (id: string) => ($entries ?? []).filter((e) => e.trackableId === id).length;
+
+  // "+ New list": the trackable sheet, offering only the dates templates.
+  let newOpen = $state(false);
 
   // Every date as an .ics file (utils/ics.ts), made here and downloaded; nothing is uploaded.
   // Reminders in the file let the phone's own calendar alert, at each trackable's lead time (3.56).
@@ -122,7 +127,7 @@
 <div class="mx-auto flex w-full flex-1 flex-col gap-4 px-5 py-6 lg:max-w-3xl">
   <div class="flex items-center justify-between gap-2">
     <h1 class="flex items-center gap-2 text-xl font-semibold text-text"><span>Dates</span> <HelpLink topic="dates" label="dates" /></h1>
-    <SegmentedControl options={VIEWS} bind:value={view} />
+    <button class="rounded-full px-3 py-1.5 text-sm font-semibold bg-brand text-brand-fg" onclick={() => (newOpen = true)}>+ New list</button>
   </div>
   {#if datesTrackables.length > 0}
     <div class="-mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-text-muted">
@@ -138,7 +143,41 @@
   {#if $trackables === undefined}
     <p class="text-sm text-text-muted">Loading&hellip;</p>
   {:else if datesTrackables.length === 0}
-    <EmptyState icon="&#x1F4C5;" title="No dates yet" text={'On Trackables, tap "+ New" and pick Birthdays, Anniversaries, US holidays or Countdowns.'} class="mt-4" />
+    <EmptyState icon="&#x1F4C5;" title="No dates yet" text={'Tap "+ New list" and pick Birthdays, Anniversaries, US holidays or Countdowns.'} class="mt-4" />
+  {:else if view === 'lists'}
+    <ul class="flex flex-col gap-2" aria-label="Date lists">
+      {#each lists as t (t.id)}
+        {@const next = items.find((i) => i.trackableId === t.id)}
+        {@const n = countIn(t.id)}
+        <li class="flex items-center gap-3 rounded-xl border p-3 border-border bg-surface">
+          <a href="/trackables/{t.id}" use:link class="flex min-w-0 flex-1 items-center gap-3">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xl" style="background: {t.color}22;">{t.icon}</span>
+            <span class="min-w-0">
+              <span class="block truncate text-sm font-semibold text-text">{#if t.pinned}<span class="mr-1 text-xs" aria-label="Pinned">&#x1F4CC;</span>{/if}{t.name}</span>
+              <span class="block truncate text-xs text-text-muted">{n} {n === 1 ? 'date' : 'dates'}{next ? ` \u00b7 next: ${next.name}, ${next.countdown.charAt(0).toLowerCase()}${next.countdown.slice(1)}` : ''}</span>
+            </span>
+          </a>
+          <button
+            class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-lg font-semibold"
+            style="background: {t.color}22; color: {readableText(t.color, themeStore.effective)};"
+            onclick={() => quickLog.log(t)}
+            aria-label="Add to {t.name}"
+          >+</button>
+        </li>
+      {/each}
+    </ul>
+    {#if archivedLists.length > 0}
+      <button class="self-start text-sm text-text-muted" onclick={() => (showArchived = !showArchived)} aria-expanded={showArchived}>
+        {showArchived ? 'Hide' : 'Show'} archived ({archivedLists.length})
+      </button>
+      {#if showArchived}
+        <ul class="flex flex-col gap-2 opacity-70">
+          {#each archivedLists as t (t.id)}
+            <li><a href="/trackables/{t.id}" use:link class="flex items-center gap-3 rounded-xl border p-3 text-sm border-border bg-surface text-text"><span class="text-xl">{t.icon}</span>{t.name}</a></li>
+          {/each}
+        </ul>
+      {/if}
+    {/if}
   {:else if view === 'list'}
     {#if items.length === 0}
       <p class="text-sm text-text-muted">Nothing in the next year.</p>
@@ -199,3 +238,9 @@
     {/if}
   {/if}
 </div>
+
+<QuickLogHost />
+
+<BottomSheet bind:open={newOpen}>
+  <EditTrackableSheet bind:open={newOpen} trackable={null} templates="dates" onSaved={(id) => push(`/trackables/${id}`)} />
+</BottomSheet>

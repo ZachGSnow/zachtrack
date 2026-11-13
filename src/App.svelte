@@ -41,7 +41,9 @@
     '/history': History,
     '/settings': wrap({ asyncComponent: () => import('./routes/Settings.svelte') }),
     '/sync': wrap({ asyncComponent: () => import('./routes/Sync.svelte') }),
-    '/dates': wrap({ asyncComponent: () => import('./routes/Dates.svelte') }),
+    '/dates': wrap({ asyncComponent: () => import('./routes/Dates.svelte'), props: { view: 'list' } }),
+    '/dates/calendar': wrap({ asyncComponent: () => import('./routes/Dates.svelte'), props: { view: 'calendar' } }),
+    '/dates/lists': wrap({ asyncComponent: () => import('./routes/Dates.svelte'), props: { view: 'lists' } }),
     '/tasks': wrap({ asyncComponent: () => import('./routes/Tasks.svelte') }),
     // Before /tasks/:id, which would take "upcoming" for a project id.
     '/tasks/upcoming': wrap({ asyncComponent: () => import('./routes/TasksUpcoming.svelte') }),

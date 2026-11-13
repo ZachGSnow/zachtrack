@@ -14,6 +14,10 @@ import type { Task } from '../db';
 
 class AttentionStore {
   items = $state<AttentionItem[]>([]);
+  /** Goals due or overdue: Needs attention on Trackables and that tab's badge. */
+  goals = $derived(this.items.filter((i) => i.kind === 'goal'));
+  /** Dates inside their lead time: the Dates tab's badge (3.75). */
+  dates = $derived(this.items.filter((i) => i.kind === 'date'));
   /** The daily fasting schedule's start has passed with no fast started today. */
   fastingLate = $state(false);
   /** Open tasks overdue or due today, outside archived projects: the Tasks tab's badge (3.62). */

@@ -61,8 +61,8 @@ test('capture README screenshots', async ({ page }) => {
       [days, years],
     );
   for (const template of [/US holidays$/, /Birthdays$/]) {
-    await page.goto('/#/trackables');
-    await page.getByRole('button', { name: '+ New' }).click();
+    await page.goto('/#/dates/lists');
+    await page.getByRole('button', { name: '+ New list' }).click();
     await page.getByRole('button', { name: template }).click();
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('button', { name: /^\+ Add/ })).toBeVisible();

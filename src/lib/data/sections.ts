@@ -9,6 +9,7 @@ import Timer from '@lucide/svelte/icons/timer';
 import ListChecks from '@lucide/svelte/icons/list-checks';
 import Lightbulb from '@lucide/svelte/icons/lightbulb';
 import ListTodo from '@lucide/svelte/icons/list-todo';
+import CalendarDays from '@lucide/svelte/icons/calendar-days';
 
 export interface SectionPage {
   href: string;
@@ -40,14 +41,17 @@ export const SECTIONS: Section[] = [
       { href: '/history', label: 'History' },
     ],
   },
+  { href: '/trackables', label: 'Trackables', icon: ListChecks, match: /^\/trackables(\/.*)?$/ },
+  // Birthdays, anniversaries, holidays and countdowns: dates to look up, not things to log (ARCHITECTURE.md 3.75).
   {
-    href: '/trackables',
-    label: 'Trackables',
-    icon: ListChecks,
-    match: /^\/(trackables(\/.*)?|dates)$/,
+    href: '/dates',
+    label: 'Dates',
+    icon: CalendarDays,
+    match: /^\/dates(\/.*)?$/,
     pages: [
-      { href: '/trackables', label: 'List' },
-      { href: '/dates', label: 'Dates' },
+      { href: '/dates', label: 'Coming up' },
+      { href: '/dates/calendar', label: 'Calendar' },
+      { href: '/dates/lists', label: 'Lists' },
     ],
   },
   // To-dos: projects, sections, tasks and subtasks (ARCHITECTURE.md 3.59, 3.60).

@@ -362,14 +362,16 @@ test('on a laptop-width screen the sidebar replaces the tab bar and marks the cu
   await waitForStarterSet(page);
   const sidebar = page.getByRole('navigation', { name: 'Main' }).filter({ hasText: 'ZachTrack' });
   await expect(sidebar).toBeVisible();
-  // Four sections, each lit on any of its pages; the current page is marked under it.
+  // The sections, each lit on any of its pages; the current page is marked under it.
   for (const [url, section, current] of [
     ['/#/', 'Today', null],
     ['/#/fasting', 'Fasting', 'Timer'],
     ['/#/journey', 'Fasting', 'Journey'],
     ['/#/history', 'Fasting', 'History'],
-    ['/#/trackables', 'Trackables', 'List'],
-    ['/#/dates', 'Trackables', 'Dates'],
+    ['/#/trackables', 'Trackables', null],
+    ['/#/dates', 'Dates', 'Coming up'],
+    ['/#/dates/calendar', 'Dates', 'Calendar'],
+    ['/#/dates/lists', 'Dates', 'Lists'],
     ['/#/insights', 'Insights', null],
   ] as const) {
     await page.goto(url);
@@ -400,11 +402,11 @@ test('on a laptop-width screen the sidebar replaces the tab bar and marks the cu
   expect(problems).toEqual([]);
 });
 
-test('on a phone five tabs mark the section, and tabs at the top switch its pages', async ({ page }) => {
+test('on a phone six tabs mark the section, and tabs at the top switch its pages', async ({ page }) => {
   await mockSync(page, noServer);
   await waitForStarterSet(page);
   const tabs = page.getByRole('navigation', { name: 'Main' });
-  await expect(tabs.getByRole('link')).toHaveText([/Today/, /Fasting/, /Trackables/, /Tasks/, /Insights/]);
+  await expect(tabs.getByRole('link')).toHaveText([/Today/, /Fasting/, /Trackables/, /Dates/, /Tasks/, /Insights/]);
 
   await page.goto('/#/journey');
   await expect(tabs.locator('a.active:visible')).toHaveText(/Fasting/);
@@ -414,11 +416,16 @@ test('on a phone five tabs mark the section, and tabs at the top switch its page
   await expect(page.getByRole('heading', { name: 'History', level: 1 })).toBeVisible();
   await expect(tabs.locator('a.active:visible')).toHaveText(/Fasting/);
 
-  await tabs.getByRole('link', { name: /Trackables/ }).click();
-  const trackablePages = page.getByRole('navigation', { name: 'Trackables pages' });
-  await trackablePages.getByRole('link', { name: 'Dates' }).click();
+  // Dates has a tab of its own (3.75), with its pages along the top.
+  await tabs.getByRole('link', { name: /Dates/ }).click();
   await expect(page.getByRole('heading', { name: 'Dates', level: 1 })).toBeVisible();
-  await expect(tabs.locator('a.active:visible')).toHaveText(/Trackables/);
+  const datePages = page.getByRole('navigation', { name: 'Dates pages' });
+  await expect(datePages.locator('[aria-current="page"]')).toHaveText('Coming up');
+  await datePages.getByRole('link', { name: 'Lists' }).click();
+  await expect(datePages.locator('[aria-current="page"]')).toHaveText('Lists');
+  await expect(tabs.locator('a.active:visible')).toHaveText(/Dates/);
+  await tabs.getByRole('link', { name: /Trackables/ }).click();
+  await expect(page.getByRole('navigation', { name: 'Trackables pages' })).toHaveCount(0);
 
   // The Data tab's old address still opens Insights, and its tab lights up.
   await page.goto('/#/charting');
