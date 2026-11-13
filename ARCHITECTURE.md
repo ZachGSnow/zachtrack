@@ -1727,6 +1727,34 @@ tooltip, which waits a second and never shows on a phone.
   it wraps, and keeps inside the card near the edges. The cells' `title`
   is gone, so there's no second, late tooltip.
 
+### 3.75 Dates get a tab of their own (v1.24.0)
+
+Birthdays, anniversaries, holidays and countdowns are dates to look up, not
+things to log or set goals on, yet their lists sat as cards among the
+trackables, and their reminders in Trackables' Needs attention. They move
+to a sixth tab, Dates (`data/sections.ts`), which the phone's tab bar fits.
+Under the hood each list is still a trackable with `displayMode: 'ages'`
+(3.38): its own page, entries, sync and export are unchanged, so this is
+display only, with no migration.
+
+- **Pages** (`routes/Dates.svelte`, the view set by its route): Coming up
+  (`/dates`, the next year by week and month), Calendar (`/dates/calendar`)
+  and Lists (`/dates/lists`: each list with how many dates it holds, the
+  next one, and "+" to add a date). The old List/Calendar switch on the
+  page gave way to the section's tabs. "+ New list" opens the trackable
+  sheet with only the date templates (`EditTrackableSheet`'s `templates`);
+  Trackables' "+ New" no longer offers them, and a new one there starts as
+  Auto rather than Dates.
+- **Trackables** lists only what you log: no date lists, active or
+  archived, and no Coming up card (`ComingUp.svelte` is gone; Today has its
+  own). The starter picker still shows when the only trackables are dates.
+- **Counts:** `AttentionItem.kind` tells goals from dates. Trackables'
+  Needs attention and badge count goals (`attentionStore.goals`); the Dates
+  tab's badge counts dates inside their lead time (`attentionStore.dates`).
+  Today and the daily reminder (3.73) show both, as before.
+- A date list's own page stays at `/trackables/:id`, so opening one lights
+  the Trackables tab; moving it would change every link to it for little.
+
 ### 3.21 Trackables list: pin, archive, order; tag filters
 - **Sort** (per device, `zachtrack:trackables-view`): Due first (goal
   urgency from 3.18: overdue, then due, then the rest, then trackables

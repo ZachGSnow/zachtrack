@@ -11,7 +11,7 @@
   <img src="docs/screenshots/journey.png" alt="Journey with goal streaks, this week against last, and the fasting days grid" width="200">
   <img src="docs/screenshots/trackables.png" alt="Trackables list showing each one's latest value or when it was last logged" width="200">
   <img src="docs/screenshots/trackable-trends.png" alt="Body Measurements trends table with weekly weight, BMI and body fat" width="200">
-  <img src="docs/screenshots/dates.png" alt="Dates list with upcoming birthdays and US holidays and their countdowns" width="200">
+  <img src="docs/screenshots/dates.png" alt="The Dates tab: upcoming birthdays and US holidays with their countdowns" width="200">
   <img src="docs/screenshots/tasks.png" alt="A Garden project with Now, Next and Later sections, tasks with due dates, a repeating task and a task with subtasks" width="200">
   <img src="docs/screenshots/tasks-done.png" alt="The Done page listing the tasks completed today, with a repeating task marked on time" width="200">
   <img src="docs/screenshots/insights.png" alt="Insights overview of fasting and each trackable over the last 30 days" width="200">
@@ -89,10 +89,11 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
   rules like the 4th Thursday of November, and Easter), and countdowns or
   renewals that repeat every few months or years, each with a countdown. A
   US holidays template adds the federal holidays and common observances.
-  Dates show under Needs attention a few days ahead, the next two weeks
-  under Coming up, and the next year on a Dates page with a list and a
-  month calendar; each date can carry notes (gift ideas, sizes), and Export
-  to calendar downloads them as an .ics file, with optional reminders.
+  Dates have their own tab, apart from what you log: Coming up (the next
+  year), a month Calendar, and your Lists; the tab counts dates a few days
+  ahead, and Today shows them too. Each date can carry notes (gift ideas,
+  sizes), and Export to calendar downloads them as an .ics file, with
+  optional reminders.
 - **Tasks:** a to-do list with projects, sections (Now / Next / Later, or
   your own), tasks with subtasks at any depth, notes and due dates with an
   optional time, typed in plain words at the end of a task ("Pay bills fri",
@@ -110,10 +111,10 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
   for them. Tasks without a project go to an Inbox. Upcoming lists what's
   due across projects, overdue first; Today shows what's due today, and
   the Tasks tab counts it.
-- **Five tabs:** Today (what to do now: the fast, habits due, what to log
+- **Six tabs:** Today (what to do now: the fast, habits due, what to log
   and dates coming up, what happened since you were last here, and whether
-  your data is safe: last sync, the server's last backup, your last export), Fasting (Timer, Journey, History), Trackables (List,
-  Dates), Tasks (Projects, Upcoming, Done) and Insights, with each tab's pages switched at the top of the page
+  your data is safe: last sync, the server's last backup, your last export), Fasting (Timer, Journey, History), Trackables,
+  Dates (Coming up, Calendar, Lists), Tasks (Projects, Upcoming, Done) and Insights, with each tab's pages switched at the top of the page
   on a phone and listed in the sidebar on a laptop. Insights opens with an
   overview of fasting and every trackable, the clearest patterns and a year
   in review, then a table to compare any of them.

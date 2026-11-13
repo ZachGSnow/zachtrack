@@ -2,7 +2,8 @@ import { expect, test, type Page } from '@playwright/test';
 import { mockSync, noServer, waitForStarterSet } from './helpers';
 
 // Dates trackables: birthdays, the US holiday pack with rule-based holidays,
-// and countdowns with renewals and past one-off dates.
+// and countdowns with renewals and past one-off dates. They live on the
+// Dates tab, apart from the trackables you log (ARCHITECTURE.md 3.75).
 test.use({ serviceWorkers: 'block' });
 
 test.beforeEach(async ({ page }) => {
@@ -24,8 +25,8 @@ const dateFromToday = (page: Page, days: number, years = 0) =>
   );
 
 async function newFromTemplate(page: Page, template: RegExp) {
-  await page.goto('/#/trackables');
-  await page.getByRole('button', { name: '+ New' }).click();
+  await page.goto('/#/dates/lists');
+  await page.getByRole('button', { name: '+ New list' }).click();
   await page.getByRole('button', { name: template }).click();
   await page.getByRole('button', { name: 'Save', exact: true }).click();
 }
@@ -49,13 +50,30 @@ test('a birthday shows the age it turns and a countdown, on its page and its car
   await page.goto('/#/dates');
   await expect(page.getByRole('link', { name: /Mom.*turns 60/ })).toContainText('Likes orchids');
 
+  // Its list on the Dates tab says what's next; the Trackables list doesn't show it.
+  await page.goto('/#/dates/lists');
+  await expect(page.getByRole('list', { name: 'Date lists' }).getByRole('listitem').filter({ hasText: 'Birthdays' })).toContainText('1 date \u00b7 next: Mom, in 5 days');
   await page.goto('/#/trackables');
-  await expect(page.getByText('Mom in 5 days')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Trackables', level: 1 })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Birthdays/ })).toHaveCount(0);
+});
+
+test('New on Trackables offers things to log, and New list on Dates only date lists', async ({ page }) => {
+  await page.goto('/#/trackables');
+  await page.getByRole('button', { name: '+ New' }).click();
+  await expect(page.getByRole('dialog').getByRole('button', { name: /Workout$/ })).toBeVisible();
+  await expect(page.getByRole('dialog').getByRole('button', { name: /Birthdays$/ })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.goto('/#/dates/lists');
+  await page.getByRole('button', { name: '+ New list' }).click();
+  await expect(page.getByRole('dialog').getByRole('button', { name: /Birthdays$/ })).toBeVisible();
+  await expect(page.getByRole('dialog').getByRole('button', { name: /Workout$/ })).toHaveCount(0);
 });
 
 test('the US holiday pack adds holidays that follow their rules', async ({ page }) => {
-  await page.goto('/#/trackables');
-  await page.getByRole('button', { name: '+ New' }).click();
+  await page.goto('/#/dates');
+  await page.getByRole('button', { name: '+ New list' }).click();
   await page.getByRole('button', { name: /US holidays$/ }).click();
   await expect(page.getByText(/Saving adds 18 US holidays/)).toBeVisible();
   await page.getByRole('button', { name: 'Save', exact: true }).click();
@@ -108,7 +126,7 @@ test('a renewal repeats every few years, and a one-off date that passed moves to
   await expect(page.getByRole('list', { name: 'Past' }).getByRole('button', { name: /Beach trip/ })).toContainText('3 days ago');
 });
 
-test('dates due soon go under Needs attention, the next two weeks under Coming up, and the Dates page lists and calendars them', async ({ page }) => {
+test('dates due soon light the Dates tab, not the Needs attention on Trackables, and the Dates pages list and calendar them', async ({ page }) => {
   await newFromTemplate(page, /Birthdays$/);
   for (const [name, days] of [['Mom', 3], ['Dad', 10]] as const) {
     await page.getByRole('button', { name: '+ Add person' }).click();
@@ -119,24 +137,22 @@ test('dates due soon go under Needs attention, the next two weeks under Coming u
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toHaveCount(0);
   }
 
-  // Birthdays show in Needs attention 7 days ahead: Mom, not Dad. Dad is under Coming up instead.
+  // Birthdays count 7 days ahead: Mom, not Dad. The Dates tab shows the count; Trackables has nothing to say.
   await page.goto('/#/trackables');
-  const attention = page.getByRole('region', { name: 'Needs attention' });
-  await expect(attention.getByRole('link', { name: /Mom/ })).toContainText('Turns 60 in 3 days');
-  await expect(attention.getByRole('link', { name: /Dad/ })).toHaveCount(0);
-  const comingUp = page.getByRole('region', { name: 'Coming up' });
-  await expect(comingUp.getByRole('link', { name: /Dad: Turns 60/ })).toContainText('in 10 days');
-  await expect(comingUp.getByRole('link', { name: /Mom/ })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Trackables', level: 1 })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Needs attention' })).toHaveCount(0);
+  await expect(page.getByLabel('1 date coming up').first()).toBeAttached();
+  await expect(page.getByLabel(/needs? attention/)).toHaveCount(0);
 
   // The Dates page lists both birthdays soonest first, and nothing else for them.
-  await comingUp.getByRole('link', { name: 'See all dates' }).click();
+  await page.goto('/#/dates');
   await expect(page.getByRole('heading', { name: 'Dates', level: 1 })).toBeVisible();
   const birthdays = await page.getByRole('link', { name: /turns 60/ }).allTextContents();
   expect(birthdays.map((n) => (n.includes('Mom') ? 'Mom' : 'Dad'))).toEqual(['Mom', 'Dad']);
   await expect(page.getByRole('link', { name: /days old/ })).toHaveCount(0);
 
   // The calendar marks Dad's day; tapping it lists him.
-  await page.getByRole('button', { name: 'Calendar', exact: true }).click();
+  await page.goto('/#/dates/calendar');
   const dadDay = await page.evaluate(() => {
     const t = new Date();
     t.setDate(t.getDate() + 10);

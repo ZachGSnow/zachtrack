@@ -14,6 +14,8 @@ export interface AttentionItem {
   name: string;
   icon: string;
   color: string;
+  /** A goal due or overdue (Trackables), or a date inside its lead time (Dates, 3.75). */
+  kind: 'goal' | 'date';
   /** The goal status, e.g. "Overdue by 2d", "Due today", "1 of 3 this week", or a date's "Turns 61 in 3 days". */
   text: string;
   state: GoalState;
@@ -49,12 +51,12 @@ export function attentionItems(snapshot: Snapshot, now: number): AttentionItem[]
     if (resolveKind(t, fields).kind === 'ages') continue;
     const status = goalStatus(t, byTrackable.get(t.id) ?? [], fields, now);
     if (status && (status.state === 'overdue' || status.state === 'due')) {
-      items.push({ key: t.id, id: t.id, name: t.name, icon: t.icon, color: t.color, text: status.text, state: status.state, urgency: status.urgency });
+      items.push({ key: t.id, kind: 'goal', id: t.id, name: t.name, icon: t.icon, color: t.color, text: status.text, state: status.state, urgency: status.urgency });
     }
   }
   const datesTrackables = snapshot.trackables.filter((t) => !t.archived && t.displayMode === 'ages');
   for (const d of datesDueSoon(datesTrackables, snapshot.entries, now)) {
-    items.push({ key: dateItemKey(d), id: d.trackableId, name: d.name, icon: d.icon, color: d.color, text: dateReminderText(d), state: 'due', urgency: 10 + d.daysUntil });
+    items.push({ key: dateItemKey(d), kind: 'date', id: d.trackableId, name: d.name, icon: d.icon, color: d.color, text: dateReminderText(d), state: 'due', urgency: 10 + d.daysUntil });
   }
   return items.sort((a, b) => a.urgency - b.urgency || a.name.localeCompare(b.name));
 }

@@ -38,12 +38,17 @@
     trackable = null,
     onSaved,
     onDeleted,
+    templates = 'logs',
   }: {
     open: boolean;
     trackable: TrackableDefinition | null;
     onSaved?: (id: string) => void;
     onDeleted?: () => void;
+    /** Which templates a new one starts from: things to log (Trackables) or date lists (Dates, 3.75). */
+    templates?: 'logs' | 'dates';
   } = $props();
+
+  const offered = $derived(TEMPLATES.filter((t) => (templates === 'dates') === !!t.dateKind));
 
   const allFields = liveQuery(() => db.fieldDefinitions.orderBy('name').toArray());
 
@@ -78,7 +83,7 @@
     icon = trackable?.icon ?? '';
     color = trackable?.color ?? PRESET_COLORS[0];
     fieldIds = trackable?.fieldIds ?? [];
-    summaryMode = trackable && !resolveKind(trackable, []).auto ? resolveKind(trackable, []).kind : 'auto';
+    summaryMode = trackable ? (!resolveKind(trackable, []).auto ? resolveKind(trackable, []).kind : 'auto') : templates === 'dates' ? 'ages' : 'auto';
     goalType = trackable?.goalType ?? '';
     goalValueDraft = trackable?.goalValue?.toString() ?? '';
     pinned = trackable?.pinned ?? false;
@@ -231,7 +236,7 @@
     <div>
       <p class="mb-1.5 text-sm text-text-muted">Start from a template</p>
       <div class="flex flex-wrap gap-1.5">
-        {#each TEMPLATES as template (template.name)}
+        {#each offered as template (template.name)}
           <button
             type="button"
             class="rounded-full border px-2.5 py-1 text-xs font-medium"

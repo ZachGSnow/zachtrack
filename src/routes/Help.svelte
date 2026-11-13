@@ -50,9 +50,10 @@
     <section id="help-getting-started">
       <h2>Getting started</h2>
       <p class="mb-2">
-        Five tabs: <strong>Today</strong> (what to do now), <strong>Fasting</strong> (the timer, Journey with your stats, and
-        History of past fasts), <strong>Trackables</strong> (the list, and Dates), <strong>Tasks</strong> (your to-do list:
-        Projects and Upcoming), and <strong>Insights</strong>. Switch a tab's
+        Six tabs: <strong>Today</strong> (what to do now), <strong>Fasting</strong> (the timer, Journey with your stats, and
+        History of past fasts), <strong>Trackables</strong> (what you log), <strong>Dates</strong> (birthdays, anniversaries,
+        holidays and countdowns: Coming up, Calendar and Lists), <strong>Tasks</strong> (your to-do list: Projects and
+        Upcoming), and <strong>Insights</strong>. Switch a tab's
         pages with the buttons at the top of the page; on a laptop they're listed in the sidebar.
       </p>
       <ol>
@@ -174,8 +175,9 @@
     <section id="help-dates">
       <h2>Dates: birthdays, holidays and countdowns</h2>
       <p>
-        A dates trackable holds named dates and counts down to each. Pick a template under Trackables > "+ New", or set an
-        existing trackable's Summary to Dates. Edit > Dates are sets which kind it holds:
+        Dates have their own tab, apart from the things you log. A date list holds named dates and counts down to each.
+        Start one with Dates > "+ New list" and a template, or set an existing trackable's Summary to Dates. Edit > Dates
+        are sets which kind it holds:
       </p>
       <ul>
         <li><strong>Birthdays:</strong> a name and a birthdate. Shows the age they turn and their age now.</li>
@@ -194,15 +196,15 @@
       <p>Where they show:</p>
       <ul>
         <li>
-          <strong>Needs attention</strong>, a few days ahead: a week for birthdays and anniversaries, 3 days for holidays,
-          30 for countdowns. Change it in Edit > Show in Needs attention this many days ahead.
+          <strong>The Dates tab's count</strong>, a few days ahead: a week for birthdays and anniversaries, 3 days for
+          holidays, 30 for countdowns. Change it in Edit > Show in Needs attention this many days ahead. The same dates show
+          on Today, and in the daily reminder if you turn it on.
         </li>
-        <li><strong>Coming up</strong> on Trackables: the next two weeks, apart from what Needs attention already shows.</li>
         <li>
-          <strong>Dates</strong> (Trackables > Dates): the next year from every dates trackable, as a list by week and month or
-          as a month calendar; tap a day to see its dates.
+          <strong>Coming up</strong>: the next year from every date list, by week and month. <strong>Calendar</strong>: a
+          month at a time; tap a day to see its dates.
         </li>
-        <li>Each trackable's own page lists its dates, and its card the next three.</li>
+        <li><strong>Lists</strong>: your date lists, each with how many dates it holds and the next one, and "+" to add a date. Tap one to open it: its own page lists its dates.</li>
         <li>
           <strong>Notes</strong> on a date (gift ideas, sizes) show under it on its page and the Dates page, and go into the
           calendar export.
@@ -349,8 +351,8 @@
       <p>
         Reminders show inside the app, and once a day on your phone if you turn that on (see
         <a href="/help/reminders" use:link class="underline">Daily reminders</a>). Goals that are overdue or due today are listed at the top of
-        Trackables, most urgent first, along with dates coming up soon (a birthday a week ahead, by default), and the
-        Trackables tab shows how many. A dot on the Fasting tab means a new fasting
+        Trackables, most urgent first, and the Trackables tab shows how many. Dates coming up soon (a birthday a week ahead,
+        by default) are counted on the Dates tab instead, and both show on Today. A dot on the Fasting tab means a new fasting
         milestone, or that your daily fast
         start has passed and no fast has started yet.
       </p>
