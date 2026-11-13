@@ -5,7 +5,7 @@
   import Repeat from '@lucide/svelte/icons/repeat';
   import NotebookText from '@lucide/svelte/icons/notebook-text';
   import type { Task } from '../db';
-  import { describeDue, subtaskProgress, type DueState } from '../utils/tasks';
+  import { describeDue, DUE_COLORS, subtaskProgress } from '../utils/tasks';
   import { taskUi } from '../stores/taskUi.svelte';
   import TaskCheck from './TaskCheck.svelte';
 
@@ -34,12 +34,6 @@
 
   const due = $derived(task.dueOn ? describeDue(task.dueOn, task.dueTime, today) : null);
   const progress = $derived(subtaskProgress(tasks, task.id));
-  const DUE_COLORS: Record<DueState, string> = {
-    overdue: 'var(--color-danger)',
-    today: 'var(--color-warn)',
-    soon: 'var(--color-text)',
-    later: 'var(--color-text-muted)',
-  };
 
   // The tick shows for a moment before a completed task leaves the list.
   let completing = $state(false);

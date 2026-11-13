@@ -109,7 +109,7 @@
      a sidebar and content that uses the width, up to 1400px. -->
 <div class="flex flex-1 flex-col lg:flex-row">
   <BottomNav variant="side" />
-  <div class="mx-auto flex w-full max-w-md flex-1 flex-col lg:max-w-[1400px] lg:px-6">
+  <div class="mx-auto flex w-full min-w-0 max-w-md flex-1 flex-col lg:max-w-[1400px] lg:px-6">
     <!-- Phone header: sync status, Help and Settings. On a laptop they live in the sidebar. -->
     <header class="flex items-center justify-end gap-2 px-3 pt-2 lg:hidden">
       <SyncStatus />

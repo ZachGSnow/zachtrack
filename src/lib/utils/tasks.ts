@@ -12,6 +12,14 @@ export const INBOX_ID = 'inbox';
 
 export type DueState = 'overdue' | 'today' | 'soon' | 'later';
 
+/** The colour of a task's date on a row or a card. */
+export const DUE_COLORS: Record<DueState, string> = {
+  overdue: 'var(--color-danger)',
+  today: 'var(--color-warn)',
+  soon: 'var(--color-text)',
+  later: 'var(--color-text-muted)',
+};
+
 export interface DueText {
   text: string;
   state: DueState;

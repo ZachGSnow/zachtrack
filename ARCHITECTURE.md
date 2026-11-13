@@ -1727,6 +1727,52 @@ tooltip, which waits a second and never shows on a phone.
   it wraps, and keeps inside the card near the edges. The cells' `title`
   is gone, so there's no second, late tooltip.
 
+### 3.76 A project as a board
+
+Asana, Todoist, Trello and ClickUp all show a project's work as columns of
+cards, with a card dragged from one column to the next. Here a task could
+already be dragged between sections, but only by a small handle on a list,
+and the other way to move it was the Section menu in its sheet. A project
+now shows as a List or a Board; both are views of the same sections, as in
+Asana and Todoist, so there is nothing new to store or sync.
+
+- **Board** (`TaskBoard.svelte`, cards in `TaskCard.svelte`): a column per
+  section in the project's order, and a first column for tasks without a
+  section when there are any (or, in a project without sections, one
+  column to add the first task to). A card shows its checkbox, name (up to
+  three lines), date (tap to reschedule, 3.64), repeat mark, subtask count
+  and a notes mark; tapping it opens the task's sheet. Subtasks stay in the
+  sheet, as on Todoist's board. Completed cards show at the foot of each
+  column with Show completed.
+- **Dragging:** cards within and between columns, using the same drop
+  handler as the list (writing `sectionId` and renumbering the column).
+  Columns drag by the dots in their header, writing the project's section
+  order; the column of tasks without a section stays first. Arrow keys on a
+  focused handle move a card (up and down) or a column (left and right).
+- **Adding:** "+ Add a task" at the foot of every column (with dates in
+  plain words, 3.64), and "+ Add a section" after the last column.
+- **Phone:** a column is 85% of the screen wide and the board scrolls
+  sideways a column at a time (scroll snap), as Trello's and Asana's apps
+  do; the column names above the board jump to each and mark the one in
+  view. Cards have no swipes there, so a sideways swipe scrolls the board.
+- **The choice** of List or Board is per project and per device, kept with
+  the other view choices (3.11): a project is a board on the laptop and a
+  list on the phone if that suits.
+
+`actions/sortable.ts` grew what the board needed: a horizontal list (`axis:
+'x'`, for the columns), a floating copy that follows the pointer both ways
+(`free`), dropping anywhere along a column rather than near its last card
+(`reach`), scrolling a sideways container near its edges with scroll snap
+paused during the drag (`scroller`), and, with a mouse, dragging an item
+from anywhere on it after a 5 px move, as Asana does (`mouseAnywhere`; a
+plain click still opens it, and the click that ends a drag is swallowed).
+The list uses `mouseAnywhere` too. When columns sit a few pixels apart, a
+column the pointer is inside sideways wins over one it is only near.
+
+The page's content column gained `min-w-0`: without it, a flex item grows
+to its widest content, and the board pushed the page wider than the screen
+instead of scrolling inside it.
+
 ### 3.75 Dates get a tab of their own (v1.24.0)
 
 Birthdays, anniversaries, holidays and countdowns are dates to look up, not
