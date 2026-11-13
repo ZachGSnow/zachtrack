@@ -671,7 +671,7 @@ test('Help opens from the header and from the question marks next to settings th
   await page.getByRole('link', { name: 'Help', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Help', level: 1 })).toBeVisible();
   const topics = page.getByRole('navigation', { name: 'Help topics' }).getByRole('link');
-  await expect(topics).toHaveCount(15);
+  await expect(topics).toHaveCount(16);
   for (const title of await topics.allTextContents()) {
     await expect(page.getByRole('heading', { name: title, level: 2 })).toHaveCount(1);
   }

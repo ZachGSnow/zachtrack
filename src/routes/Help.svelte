@@ -17,6 +17,7 @@
     { id: 'streaks', title: 'Streaks, rest days, skipping and pausing' },
     { id: 'grid', title: 'The habit grid' },
     { id: 'attention', title: 'Needs attention' },
+    { id: 'reminders', title: 'Daily reminders on your phone' },
     { id: 'insights', title: 'Insights' },
     { id: 'fasting', title: 'Fasting' },
     { id: 'data', title: 'Tables, comparing and your files' },
@@ -335,11 +336,33 @@
     <section id="help-attention">
       <h2>Needs attention</h2>
       <p>
-        Instead of notifications, reminders show inside the app. Goals that are overdue or due today are listed at the top of
+        Reminders show inside the app, and once a day on your phone if you turn that on (see
+        <a href="/help/reminders" use:link class="underline">Daily reminders</a>). Goals that are overdue or due today are listed at the top of
         Trackables, most urgent first, along with dates coming up soon (a birthday a week ahead, by default), and the
         Trackables tab shows how many. A dot on the Fasting tab means a new fasting
         milestone, or that your daily fast
         start has passed and no fast has started yet.
+      </p>
+    </section>
+
+    <section id="help-reminders">
+      <h2>Daily reminders on your phone</h2>
+      <p>
+        Settings > <strong>Reminders</strong> sends one notification a day, at the time you pick, when something needs a
+        look: habits due or overdue, tasks due today or overdue, and dates coming up. Nothing comes on a day with nothing
+        due. It works with the app closed; tap it to open Today.
+      </p>
+      <p>
+        Each device turns it on for itself, and the phone asks for permission first. On Android, install ZachTrack to the
+        home screen from Chrome; on an iPhone, add it to the home screen first. <strong>Name what's due</strong> is off at
+        first: the notification then gives only counts ("2 habits and 1 task need a look today"), since the lock screen
+        shows it. <strong>Send a test</strong> checks it arrives. A phone saving battery can hold a notification back for
+        a few minutes.
+      </p>
+      <p>
+        The server works out what's due with the same rules as the app, in your phone's time zone, and sends it through
+        your browser's push service (Google's, on Android), encrypted so only your phone can read it. Goals for less
+        (Avoid it, At most N a week) never remind you.
       </p>
     </section>
 

@@ -19,6 +19,11 @@ ACCESS_TEAM_DOMAIN = "your-team.cloudflareaccess.com"
 # The Access application's AUD tag (Zero Trust > Access > Applications >
 # your app > Overview). Required: without it the endpoints refuse every request.
 ACCESS_AUD = "<your-access-aud-tag>"
+# Optional: daily reminders on your phone (README "Reminders"). The public key
+# from `npm run vapid-keys`, the same one the backup Worker has; the private
+# key is a secret: `npx wrangler pages secret put VAPID_PRIVATE_KEY`.
+# VAPID_PUBLIC_KEY = ""
+# VAPID_SUBJECT = "https://zachtrack.example.com"
 
 # Optional: the nightly backup bucket (README "Backups"), so Today can say when the
 # last server backup ran (/api/backup-status). Leave it out if you don't run the backup Worker.

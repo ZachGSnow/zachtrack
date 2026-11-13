@@ -72,9 +72,11 @@ Cloudflare account, behind Cloudflare Access, with no login code of its own.
   a broken streak. A trackable without fields logs in one tap,
   with undo, and Today logs a reading or a rating inline, without a sheet. The list
   sorts by what's due (or your own order, or A-Z), with pinning and
-  archiving; fasts and entries can be filtered by tag. In-app reminders
-  instead of notifications: a Needs attention list of overdue and due goals,
-  and badges on the Trackables and Fasting tabs. Each trackable's page adds
+  archiving; fasts and entries can be filtered by tag. Reminders in the app:
+  a Needs attention list of overdue and due goals, and badges on the
+  Trackables and Fasting tabs; and, if you turn it on per device, one
+  notification a day on your phone at a time you pick, naming what's due or
+  only counting it (see Reminders below). Each trackable's page adds
   plain-language insights: goal consistency, best weekday, and how a value
   differs on days with your other trackables, or the day after them (a
   late meal in the next morning's weight) or after a fast that met its
@@ -221,13 +223,39 @@ All values live in `wrangler.toml` (start from `wrangler.toml.example`).
 If `OWNER_EMAIL`, `ACCESS_TEAM_DOMAIN` or `ACCESS_AUD` is missing, the sync
 endpoint refuses every request instead of running unchecked.
 
+## Reminders
+
+Optional: one notification a day on a device, at the time chosen in its
+Settings > Reminders, when habits, tasks or dates need a look. The backup
+Worker below sends them (it runs every 15 minutes and makes the backup at
+09:00 UTC), so set that up first. Web Push needs a key pair (VAPID):
+
+```bash
+npm run vapid-keys
+```
+
+It prints the public key, which goes in `[vars]` as `VAPID_PUBLIC_KEY` in both
+`wrangler.toml` and `workers/backup/wrangler.toml` (with `VAPID_SUBJECT`, an
+`https:` or `mailto:` address for the push service to reach you), and the
+private key, which is a secret in both places and in no file:
+
+```bash
+npx wrangler pages secret put VAPID_PRIVATE_KEY
+cd workers/backup && npx wrangler secret put VAPID_PRIVATE_KEY
+```
+
+Then deploy the app and the Worker. On Android, install the app from Chrome
+and turn reminders on in Settings; an iPhone needs the app added to the home
+screen first. Without the keys, Settings says reminders aren't set up.
+
 ## Backups
 
 D1 keeps point-in-time history for 7 days on the free plan. For longer,
 `workers/backup/` is a small scheduled Worker that writes a restore-ready SQL
 file of the whole database to a private R2 bucket every night at 09:00 UTC
 (`zachtrack-db/YYYY-MM-DD.sql`). It has no public URL. A bucket lifecycle rule
-deletes files after 30 days.
+deletes files after 30 days. It runs every 15 minutes: the other runs send
+the daily reminders, if they're set up (see Reminders).
 
 Set up once:
 
@@ -302,6 +330,11 @@ protocol, the real bugs hit along the way and how they were fixed.
   `d1/scrub-deleted.sql` once. Clearing site data removes the local copy;
   dropping the D1 database removes the server copy. Neither is a secure erase,
   and D1 Time Travel keeps earlier versions for 7 days.
+- **Reminders**, if turned on: D1 keeps each device's push address and
+  keys, its time zone and choices (not in the backups). The notification
+  goes through the browser's push service (Google's, on Android), encrypted
+  so only the device can read it; by default it gives only counts, no
+  names, since the lock screen shows it.
 - **Per-device only:** sync history and view preferences stay in that
   browser's `localStorage`.
 - **Export files** are plain JSON with all of the above in readable form.
