@@ -5,6 +5,7 @@
   import { describeQuickAdd, parseQuickAdd } from '../utils/quickAdd';
   import { moveTo } from '../utils/reorder';
   import { sortable, type DropEvent } from '../actions/sortable';
+  import { taskUi } from '../stores/taskUi.svelte';
   import TaskCard from './TaskCard.svelte';
 
   // A project as a board (3.76), Asana's and Todoist's other view of the same
@@ -76,7 +77,7 @@
     const at = project.sections.findIndex((s) => s.id === id);
     const to = at + direction;
     if (at < 0 || to < 0 || to >= project.sections.length) return;
-    void dropColumn({ id, from: 'columns', to: 'columns', index: to });
+    void dropColumn({ id, ids: [id], from: 'columns', to: 'columns', index: to });
   }
 
   async function addSection() {
@@ -159,6 +160,7 @@
           reach: Infinity,
           scroller: () => scroller,
           mouseAnywhere: true,
+          selection: () => taskUi.selected,
         }}
       >
         {#each g.open as t (t.id)}

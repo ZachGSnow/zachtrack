@@ -1727,6 +1727,40 @@ tooltip, which waits a second and never shows on a phone.
   it wraps, and keeps inside the card near the edges. The cells' `title`
   is gone, so there's no second, late tooltip.
 
+### 3.77 Moving tasks in one tap, or several at once
+
+Dragging across a board's columns is fiddly on a phone in every app, and a
+task's section was a drop-down in its sheet. Three quicker ways, none of
+which store anything new:
+
+- **A quick menu** (`TaskMenu.svelte`, mounted by `TaskHost`, opened by
+  `taskUi.menuId`) from a long press on a row or card on a touch screen, or
+  a right-click (or the keyboard's menu key) elsewhere
+  (`actions/longPress.ts`). Its project's sections are buttons, the current
+  one marked; a tap moves the task to the end of that section with Undo
+  (`taskUi.moveToSection`) and closes the menu. Then Open, Set or Move the
+  date (the reschedule sheet, 3.64), Duplicate (3.65) and Delete, which asks
+  first like the sheet. Subtasks and tasks outside a project get the menu
+  without sections.
+- **The hold** is 500 ms without moving 8 px; a drag handle or a text box
+  doesn't count, and a swipe (3.65) moves past 8 px first. Android also
+  sends `contextmenu` for a hold; it is cancelled so the browser's own menu
+  doesn't show, and the two signals open the menu once. The finger lifting
+  from a hold may still send a click, which would land on the menu's
+  backdrop, now under the finger, and close it again; a capturing listener
+  on the window swallows that one click (until 400 ms after the finger
+  lifts). Rows and cards are `select-none` so a hold doesn't select text.
+- **The sheet's section** is the same row of buttons (`SectionChips.svelte`),
+  with "No section" as well, instead of a drop-down.
+- **Several at once** on a laptop, as in Asana: on a project page
+  (`taskUi.selectable`), Ctrl+click (Cmd+click) on an open task picks it
+  instead of opening it (`taskUi.pick`), and a bar says how many are picked,
+  with Clear; Esc clears too, as does leaving the project. Dragging any
+  picked task drags them all (`sortable`'s `selection`, with a count on the
+  floating copy): they leave their sections and land together where it is
+  dropped, in the order they showed in (`moveManyTo` in `utils/reorder.ts`),
+  each written with its new section and order. `DropEvent` gained `ids`.
+
 ### 3.76 A project as a board
 
 Asana, Todoist, Trello and ClickUp all show a project's work as columns of

@@ -7,8 +7,9 @@
   import BottomSheet from './BottomSheet.svelte';
   import TaskSheet from './TaskSheet.svelte';
   import DateChoices from './DateChoices.svelte';
+  import TaskMenu from './TaskMenu.svelte';
 
-  // The task sheet and the reschedule sheet (stores/taskUi.svelte.ts); the undo message is UndoToast.svelte. Mounted once
+  // The task sheet, the reschedule sheet and a task's quick menu (stores/taskUi.svelte.ts); the undo message is UndoToast.svelte. Mounted once
   // on each page that lists tasks, with the tasks and projects it already reads.
   let { tasks, projects }: { tasks: readonly Task[]; projects: readonly TaskProject[] } = $props();
   // Only the sheet needs the completion history.
@@ -18,6 +19,17 @@
   onDestroy(() => {
     taskUi.open = false;
     taskUi.rescheduleId = null;
+    taskUi.menuId = null;
+  });
+
+  // The quick menu: a long press or right-click on a row or card (3.77).
+  const menuTask = $derived(taskUi.menuId ? tasks.find((t) => t.id === taskUi.menuId) : undefined);
+  let menuOpen = $state(false);
+  $effect(() => {
+    menuOpen = !!taskUi.menuId;
+  });
+  $effect(() => {
+    if (!menuOpen) taskUi.menuId = null;
   });
 
   // The reschedule sheet: a tap on a row's date (3.64).
@@ -54,6 +66,14 @@
         />
       </label>
     </div>
+  {/if}
+</BottomSheet>
+
+<BottomSheet bind:open={menuOpen}>
+  {#if menuTask}
+    {#key menuTask.id}
+      <TaskMenu task={menuTask} {tasks} {projects} onclose={() => (menuOpen = false)} />
+    {/key}
   {/if}
 </BottomSheet>
 

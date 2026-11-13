@@ -7,6 +7,7 @@
   import type { Task } from '../db';
   import { describeDue, DUE_COLORS, subtaskProgress } from '../utils/tasks';
   import { taskUi } from '../stores/taskUi.svelte';
+  import { longPress } from '../actions/longPress';
   import TaskCheck from './TaskCheck.svelte';
 
   // One task in a list: its checkbox, name, where it lives, subtask count, a
@@ -14,7 +15,8 @@
   // when tapped (3.64). Tapping the row opens the task sheet. On a list that
   // can be reordered it has a drag handle (actions/sortable.ts), and on a
   // touch screen a swipe right completes it and a swipe left moves its date
-  // (3.65).
+  // (3.65). A long press (or a right-click) opens its quick menu, and on a
+  // project page Ctrl+click selects it to drag with others (3.77).
   let {
     task,
     tasks,
@@ -33,6 +35,7 @@
   } = $props();
 
   const due = $derived(task.dueOn ? describeDue(task.dueOn, task.dueTime, today) : null);
+  const selected = $derived(taskUi.selected.includes(task.id));
   const progress = $derived(subtaskProgress(tasks, task.id));
 
   // The tick shows for a moment before a completed task leaves the list.
@@ -94,8 +97,9 @@
 
 <li
   data-sort-id={task.id}
-  class="relative overflow-hidden rounded-xl {completing ? 'opacity-60' : ''}"
-  style="touch-action: pan-y;"
+  class="relative select-none overflow-hidden rounded-xl {completing ? 'opacity-60' : ''} {selected ? 'ring-2 ring-brand' : ''}"
+  style="touch-action: pan-y; -webkit-touch-callout: none;"
+  use:longPress={() => (taskUi.menuId = task.id)}
   onpointerdown={down}
   onpointermove={moveTouch}
   onpointerup={up}
@@ -122,8 +126,8 @@
     ><GripVertical size={16} aria-hidden="true" /></button>
   {/if}
   <TaskCheck done={!!task.completedAt || completing} name={task.name} onclick={check} />
-  <button type="button" class="min-w-0 flex-1 text-left" onclick={() => taskUi.show(task.id)}>
-    <span class="block truncate text-sm {task.completedAt || completing ? 'text-text-muted line-through' : 'text-text'}">{task.name || 'Untitled task'}</span>
+  <button type="button" class="min-w-0 flex-1 text-left" onclick={(e) => taskUi.pick(e, task) || taskUi.show(task.id)}>
+    <span class="block truncate text-sm {task.completedAt || completing ? 'text-text-muted line-through' : 'text-text'}">{task.name || 'Untitled task'}</span>{#if selected}<span class="sr-only">, selected</span>{/if}
     {#if progress || task.notes || context}
       <span class="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-text-muted">
         {#if context}

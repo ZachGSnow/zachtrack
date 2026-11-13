@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onDestroy, untrack } from 'svelte';
   import { liveQuery } from 'dexie';
   import { link, push } from 'svelte-spa-router';
   import ChevronLeft from '@lucide/svelte/icons/chevron-left';
@@ -7,7 +8,8 @@
   import Pencil from '@lucide/svelte/icons/pencil';
   import { createTask, db, updateTask, updateTaskProject } from '../lib/db';
   import { dayKey, groupBySection, INBOX_ID, nextSortOrder, topLevelTasks, type SectionGroup } from '../lib/utils/tasks';
-  import { moveTo, renumber } from '../lib/utils/reorder';
+  import { moveManyTo, renumber } from '../lib/utils/reorder';
+  import { taskUi } from '../lib/stores/taskUi.svelte';
   import { sortable, type DropEvent } from '../lib/actions/sortable';
   import { describeQuickAdd, parseQuickAdd } from '../lib/utils/quickAdd';
   import { describeDue } from '../lib/utils/tasks';
@@ -23,6 +25,7 @@
   // each section, completed tasks on request, and drag and drop within and
   // between sections (3.60, 3.65). A project shows as a list or a board of
   // columns (TaskBoard.svelte, 3.76), chosen per project on each device.
+  // Ctrl+click selects several open tasks, which then drag as one (3.77).
   let { params }: { params: { id: string } } = $props();
 
   const projects = liveQuery(() => db.taskProjects.toArray());
@@ -98,21 +101,43 @@
     });
   }
 
-  /** A task dropped at `index` in a section's open tasks, maybe from another section. */
+  // Ctrl+click selects on this page only; leaving it, or another project, starts with nothing selected.
+  taskUi.selectable = true;
+  $effect(() => {
+    void params.id;
+    // Untracked: reading the selection here would clear every new pick.
+    untrack(() => taskUi.clearSelection());
+  });
+  onDestroy(() => {
+    taskUi.selectable = false;
+    taskUi.clearSelection();
+  });
+
+  /**
+   * Tasks dropped at `index` in a section's open tasks: one, or every selected
+   * one (3.77), maybe from other sections. They keep the order they showed in.
+   */
   async function drop(e: DropEvent) {
     const target = groups.find((g) => keyOf(g) === e.to);
     if (!target) return;
-    const order = moveTo(target.open.map((t) => t.id), e.id, e.index);
+    const moving = groups.flatMap((g) => g.open.map((t) => t.id)).filter((id) => e.ids.includes(id));
+    if (moving.length === 0) return;
+    const order = moveManyTo(
+      target.open.map((t) => t.id),
+      moving,
+      e.index,
+    );
     const changes = renumber(order, new Map(target.open.map((t) => [t.id, t.sortOrder])));
-    const moved = e.from !== e.to;
-    for (const c of changes) await updateTask(c.id, { sortOrder: c.sortOrder, ...(c.id === e.id && moved ? { sectionId: target.section?.id } : {}) });
+    const here = new Set(target.open.map((t) => t.id));
+    for (const c of changes) await updateTask(c.id, { sortOrder: c.sortOrder, ...(here.has(c.id) ? {} : { sectionId: target.section?.id }) });
+    if (moving.length > 1) taskUi.clearSelection();
   }
 
   /** Arrow Up / Down on a task's handle: one place within its section. */
   function keyMove(g: SectionGroup, id: string, direction: -1 | 1) {
     const at = g.open.findIndex((t) => t.id === id);
     if (at < 0 || at + direction < 0 || at + direction >= g.open.length) return;
-    void drop({ id, from: keyOf(g), to: keyOf(g), index: at + direction });
+    void drop({ id, ids: [id], from: keyOf(g), to: keyOf(g), index: at + direction });
   }
 </script>
 
@@ -160,6 +185,13 @@
       {/if}
     </div>
 
+    {#if taskUi.selected.length > 0}
+      <div class="sticky top-2 z-10 flex items-center justify-between gap-3 rounded-xl border border-brand bg-surface px-3 py-2 text-sm shadow-lg" role="status">
+        <span class="text-text"><strong>{taskUi.selected.length} selected.</strong> Drag one to move them all; Esc clears.</span>
+        <button type="button" class="font-semibold text-brand" onclick={() => taskUi.clearSelection()}>Clear</button>
+      </div>
+    {/if}
+
     {#if project && layout === 'board'}
       <TaskBoard {project} groups={boardGroups} tasks={$tasks} {today} {showDone} {keyOf} onDrop={drop} onKeyMove={keyMove} onAdd={addTask} />
     {:else}
@@ -178,7 +210,14 @@
             <!-- Always there, even empty, so a task can be dropped into an empty section. -->
             <ul
               class="flex min-h-2 flex-col"
-              use:sortable={{ group: `tasks:${params.id}`, zone: k, onDrop: drop, onKeyMove: (id, d) => keyMove(g, id, d), mouseAnywhere: true }}
+              use:sortable={{
+                group: `tasks:${params.id}`,
+                zone: k,
+                onDrop: drop,
+                onKeyMove: (id, d) => keyMove(g, id, d),
+                mouseAnywhere: true,
+                selection: () => taskUi.selected,
+              }}
             >
               {#each g.open as t (t.id)}
                 <TaskRow task={t} tasks={$tasks} {today} draggable />
@@ -229,6 +268,12 @@
     {/if}
   {/if}
 </div>
+
+<svelte:window
+  onkeydown={(e) => {
+    if (e.key === 'Escape' && taskUi.selected.length > 0 && !taskUi.open && !taskUi.menuId && !taskUi.rescheduleId) taskUi.clearSelection();
+  }}
+/>
 
 <TaskHost tasks={$tasks ?? []} projects={$projects ?? []} />
 

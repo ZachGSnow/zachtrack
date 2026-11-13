@@ -1,5 +1,5 @@
-import { completeTask, db, skipTask, undoComplete, updateTask, type Task } from '../db';
-import { describeDue, dayKey } from '../utils/tasks';
+import { completeTask, db, skipTask, undoComplete, updateTask, type Task, type TaskSection } from '../db';
+import { describeDue, dayKey, nextSortOrder } from '../utils/tasks';
 import { followDueDate } from '../utils/taskRepeat';
 import { undoToast } from './undo.svelte';
 
@@ -16,7 +16,28 @@ class TaskUi {
   taskId = $state<string | null>(null);
   open = $state(false);
   error = $state<string | null>(null);
+  /** The task whose quick menu is open: a long press or right-click on a row or card (3.77). */
+  menuId = $state<string | null>(null);
+  /** Tasks picked with Ctrl+click (Cmd+click on a Mac) on a project page, to drag together (3.77). */
+  selected = $state<string[]>([]);
+  /** A project page is showing, where Ctrl+click selects. */
+  selectable = $state(false);
 
+  toggleSelected(id: string) {
+    this.selected = this.selected.includes(id) ? this.selected.filter((x) => x !== id) : [...this.selected, id];
+  }
+
+  clearSelection() {
+    if (this.selected.length > 0) this.selected = [];
+  }
+
+  /** A Ctrl+click (Cmd+click) on an open task of a project page selects it instead of opening it; true when it did. */
+  pick(e: { ctrlKey: boolean; metaKey: boolean; preventDefault(): void }, task: Task): boolean {
+    if (!this.selectable || !(e.ctrlKey || e.metaKey) || task.completedAt || task.parentId) return false;
+    e.preventDefault();
+    this.toggleSelected(task.id);
+    return true;
+  }
 
   show(id: string) {
     this.taskId = id;
@@ -86,6 +107,19 @@ class TaskUi {
       this.offerUndo(dueOn ? `Moved ${current.name} to ${describeDue(dueOn, current.dueTime, today).text}` : `Cleared the date of ${current.name}`, () =>
         updateTask(current.id, before),
       );
+    });
+  }
+
+  /** Moves a task to the end of a section of its project (null: no section), with Undo. */
+  moveToSection(task: Task, section: TaskSection | null) {
+    return this.attempt(async () => {
+      const current = await db.tasks.get(task.id);
+      const to = section?.id;
+      if (!current || current.parentId || current.sectionId === to) return;
+      const siblings = await db.tasks.filter((t) => !t.parentId && t.projectId === current.projectId && t.sectionId === to && t.id !== current.id).toArray();
+      const before = { sectionId: current.sectionId, sortOrder: current.sortOrder };
+      await updateTask(current.id, { sectionId: to, sortOrder: nextSortOrder(siblings) });
+      this.offerUndo(`Moved ${current.name} to ${section?.name ?? 'No section'}`, () => updateTask(current.id, before));
     });
   }
 

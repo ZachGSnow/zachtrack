@@ -7,14 +7,18 @@
 // pixels, as in Asana; a plain click still clicks. Lists in the same `group`
 // exchange items (a task dragged into another section, or a card into another
 // column of a board). A list is vertical by default, or horizontal with
-// `axis: 'x'` (a board's columns). Arrow keys on a focused handle move it one
-// place, for the keyboard. Written here rather than taken from a library to
+// `axis: 'x'` (a board's columns). Dragging one of several selected items
+// takes them all (`selection`, 3.77). Arrow keys on a focused handle move it
+// one place, for the keyboard. Written here rather than taken from a library to
 // keep the dependencies the licence policy checks to a minimum.
 
 import { dropIndex } from '../utils/reorder';
 
 export interface DropEvent {
+  /** The item that was dragged. */
   id: string;
+  /** Every item that moved: `id` alone, or the selection it is part of, in the order they show. */
+  ids: string[];
   /** The `zone` of the list it came from, and of the list it was dropped in. */
   from: string;
   to: string;
@@ -38,6 +42,8 @@ export interface SortableOptions {
   scroller?: () => HTMLElement | null | undefined;
   /** A mouse can drag an item from anywhere on it, not only its handle. */
   mouseAnywhere?: boolean;
+  /** The ids selected now: dragging one of them drags them all. */
+  selection?: () => readonly string[];
 }
 
 interface Zone {
@@ -50,8 +56,8 @@ const groups = new Map<string, Set<Zone>>();
 /** How far a mouse moves before a press on an item becomes a drag (`mouseAnywhere`). */
 const DRAG_START = 5;
 
-const itemsOf = (node: HTMLElement, except?: Element) =>
-  [...node.querySelectorAll<HTMLElement>(':scope > [data-sort-id]')].filter((el) => el !== except);
+const itemsOf = (node: HTMLElement, except?: ReadonlySet<Element>) =>
+  [...node.querySelectorAll<HTMLElement>(':scope > [data-sort-id]')].filter((el) => !except?.has(el));
 
 export function sortable(node: HTMLElement, options: SortableOptions) {
   const zone: Zone = { node, opts: options };
@@ -104,6 +110,12 @@ export function sortable(node: HTMLElement, options: SortableOptions) {
 
   function startDrag(e: PointerEvent, handle: HTMLElement, item: HTMLElement, now: PointerEvent = e) {
     const id = item.dataset.sortId!;
+    // One of several selected items takes the others with it, in the order they show.
+    const selected = new Set(zone.opts.selection?.() ?? []);
+    const zones = () => [...(groups.get(zone.opts.group) ?? [])].filter((z) => z.node.isConnected);
+    const dragged = selected.has(id) && selected.size > 1 ? zones().flatMap((z) => itemsOf(z.node).filter((el) => selected.has(el.dataset.sortId!))) : [item];
+    const ids = dragged.map((el) => el.dataset.sortId!);
+    const draggedSet = new Set<Element>(dragged);
     const horizontal = zone.opts.axis === 'x';
     const followX = horizontal || !!zone.opts.free;
     const followY = !horizontal || !!zone.opts.free;
@@ -127,11 +139,29 @@ export function sortable(node: HTMLElement, options: SortableOptions) {
     });
     ghost.removeAttribute('data-sort-id');
     ghost.setAttribute('aria-hidden', 'true');
+    if (ids.length > 1) {
+      // How many are moving, on the corner of the floating copy.
+      const badge = document.createElement('span');
+      badge.textContent = String(ids.length);
+      Object.assign(badge.style, {
+        position: 'absolute',
+        top: '4px',
+        right: '4px',
+        minWidth: '1.5rem',
+        padding: '0 0.4rem',
+        borderRadius: '9999px',
+        background: 'var(--color-brand)',
+        color: 'var(--color-brand-fg)',
+        font: '600 0.75rem/1.5rem system-ui, sans-serif',
+        textAlign: 'center',
+      });
+      ghost.appendChild(badge);
+    }
     document.body.appendChild(ghost);
     const line = document.createElement('div');
     Object.assign(line.style, { position: 'fixed', background: 'var(--color-brand)', zIndex: '61', pointerEvents: 'none', display: 'none' });
     document.body.appendChild(line);
-    item.style.opacity = '0.35';
+    for (const el of dragged) el.style.opacity = '0.35';
     // No text selected by a drag that started on a name.
     const userSelect = document.body.style.userSelect;
     document.body.style.userSelect = 'none';
@@ -157,14 +187,13 @@ export function sortable(node: HTMLElement, options: SortableOptions) {
     };
 
     const locate = () => {
-      const zones = [...(groups.get(zone.opts.group) ?? [])].filter((z) => z.node.isConnected);
       // The nearest list along the axis among those the pointer is beside; a list
       // the pointer is inside sideways beats one it is only near (columns a few
       // pixels apart).
       let best: Zone | null = null;
       let bestScore = Infinity;
       const gap = (a: number, lo: number, hi: number) => (a < lo ? lo - a : a > hi ? a - hi : 0);
-      for (const z of zones) {
+      for (const z of zones()) {
         const r = z.node.getBoundingClientRect();
         const reach = z.opts.reach ?? 32;
         const across = horizontal ? gap(lastY, r.top, r.bottom) : gap(lastX, r.left, r.right);
@@ -177,7 +206,7 @@ export function sortable(node: HTMLElement, options: SortableOptions) {
         }
       }
       if (!best) return;
-      const others = itemsOf(best.node, item);
+      const others = itemsOf(best.node, draggedSet);
       const rects = others.map((el) => el.getBoundingClientRect());
       const index = dropIndex(
         rects.map((r) => (horizontal ? r.left + r.width / 2 : r.top + r.height / 2)),
@@ -225,7 +254,7 @@ export function sortable(node: HTMLElement, options: SortableOptions) {
       window.removeEventListener('keydown', escape, true);
       ghost.remove();
       line.remove();
-      item.style.opacity = '';
+      for (const el of dragged) el.style.opacity = '';
       document.body.style.userSelect = userSelect;
       if (scroller) scroller.style.scrollSnapType = snap;
       // The click that ends a drag isn't a tap on the item.
@@ -238,8 +267,8 @@ export function sortable(node: HTMLElement, options: SortableOptions) {
       const t = target as { zone: Zone; index: number } | null;
       if (!drop || !t) return;
       const fromIndex = itemsOf(node).indexOf(item);
-      if (t.zone === zone && t.index === fromIndex) return;
-      t.zone.opts.onDrop({ id, from: zone.opts.zone, to: t.zone.opts.zone, index: t.index });
+      if (ids.length === 1 && t.zone === zone && t.index === fromIndex) return;
+      t.zone.opts.onDrop({ id, ids, from: zone.opts.zone, to: t.zone.opts.zone, index: t.index });
     };
     const up = (ev: PointerEvent) => ev.pointerId === e.pointerId && finish(true);
     const cancel = (ev: PointerEvent) => ev.pointerId === e.pointerId && finish(false);
