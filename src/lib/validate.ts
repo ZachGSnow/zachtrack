@@ -175,8 +175,8 @@ const checks: Record<Exclude<RecordKind, 'tombstones'>, Check> = {
       optional(
         r,
         'goalType',
-        (v) => typeof v === 'string' && ['dailyTotal', 'perDay', 'perWeek', 'everyDays', 'avoid'].includes(v),
-        "'dailyTotal', 'perDay', 'perWeek', 'everyDays' or 'avoid'",
+        (v) => typeof v === 'string' && ['dailyTotal', 'perDay', 'perWeek', 'everyDays', 'avoid', 'maxPerWeek'].includes(v),
+        "'dailyTotal', 'perDay', 'perWeek', 'everyDays', 'avoid' or 'maxPerWeek'",
       ),
       optional(r, 'goalValue', (v) => isNum(v) && v > 0, 'a positive number'),
       optional(r, 'pinned', (v) => typeof v === 'boolean', 'a boolean'),

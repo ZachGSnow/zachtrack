@@ -100,6 +100,43 @@ describe('avoid', () => {
   });
 });
 
+describe('at most N a week', () => {
+  const goal = { goalType: 'maxPerWeek' as const, goalValue: 2 };
+  // Weeks start Mondays: Oct 5, 12, 19.
+
+  it('reads naturally', () => {
+    expect(describeGoal(goal, [])).toBe('At most 2 times a week');
+    expect(describeGoal({ goalType: 'maxPerWeek', goalValue: 1 }, [])).toBe('At most once a week');
+  });
+
+  it('counts each time this week, not days, and is never due', () => {
+    // Twice on Monday the 19th: two times, one day.
+    const s = goalStatus(goal, logs(oct(6), oct(13), oct(19, 8), oct(19, 20)), [], oct(21))!;
+    expect(s.text).toBe('2 of at most 2 this week');
+    expect(s.state).toBe('ok');
+    expect(s.streak).toBe('3 weeks within');
+    expect(goalCardLine(s, 'maxPerWeek', 'ignored')).toMatch(/^2 of at most 2 this week . 3 weeks within$/);
+  });
+
+  it('turns red over the limit, and the streak starts again', () => {
+    const s = goalStatus(goal, logs(oct(6), oct(19), oct(20), oct(21)), [], oct(21, 18))!;
+    expect(s.text).toBe('3 this week, 1 over the limit');
+    expect(s.state).toBe('overdue');
+    expect(s.streak).toBeUndefined();
+  });
+
+  it('has its own stat tiles, and no habit strength', () => {
+    const entries = logs(oct(6), oct(7), oct(8), oct(13), oct(19));
+    expect(goalStats({ ...goal, createdAt: T0 }, entries, [], oct(21))).toEqual([
+      { label: 'This week', value: '1 of at most 2' },
+      { label: 'Weeks within (12)', value: '2 of 3' },
+      { label: 'Current streak', value: '2 weeks' },
+      { label: 'Best streak', value: '2 weeks' },
+    ]);
+    expect(habitStrength({ ...goal, createdAt: T0 }, entries, [], oct(21))).toBeNull();
+  });
+});
+
 describe('times per day', () => {
   const goal = { goalType: 'perDay' as const, goalValue: 3 };
 

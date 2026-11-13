@@ -4,6 +4,7 @@ import { startOfDay } from '../utils/time';
 import { BODY_FIELD_ROLES, BODY_FIELD_SETTING, resolveBodyField } from '../utils/health';
 import { type FastRecord, type FieldDefinition, type TrackableDefinition, type TrackableEntry, type SettingsRecord, DEFAULT_SETTINGS, DuplicateStartDayError } from './types';
 import { db, uuid, notifyMutation, addTombstone } from './schema';
+import { canSplit, mergedFieldIds, planSplit } from '../utils/trackableSplit';
 
 export async function getSettings(): Promise<SettingsRecord> {
   const existing = await db.settings.get('app-settings');
@@ -133,6 +134,136 @@ export async function createTrackable(
 export async function updateTrackable(id: string, patch: Partial<TrackableDefinition>): Promise<void> {
   await db.trackableDefinitions.update(id, { ...patch, updatedAt: Date.now() });
   notifyMutation();
+}
+
+/** What a split did, for Undo (`undoSplitTrackable`). */
+export interface SplitResult {
+  originalId: string;
+  /** The new trackables, one per field, with the entries moved to each. */
+  created: Array<{ id: string; fieldId: string; entryIds: string[] }>;
+  /** The original was archived because no entries were left in it. */
+  archived: boolean;
+}
+
+/**
+ * Splits a trackable into one per field (3.72): each entry with only one of
+ * the fields moves to that field's trackable, keeping its id, time, note and
+ * values, so nothing is copied or lost and the move syncs as an edit. Entries
+ * with several fields, or none, stay. `goalFieldId` picks the new trackable
+ * that takes over the goal; the original is archived if it ends up empty.
+ */
+export async function splitTrackable(id: string, goalFieldId?: string): Promise<SplitResult> {
+  const result = await db.transaction('rw', db.trackableDefinitions, db.trackableEntries, db.fieldDefinitions, async () => {
+    const original = await db.trackableDefinitions.get(id);
+    if (!original || !canSplit(original)) throw new Error('Only a trackable with two or more fields can be split.');
+    const entries = await db.trackableEntries.where('trackableId').equals(id).toArray();
+    const fields = await db.fieldDefinitions.bulkGet(original.fieldIds);
+    const plan = planSplit(original, entries);
+    const now = Date.now();
+    const created: SplitResult['created'] = [];
+    for (const [i, part] of plan.parts.entries()) {
+      const goal =
+        part.fieldId === goalFieldId
+          ? {
+              goalType: original.goalType,
+              goalValue: original.goalValue,
+              scheduleDays: original.scheduleDays,
+              skipDays: original.skipDays,
+              pausedUntil: original.pausedUntil,
+              scheduleHistory: original.scheduleHistory,
+            }
+          : {};
+      const trackable: TrackableDefinition = {
+        id: uuid(),
+        name: fields[i]?.name ?? `${original.name} ${i + 1}`,
+        icon: original.icon,
+        color: original.color,
+        fieldIds: [part.fieldId],
+        ...(original.displayMode ? { displayMode: original.displayMode } : {}),
+        ...(original.pinned ? { pinned: true } : {}),
+        ...(original.insightsHidden ? { insightsHidden: true } : {}),
+        ...(original.sortOrder != null ? { sortOrder: original.sortOrder } : {}),
+        ...Object.fromEntries(Object.entries(goal).filter(([, v]) => v !== undefined)),
+        createdAt: now,
+        updatedAt: now,
+      };
+      await db.trackableDefinitions.add(trackable);
+      await moveEntries(part.entryIds, trackable.id, now);
+      created.push({ id: trackable.id, fieldId: part.fieldId, entryIds: part.entryIds });
+    }
+    const archived = plan.staying.length === 0;
+    const patch: Partial<TrackableDefinition> = { updatedAt: now };
+    if (archived) patch.archived = true;
+    // The goal went with one of the parts.
+    if (goalFieldId && original.goalType) Object.assign(patch, { goalType: undefined, goalValue: undefined });
+    await db.trackableDefinitions.update(id, patch);
+    return { originalId: id, created, archived };
+  });
+  notifyMutation();
+  return result;
+}
+
+/** Puts a split back: the entries return, the original comes back as it was, and the new trackables go. */
+export async function undoSplitTrackable(split: SplitResult, original: TrackableDefinition): Promise<void> {
+  await db.transaction('rw', db.trackableDefinitions, db.trackableEntries, db.syncTombstones, async () => {
+    const now = Date.now();
+    for (const part of split.created) await moveEntries(part.entryIds, split.originalId, now);
+    await db.trackableDefinitions.put({ ...original, updatedAt: now });
+    for (const part of split.created) {
+      const left = await db.trackableEntries.where('trackableId').equals(part.id).count();
+      // Anything logged to it since the split stays, with it.
+      if (left > 0) continue;
+      const t = await db.trackableDefinitions.get(part.id);
+      await db.trackableDefinitions.delete(part.id);
+      await addTombstone('trackableDefinitions', part.id, t?.name);
+    }
+  });
+  notifyMutation();
+}
+
+/** What a merge did, for Undo (`undoMergeTrackable`). */
+export interface MergeResult {
+  sourceId: string;
+  targetId: string;
+  entryIds: string[];
+  /** The target's fields before the merge. */
+  targetFieldIds: string[];
+}
+
+/**
+ * Merges a trackable into another (3.72): every entry moves to the target,
+ * which gains the fields it didn't have; the emptied source is archived, not
+ * deleted.
+ */
+export async function mergeTrackable(sourceId: string, targetId: string): Promise<MergeResult> {
+  const result = await db.transaction('rw', db.trackableDefinitions, db.trackableEntries, async () => {
+    const [source, target] = await db.trackableDefinitions.bulkGet([sourceId, targetId]);
+    if (!source || !target || sourceId === targetId) throw new Error('Pick another trackable to merge into.');
+    if (source.displayMode === 'ages' || target.displayMode === 'ages') throw new Error('Dates trackables cannot be merged.');
+    const entryIds = (await db.trackableEntries.where('trackableId').equals(sourceId).primaryKeys()) as string[];
+    const now = Date.now();
+    await moveEntries(entryIds, targetId, now);
+    await db.trackableDefinitions.update(targetId, { fieldIds: mergedFieldIds(target.fieldIds, source.fieldIds), updatedAt: now });
+    await db.trackableDefinitions.update(sourceId, { archived: true, updatedAt: now });
+    return { sourceId, targetId, entryIds, targetFieldIds: [...target.fieldIds] };
+  });
+  notifyMutation();
+  return result;
+}
+
+/** Puts a merge back: the entries return and the source is unarchived; the target keeps entries logged since. */
+export async function undoMergeTrackable(merge: MergeResult): Promise<void> {
+  await db.transaction('rw', db.trackableDefinitions, db.trackableEntries, async () => {
+    const now = Date.now();
+    await moveEntries(merge.entryIds, merge.sourceId, now);
+    await db.trackableDefinitions.update(merge.targetId, { fieldIds: merge.targetFieldIds, updatedAt: now });
+    await db.trackableDefinitions.update(merge.sourceId, { archived: undefined, updatedAt: now });
+  });
+  notifyMutation();
+}
+
+async function moveEntries(entryIds: readonly string[], trackableId: string, now: number): Promise<void> {
+  for (const entryId of entryIds) await db.trackableEntries.update(entryId, { trackableId, updatedAt: now });
 }
 
 export async function deleteTrackable(id: string): Promise<void> {

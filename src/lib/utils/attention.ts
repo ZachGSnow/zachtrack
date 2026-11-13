@@ -1,5 +1,5 @@
 import type { FastRecord, FieldDefinition, TrackableDefinition, TrackableEntry } from '../db';
-import { goalStatus, type GoalState } from './trackableGoals';
+import { goalStatus, isLessGoal, type GoalState } from './trackableGoals';
 import { resolveKind } from './trackableKinds';
 import { dateItemKey, dateReminderText, datesDueSoon } from './dates';
 import type { ScheduleInput } from './fastingSchedule';
@@ -43,7 +43,8 @@ export function attentionItems(snapshot: Snapshot, now: number): AttentionItem[]
   }
   const items: AttentionItem[] = [];
   for (const t of snapshot.trackables) {
-    if (t.archived || !t.goalType) continue;
+    // Less-is-better goals ask nothing of today, even over the limit.
+    if (t.archived || !t.goalType || isLessGoal(t.goalType)) continue;
     const fields = t.fieldIds.map((id) => snapshot.fields.find((f) => f.id === id)).filter((f): f is FieldDefinition => f != null);
     if (resolveKind(t, fields).kind === 'ages') continue;
     const status = goalStatus(t, byTrackable.get(t.id) ?? [], fields, now);

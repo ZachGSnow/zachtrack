@@ -77,6 +77,11 @@ export function weeklyReview(
       const status = goalStatus(t, own.filter((e) => e.timestamp <= end), attached, end);
       of += 1;
       if (status && status.state !== 'overdue') met += 1;
+    } else if (t.goalType === 'maxPerWeek') {
+      // Within the limit at the week's end (so far, on a Sunday).
+      const times = own.filter((e) => e.timestamp >= weekStart && e.timestamp < addDays(lastDay, 1)).length;
+      of += 1;
+      if (times <= t.goalValue) met += 1;
     }
   }
 

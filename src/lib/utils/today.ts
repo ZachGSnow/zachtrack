@@ -1,5 +1,5 @@
 import type { FieldDefinition, TrackableDefinition, TrackableEntry } from '../db';
-import { goalField, goalStatus, offDayReason, type GoalStatus } from './trackableGoals';
+import { goalField, goalStatus, isLessGoal, offDayReason, type GoalStatus } from './trackableGoals';
 import { computeFieldValuesByDay } from './trackableStats';
 import { resolveKind, summarize, type MeasurementView, type TrackableKind } from './trackableKinds';
 import { upcomingDates, type DateItem } from './dates';
@@ -48,10 +48,10 @@ export function entriesByTrackable(entries: readonly TrackableEntry[]): Map<stri
   return map;
 }
 
-const isHabit = (t: TrackableDefinition) => !!t.goalType && t.goalType !== 'avoid';
+const isHabit = (t: TrackableDefinition) => !!t.goalType && !isLessGoal(t.goalType);
 
 /**
- * Every trackable with a goal (other than avoid), most urgent first: overdue,
+ * Every trackable with a goal (other than avoid or at most N a week), most urgent first: overdue,
  * due, in progress, then done; rest, skipped and paused days last.
  */
 export function todayHabits(

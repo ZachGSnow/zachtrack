@@ -1598,6 +1598,43 @@ every nightly backup. Now they go 180 days after the delete:
 - Removed unused code: `ui/Pill.svelte`, `ui/StatTile.svelte` and
   `seedDefaultTrackablesIfEmpty`.
 
+### 3.72 Split by field, merge, and at most N a week (v1.22.0)
+
+One trackable sometimes holds two things you want to follow apart: two
+fields, each entry logged with one of them, and a goal that should differ
+for each (more of one, less of the other). Goals per field would have
+meant reworking every place a goal shows (the card, Today's habits, Needs
+attention, the badge, streaks, the grid, the weekly review), which all
+assume one goal per trackable. Splitting the trackable keeps that model
+and loses no history.
+
+- **Split by field** (`splitTrackable` in `db/records.ts`, planned by
+  `planSplit` in `utils/trackableSplit.ts`, from `SplitMergeSection.svelte`
+  in the edit sheet): one new trackable per field, named after it, with the
+  original's icon, colour, pin and order. Each entry with exactly one of
+  the fields moves to that field's trackable: its `trackableId` changes, so
+  it keeps its id, time, note and values, and it syncs as an ordinary edit
+  (the server's upsert already updates `trackableId`). Entries with several
+  of the fields, or none, stay. The goal, with its schedule, skipped days
+  and pause, goes to the part you pick; the original is archived when it
+  ends up empty, never deleted. One Dexie transaction.
+- **Merge into...** (`mergeTrackable`): every entry moves to the target,
+  which gains the fields it lacked; the emptied source is archived and its
+  goal isn't carried over.
+- **Undo** for six seconds through the one undo message (3.67):
+  `undoSplitTrackable` moves the entries back, restores the original as it
+  was and deletes the new trackables (with tombstones), keeping any that
+  were logged to since; `undoMergeTrackable` moves them back and restores
+  the target's fields.
+- **At most N a week** (`maxPerWeek`): for less, but not never. It counts
+  each time, Monday to Sunday (unlike Times per week, which counts days),
+  turns red over the limit, and its streak is weeks in a row within the
+  limit. Like avoid (`isLessGoal`) it is never due: no check button, no
+  place in Needs attention or Today's habits, no pause or skip, no habit
+  strength; the weekly review counts a week within the limit as met. A new
+  value in the existing `goalType` column, so no migration; an older app
+  shows such a goal like avoid until it updates.
+
 ### 3.21 Trackables list: pin, archive, order; tag filters
 - **Sort** (per device, `zachtrack:trackables-view`): Due first (goal
   urgency from 3.18: overdue, then due, then the rest, then trackables

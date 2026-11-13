@@ -161,6 +161,13 @@
         label: changing it doesn't convert numbers already logged. "+" logs an entry; a trackable without fields logs in one
         tap, with a few seconds to undo.
       </p>
+      <p>
+        <strong>Split or merge.</strong> When one trackable holds two things you want to follow apart (each with its own
+        goal), Edit > <strong>Split by field</strong> makes one trackable per field and moves each entry to the field it was
+        logged with, keeping its time, note and values; entries with more than one of the fields stay where they are.
+        <strong>Merge into...</strong> does the opposite, moving every entry into another trackable. Either way the
+        trackable left empty is archived, not deleted, and Undo puts it all back for a few seconds.
+      </p>
     </section>
 
     <section id="help-dates">
@@ -291,7 +298,8 @@
         <li><strong>Times per day:</strong> log it N times a day. Without fields, each tap of the button counts one.</li>
         <li><strong>Times per week:</strong> the number of days you log it, Monday to Sunday. Due when every remaining day is needed, overdue when it can't be reached.</li>
         <li><strong>Every N days:</strong> due again N days after the last entry: "Due in 3d", "Due today", "Overdue by 2d".</li>
-        <li><strong>Avoid it:</strong> for things you want to do less. The streak is the time since it last happened.</li>
+        <li><strong>At most N a week:</strong> for things you want to do less, but not never. Each time counts, Monday to Sunday; over the limit it turns red. The streak is weeks in a row within the limit. It never shows in Needs attention: there is nothing to do about it today.</li>
+        <li><strong>Avoid it:</strong> for things you want to stop. The streak is the time since it last happened.</li>
       </ul>
       <p>A goal is optional. Without one, a trackable keeps a plain card with "+".</p>
     </section>
